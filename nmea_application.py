@@ -286,7 +286,7 @@ class LogAnalyserApp:
         try:
             self._set_progress(20)
             self._log_message("📂 Extracting data from log file...")
-            self.cache = build_dataset(self.file_path)
+            self.cache = process_nmea_file(self.file_path)
             self._set_progress(80)
             self._log_message("⏱️ Analyzing data...")
             self._set_progress(100)
