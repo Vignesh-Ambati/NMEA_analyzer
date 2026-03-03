@@ -38,6 +38,28 @@ def stream_nmea(file_path):
 
 
 # =========================
+# TIME PARSER (CORRECT)
+# =========================
+
+def parse_time_to_seconds(t):
+    """
+    Convert hhmmss.sss → seconds since midnight
+    Example: "123519.00" → 45319.0
+    """
+    try:
+        if not t:
+            return 0.0
+
+        hh = int(t[0:2])
+        mm = int(t[2:4])
+        ss = float(t[4:])
+
+        return hh * 3600 + mm * 60 + ss
+    except:
+        return 0.0
+
+
+# =========================
 # PARSER
 # =========================
 
@@ -49,21 +71,23 @@ def parse_epochs(lines):
         return {
             "time": None,
             "GSA": {},
-            "GSV": {"GP": [], "GL": [], "GA": [], "GB": [], "GQ": [], "GI": []}
+            "GSV": {}
         }
 
-    gsv_state = {k: [] for k in ("GP", "GL", "GA", "GB", "GQ", "GI")}
+    gsv_state = {}
 
     for line in lines:
-        parts = line.split(",")   # ✅ FAST (C optimized)
+        parts = line.split(",")
         msg = parts[0][1:]
 
-        # ---- TIME EXTRACTION ----
+        # ---- TIME ----
         if msg.endswith(("RMC", "GGA", "ZDA")) and len(parts) > 1:
             t = parts[1]
+
             if t and t != current_time:
                 if current_epoch:
                     yield current_epoch
+
                 current_epoch = new_epoch()
                 current_time = t
 
@@ -80,9 +104,17 @@ def parse_epochs(lines):
         # ---- GSV ----
         if msg.endswith("GSV"):
             talker = msg[:2]
+
+            if talker not in gsv_state:
+                gsv_state[talker] = []
+
             gsv_state[talker].append(parts)
 
-            total = int(parts[1]) if parts[1] else 1
+            try:
+                total = int(parts[1])
+            except:
+                total = 1
+
             if len(gsv_state[talker]) == total:
                 current_epoch["GSV"][talker] = gsv_state[talker][:]
                 gsv_state[talker].clear()
@@ -97,49 +129,84 @@ def parse_epochs(lines):
 
 
 # =========================
-# MAIN (ULTRA FAST)
+# MAIN PROCESSOR
 # =========================
 
-def process_nmea_file(file_path):
+def process_nmea_file(file_path, chunk_size=50000):
     cache = DataCache()
 
-    json_path = cache.path("data.jsonl")
-    index_path = cache.path("time_index.npy")
-
     times = []
+    chunk_ids = []
+    offsets = []
 
-    # BIG BUFFER WRITE
-    with open(json_path, "w", buffering=8 * 1024 * 1024) as f:
+    chunk_id = 0
+    local_index = 0
 
-        for epoch in parse_epochs(stream_nmea(file_path)):
+    current_file = open(
+        cache.path(f"chunk_{chunk_id}.jsonl"),
+        "w",
+        buffering=8 * 1024 * 1024
+    )
 
-            # ---- WRITE JSON LINE ----
-            f.write(json.dumps(epoch) + "\n")
+    for epoch in parse_epochs(stream_nmea(file_path)):
 
-            # ---- BUILD INDEX INLINE ----
-            t = epoch.get("time")
-            if t:
-                try:
-                    times.append(float(t))
-                except:
-                    times.append(0.0)
-            else:
-                times.append(0.0)
+        # ---- WRITE ----
+        current_file.write(json.dumps(epoch) + "\n")
+
+        # ---- INDEX ----
+        t = parse_time_to_seconds(epoch.get("time"))
+        times.append(t)
+        chunk_ids.append(chunk_id)
+        offsets.append(local_index)
+
+        local_index += 1
+
+        # ---- ROTATE ----
+        if local_index >= chunk_size:
+            current_file.close()
+
+            chunk_id += 1
+            local_index = 0
+
+            current_file = open(
+                cache.path(f"chunk_{chunk_id}.jsonl"),
+                "w",
+                buffering=8 * 1024 * 1024
+            )
+
+    current_file.close()
 
     # ---- SAVE INDEX ----
-    np.save(index_path, np.array(times, dtype=np.float64))
+    np.save(cache.path("time_index.npy"), np.array(times, dtype=np.float64))
+    np.save(cache.path("chunk_ids.npy"), np.array(chunk_ids, dtype=np.int32))
+    np.save(cache.path("offsets.npy"), np.array(offsets, dtype=np.int32))
 
-    return cache, json_path, index_path
+    return cache
 
 
 # =========================
-# READER (FAST)
+# READER
 # =========================
 
-def read_all(json_path):
-    with open(json_path, "r") as f:
+def read_selected_offsets(file_path, target_offsets):
+    results = []
+    target_offsets = sorted(target_offsets)
+
+    with open(file_path, "r") as f:
+        current = 0
+        target_idx = 0
+
         for line in f:
-            yield json.loads(line)
+            if target_idx >= len(target_offsets):
+                break
+
+            if current == target_offsets[target_idx]:
+                results.append(json.loads(line))
+                target_idx += 1
+
+            current += 1
+
+    return results
 
 
 # =========================
@@ -147,14 +214,26 @@ def read_all(json_path):
 # =========================
 
 def query_time_range(cache, start, end):
-    index = np.load(cache.path("time_index.npy"))
+    time_index = np.load(cache.path("time_index.npy"))
+    chunk_ids = np.load(cache.path("chunk_ids.npy"))
+    offsets = np.load(cache.path("offsets.npy"))
 
-    mask = (index >= start) & (index <= end)
-    indices = set(np.where(mask)[0])   # ⚡ O(1) lookup
+    mask = (time_index >= start) & (time_index <= end)
+    indices = np.where(mask)[0]
+
+    # ---- GROUP ----
+    chunk_groups = {}
+
+    for i in indices:
+        cid = int(chunk_ids[i])
+        off = int(offsets[i])
+        chunk_groups.setdefault(cid, []).append(off)
 
     results = []
-    for i, epoch in enumerate(read_all(cache.path("data.jsonl"))):
-        if i in indices:
-            results.append(epoch)
+
+    # ---- READ MINIMUM ----
+    for cid, offs in chunk_groups.items():
+        path = cache.path(f"chunk_{cid}.jsonl")
+        results.extend(read_selected_offsets(path, offs))
 
     return results
