@@ -1,3 +1,4 @@
+import datetime
 import os
 import numpy as np
 import tempfile
@@ -9,6 +10,8 @@ import threading
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 import multiprocessing as mp
 import matplotlib.pyplot as plt
+import tkinter as tk
+from tkinter import filedialog
 
 # =========================================
 # CONFIG
@@ -23,10 +26,25 @@ BATCH_LINES = 50000            # lines per parsing batch (tunable)
 # CACHE
 # =========================================
 
+# class DataCache:
+#     def __init__(self):
+#         self.temp_dir = tempfile.mkdtemp(prefix=".logcache_")
+#         atexit.register(self.cleanup)
+
+#     def path(self, name):
+#         return os.path.join(self.temp_dir, name)
+
+#     def cleanup(self):
+#         shutil.rmtree(self.temp_dir, ignore_errors=True)
+        
 class DataCache:
     def __init__(self):
-        self.temp_dir = tempfile.mkdtemp(prefix=".logcache_")
-        atexit.register(self.cleanup)
+        base_dir = os.getcwd()
+        self.temp_directory = os.path.join(base_dir, ".logcache")
+        os.makedirs(self.temp_directory, exist_ok=True)
+        
+        # FIX: Explicitly pass 'dir'. The first positional argument is 'suffix'.
+        self.temp_dir = tempfile.mkdtemp(prefix=".logcache_", dir=self.temp_directory)
 
     def path(self, name):
         return os.path.join(self.temp_dir, name)
@@ -36,7 +54,7 @@ class DataCache:
 
 
 # =========================================
-# DETECT TYPE & PARSERS
+# DETECT TYPE & PARSERS (enhanced)
 # =========================================
 
 def detect_type(line):
@@ -57,6 +75,7 @@ def parse_line(line):
                 "lon": float(parts[4]) if parts[4] else None,
                 "sat": int(parts[7]) if parts[7] else 0,
                 "alt": float(parts[9]) if parts[9] else None,
+                "quality": int(parts[6]) if parts[6] else 0,
             }
 
         elif msg == "RMC":
@@ -67,27 +86,51 @@ def parse_line(line):
             }
 
         elif msg == "GSV":
-            cno = []
-            for i in range(7, len(parts), 4):
-                if parts[i]:
-                    cno.append(float(parts[i]))
+            sv_cno = []
+            # fields: total messages, msg num, total SVs, then quadruples (sv, elev, az, cno)
+            for i in range(4, len(parts)-1, 4):
+                if i+3 < len(parts):
+                    sv = parts[i]
+                    cno = parts[i+3]
+                    if sv and cno:
+                        try:
+                            sv_cno.append((int(sv), float(cno)))
+                        except:
+                            pass
             return {
                 "type": "CNO",
                 "time": None,
-                "cno": cno
+                "sv_cno": sv_cno
             }
 
         elif msg == "GSA":
-            pdop = float(parts[15]) if parts[15] else None
-            hdop = float(parts[16]) if parts[16] else None
-            vdop = float(parts[17]) if parts[17] else None
+            talker = line[1:3]  # e.g., "GP"
+            const_map = {"GP":0, "GL":1, "GA":2, "GB":3, "GQ":4, "GI":5}
+            const = const_map.get(talker, -1)
+            # PRNs are fields 3 to 14
+            prns = []
+            for i in range(3, 15):
+                if i < len(parts) and parts[i]:
+                    try:
+                        prns.append(int(parts[i]))
+                    except:
+                        pass
+            svCount = len(prns)
+            pdop = float(parts[15]) if len(parts)>15 and parts[15] else None
+            hdop = float(parts[16]) if len(parts)>16 and parts[16] else None
+            vdop = float(parts[17]) if len(parts)>17 and parts[17] else None
             return {
                 "type": "GSA",
                 "time": None,
+                "constellation": const,
+                "svCount": svCount,
                 "pdop": pdop,
                 "hdop": hdop,
                 "vdop": vdop
             }
+
+        # Optional: add parser for $ACMPS if needed
+        # ...
 
     except:
         return None
@@ -95,32 +138,64 @@ def parse_line(line):
     return None
 
 
+# =========================================
+# TIME VALIDATOR
+# =========================================
+
 class TimeValidator:
     def __init__(self):
         self.last_time = None
-        self.restarts = []
-
-    def validate(self, t):
-        if t is None:
-            return False
+        self.invalid_jumps = []
+        self.diff_count = 0
+        self.allowed_diffs = {
+            datetime.timedelta(seconds=1),
+            datetime.timedelta(seconds=1, microseconds=10000),
+            datetime.timedelta(seconds=1, microseconds=990000),
+            datetime.timedelta(microseconds=980000),
+            datetime.timedelta(microseconds=970000),
+            datetime.timedelta(microseconds=960000),
+        }
+    def validate(self, current_time):
+        if current_time is None:
+            return True  # Ignore invalid parses safely
         if self.last_time is None:
-            self.last_time = t
+            self.last_time = current_time
             return True
-        if t < self.last_time or (t - self.last_time > 5):
-            self.restarts.append(t)
-            self.last_time = t
-            return False
-        self.last_time = t
-        return True
+        diff = current_time - self.last_time
+        if diff in self.allowed_diffs:
+            self.last_time = current_time
+            return True
+        else:
+            self.diff_count += 1
+            self.invalid_jumps.append((self.last_time, current_time, diff))
+            print("Remove the incomplete data from the log file and continue")
+            print("time difference:", diff)
+            print("Previous:", self.last_time)
+            print("Current :", current_time)
+            self.last_time = current_time
+            return False    #check this, if needed, make it automatic to remove this set from the log.
+    def summary(self):
+        print("The time Difference count:", self.diff_count)
+        return self.diff_count
+
+
+# =========================================
+# DISK WRITER (extended)
+# =========================================
 
 class DiskWriter:
     def __init__(self, cache):
         self.cache = cache
         self.buffers = {
-            "GGA_time": [], "GGA_lat": [], "GGA_lon": [], "GGA_sat": [], "GGA_alt": [],
-            "RMC_time": [], "RMC_speed": [],
-            "CNO_time": [], "CNO_val": [],
-            "GSA_time": [], "GSA_pdop": [], "GSA_hdop": [], "GSA_vdop": [],
+            "GNGGA_time": [], "GNGGA_lat": [], "GNGGA_lon": [], "GNGGA_sv": [], "GNGGA_dop": [], "GNGGA_alt": [], "GNGGA_geoidal": [],
+            "GNGNS_time": [], "GNGNS_lat": [], "GNGNS_lon": [], "GNGNS_sv": [], "GNGNS_dop": [], "GNGNS_alt": [],
+            "GNRMC_time": [], "GNRMC_lat": [], "GNRMC_lon": [], "GNRMC_speedknots": [], "GNRMC_course": [], "GNGNS_date": [],
+            "GNGLL_lat": [], "GNGLL_lon": [], "GNGLL_time": [],
+            "GNVTG_speedknots": [], "GNVTG_speedkmph": [],
+            "GNZDA_time": [], "GNZDA_date": [], "GNZDA_offset": [],
+            "GNGSA_gps": [], "GNGSA_gls": [], "GNGSA_gal": [], "GNGSA_bds": [], "GNGSA_qzss": [], "GNGSA_irnss": [],
+            "GPGSV": [], "GLGSV": [], "GAGSV": [], "GBGSV": [], "GIGSV": [], "GQGSV": [],
+            "ACSUR": [], "PVT": [],
         }
         self.validator = TimeValidator()
         self.last_time = None
@@ -138,6 +213,7 @@ class DiskWriter:
         self.append_npy(self.cache.path("GGA_lon.npy"), np.array(self.buffers["GGA_lon"]))
         self.append_npy(self.cache.path("GGA_sat.npy"), np.array(self.buffers["GGA_sat"]))
         self.append_npy(self.cache.path("GGA_alt.npy"), np.array(self.buffers["GGA_alt"]))
+        self.append_npy(self.cache.path("GGA_quality.npy"), np.array(self.buffers["GGA_quality"]))
 
         if self.buffers["RMC_time"]:
             self.append_npy(self.cache.path("RMC_time.npy"), np.array(self.buffers["RMC_time"]))
@@ -145,10 +221,13 @@ class DiskWriter:
 
         if self.buffers["CNO_time"]:
             self.append_npy(self.cache.path("CNO_time.npy"), np.array(self.buffers["CNO_time"]))
-            self.append_npy(self.cache.path("CNO_val.npy"), np.array(self.buffers["CNO_val"]))
+            self.append_npy(self.cache.path("CNO_svId.npy"), np.array(self.buffers["CNO_svId"]))
+            self.append_npy(self.cache.path("CNO_cno.npy"), np.array(self.buffers["CNO_cno"]))
 
         if self.buffers["GSA_time"]:
             self.append_npy(self.cache.path("GSA_time.npy"), np.array(self.buffers["GSA_time"]))
+            self.append_npy(self.cache.path("GSA_const.npy"), np.array(self.buffers["GSA_const"]))
+            self.append_npy(self.cache.path("GSA_svCount.npy"), np.array(self.buffers["GSA_svCount"]))
             self.append_npy(self.cache.path("GSA_pdop.npy"), np.array(self.buffers["GSA_pdop"]))
             self.append_npy(self.cache.path("GSA_hdop.npy"), np.array(self.buffers["GSA_hdop"]))
             self.append_npy(self.cache.path("GSA_vdop.npy"), np.array(self.buffers["GSA_vdop"]))
@@ -157,10 +236,6 @@ class DiskWriter:
             self.buffers[k].clear()
 
     def store(self, item):
-        """
-        item: tuple (global_index, parsed_dict)
-        Downsampling and time validation are applied here.
-        """
         idx, parsed = item
 
         # downsampling based on global line index
@@ -190,18 +265,22 @@ class DiskWriter:
             self.buffers["GGA_lon"].append(parsed["lon"])
             self.buffers["GGA_sat"].append(parsed["sat"])
             self.buffers["GGA_alt"].append(parsed["alt"])
+            self.buffers["GGA_quality"].append(parsed["quality"])
 
         elif parsed["type"] == "RMC":
             self.buffers["RMC_time"].append(t)
             self.buffers["RMC_speed"].append(parsed["speed"])
 
         elif parsed["type"] == "CNO":
-            for v in parsed["cno"]:
+            for svId, cno in parsed["sv_cno"]:
                 self.buffers["CNO_time"].append(t)
-                self.buffers["CNO_val"].append(v)
+                self.buffers["CNO_svId"].append(svId)
+                self.buffers["CNO_cno"].append(cno)
 
         elif parsed["type"] == "GSA":
             self.buffers["GSA_time"].append(t)
+            self.buffers["GSA_const"].append(parsed["constellation"])
+            self.buffers["GSA_svCount"].append(parsed["svCount"])
             self.buffers["GSA_pdop"].append(parsed["pdop"])
             self.buffers["GSA_hdop"].append(parsed["hdop"])
             self.buffers["GSA_vdop"].append(parsed["vdop"])
@@ -212,14 +291,10 @@ class DiskWriter:
 
 
 # =========================================
-# BATCH PARSER (runs in worker processes)
+# BATCH PARSER (unchanged)
 # =========================================
 
 def parse_batch(lines_with_indices):
-    """
-    lines_with_indices: list of (global_index, line_bytes)
-    returns: list of (global_index, parsed_dict) for all successfully parsed lines
-    """
     results = []
     for idx, line_bytes in lines_with_indices:
         try:
@@ -231,17 +306,20 @@ def parse_batch(lines_with_indices):
             results.append((idx, parsed))
     return results
 
+
+# =========================================
+# MAIN BUILD (unchanged)
+# =========================================
+
 def build_dataset(filepath):
     cache = DataCache()
     writer = DiskWriter(cache)
 
-    num_workers = mp.cpu_count()
+    num_workers = mp.cpu_count() - 2
     print(f"Using {num_workers} worker processes")
 
     with open(filepath, 'rb') as f:
-        # memory-map the file for fast scanning
         with mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as mm:
-            # generator that yields (global_index, line_bytes)
             def line_generator():
                 idx = 0
                 start = 0
@@ -258,7 +336,6 @@ def build_dataset(filepath):
                     idx += 1
                     start = end + 1
 
-            # collect batches and submit to process pool
             futures = []
             batch = []
             with ProcessPoolExecutor(max_workers=num_workers) as executor:
@@ -271,7 +348,6 @@ def build_dataset(filepath):
                 if batch:
                     futures.append(executor.submit(parse_batch, batch))
 
-                # reorder results using a min-heap
                 heap = []
                 next_expected = 0
 
@@ -279,26 +355,21 @@ def build_dataset(filepath):
                     for item in future.result():
                         heapq.heappush(heap, item)
 
-                    # write as long as the smallest index is exactly the next expected
                     while heap and heap[0][0] == next_expected:
                         _, parsed = heapq.heappop(heap)
                         writer.store((next_expected, parsed))
                         next_expected += 1
 
-                # drain remaining heap (indices are sorted, but gaps exist)
                 while heap:
                     idx, parsed = heapq.heappop(heap)
-                    # safety check: idx should never be less than next_expected
                     if idx < next_expected:
                         print(f"Error: index {idx} < next_expected {next_expected} – this should not happen")
                         continue
                     writer.store((idx, parsed))
                     next_expected = idx + 1
 
-    # final flush and save restarts
     writer.flush()
     np.save(cache.path("restarts.npy"), np.array(writer.validator.restarts))
-
     return cache
 
 
@@ -320,15 +391,16 @@ def load_all_chunks(file):
 
 
 # =========================================
-# PLOTS (unchanged)
+# PLOTS (enhanced)
 # =========================================
 
+# ---------- Simple plots (keep existing) ----------
 def plot_cno(cache):
     t = load_all_chunks(cache.path("CNO_time.npy"))
-    c = load_all_chunks(cache.path("CNO_val.npy"))
+    c = load_all_chunks(cache.path("CNO_cno.npy"))
     plt.figure()
     plt.scatter(t, c, s=1)
-    plt.title("C/N0")
+    plt.title("C/N0 (all satellites)")
     plt.xlabel("Time (s)")
     plt.ylabel("C/N0 (dBHz)")
     plt.show()
@@ -349,7 +421,7 @@ def plot_sat(cache):
     s = load_all_chunks(cache.path("GGA_sat.npy"))
     plt.figure()
     plt.plot(t, s)
-    plt.title("Satellites Used")
+    plt.title("Satellites Used (total)")
     plt.xlabel("Time (s)")
     plt.ylabel("Number of satellites")
     plt.show()
@@ -398,6 +470,148 @@ def plot_velocity(cache):
     plt.ylabel("Speed (m/s)")
     plt.show()
 
+# ---------- New per‑satellite C/N0 plots ----------
+def plot_cno_all_sv(cache):
+    t = load_all_chunks(cache.path("CNO_time.npy"))
+    sv = load_all_chunks(cache.path("CNO_svId.npy"))
+    c = load_all_chunks(cache.path("CNO_cno.npy"))
+    if len(t) == 0:
+        print("No CNO data")
+        return
+    unique_sv = np.unique(sv)
+    plt.figure(figsize=(12,6))
+    for sv_id in unique_sv:
+        mask = sv == sv_id
+        plt.scatter(t[mask], c[mask], s=1, label=f'SV {sv_id}')
+    plt.title("C/N0 per satellite")
+    plt.xlabel("Time (s)")
+    plt.ylabel("C/N0 (dBHz)")
+    plt.legend(loc='upper right', fontsize=8, ncol=3)
+    plt.show()
+
+def plot_cno_two_logs(cache1, cache2):
+    # This function expects two caches; it will prompt for second file if not provided.
+    # For simplicity, we assume both caches are passed.
+    t1 = load_all_chunks(cache1.path("CNO_time.npy"))
+    sv1 = load_all_chunks(cache1.path("CNO_svId.npy"))
+    c1 = load_all_chunks(cache1.path("CNO_cno.npy"))
+    t2 = load_all_chunks(cache2.path("CNO_time.npy"))
+    sv2 = load_all_chunks(cache2.path("CNO_svId.npy"))
+    c2 = load_all_chunks(cache2.path("CNO_cno.npy"))
+    if len(t1)==0 or len(t2)==0:
+        print("Insufficient CNO data in one of the logs")
+        return
+    unique_sv = np.union1d(np.unique(sv1), np.unique(sv2))
+    plt.figure(figsize=(12,6))
+    for sv_id in unique_sv:
+        mask1 = sv1 == sv_id
+        mask2 = sv2 == sv_id
+        if np.any(mask1):
+            plt.scatter(t1[mask1], c1[mask1], s=1, label=f'SV {sv_id} (log1)')
+        if np.any(mask2):
+            plt.scatter(t2[mask2], c2[mask2], s=1, marker='x', label=f'SV {sv_id} (log2)')
+    plt.title("C/N0 comparison")
+    plt.xlabel("Time (s)")
+    plt.ylabel("C/N0 (dBHz)")
+    plt.legend(loc='upper right', fontsize=6, ncol=3)
+    plt.show()
+
+# ---------- SV count per constellation ----------
+def plot_sv_count_per_constellation(cache):
+    t = load_all_chunks(cache.path("GSA_time.npy"))
+    const = load_all_chunks(cache.path("GSA_const.npy"))
+    count = load_all_chunks(cache.path("GSA_svCount.npy"))
+    if len(t) == 0:
+        print("No GSA data")
+        return
+    const_names = ['GPS', 'GLONASS', 'Galileo', 'BDS', 'QZSS', 'IRNSS']
+    plt.figure(figsize=(12,6))
+    for code in range(6):
+        mask = const == code
+        if np.any(mask):
+            plt.plot(t[mask], count[mask], label=const_names[code])
+    plt.title("Satellites used per constellation")
+    plt.xlabel("Time (s)")
+    plt.ylabel("Number of SVs")
+    plt.legend()
+    plt.show()
+
+def plot_sv_count_two_logs(cache1, cache2):
+    t1 = load_all_chunks(cache1.path("GSA_time.npy"))
+    const1 = load_all_chunks(cache1.path("GSA_const.npy"))
+    count1 = load_all_chunks(cache1.path("GSA_svCount.npy"))
+    t2 = load_all_chunks(cache2.path("GSA_time.npy"))
+    const2 = load_all_chunks(cache2.path("GSA_const.npy"))
+    count2 = load_all_chunks(cache2.path("GSA_svCount.npy"))
+    if len(t1)==0 or len(t2)==0:
+        print("Insufficient GSA data")
+        return
+    const_names = ['GPS', 'GLONASS', 'Galileo', 'BDS', 'QZSS', 'IRNSS']
+    plt.figure(figsize=(12,6))
+    for code in range(6):
+        mask1 = const1 == code
+        mask2 = const2 == code
+        if np.any(mask1):
+            plt.plot(t1[mask1], count1[mask1], label=f'{const_names[code]} (log1)')
+        if np.any(mask2):
+            plt.plot(t2[mask2], count2[mask2], '--', label=f'{const_names[code]} (log2)')
+    plt.title("Satellites used per constellation (comparison)")
+    plt.xlabel("Time (s)")
+    plt.ylabel("Number of SVs")
+    plt.legend()
+    plt.show()
+
+# ---------- Position losses ----------
+def plot_position_losses(cache):
+    # Identify times where altitude is zero or lat/lon missing
+    t = load_all_chunks(cache.path("GGA_time.npy"))
+    alt = load_all_chunks(cache.path("GGA_alt.npy"))
+    lat = load_all_chunks(cache.path("GGA_lat.npy"))
+    lon = load_all_chunks(cache.path("GGA_lon.npy"))
+    if len(t) == 0:
+        print("No GGA data")
+        return
+    # Consider loss if alt is NaN or lat/lon are 0 (assuming 0 means invalid)
+    # In our data, missing values are stored as None, but numpy converts to NaN? Actually we store floats, missing become 0.0? Need to check.
+    # For safety, we'll treat alt==0 as loss, but that may not be accurate.
+    loss_mask = (alt == 0) | (lat == 0) | (lon == 0)
+    loss_times = t[loss_mask]
+    plt.figure()
+    plt.plot(t, alt, label='Altitude')
+    plt.scatter(loss_times, np.zeros_like(loss_times), color='red', marker='x', label='Position loss')
+    plt.title("Position losses (altitude = 0)")
+    plt.xlabel("Time (s)")
+    plt.ylabel("Altitude (m)")
+    plt.legend()
+    plt.show()
+    print(f"Position lost at {len(loss_times)} times")
+
+# ---------- Print restarts (console) ----------
+def print_restarts(cache):
+    r = np.load(cache.path("restarts.npy"))
+    print(f"Total restarts: {len(r)}")
+    for i, t in enumerate(r):
+        print(f"Restart {i+1}: time {t:.3f} s")
+
+# ---------- SBAS usage (GGA quality) ----------
+def plot_sbas_usage(cache):
+    t = load_all_chunks(cache.path("GGA_time.npy"))
+    qual = load_all_chunks(cache.path("GGA_quality.npy"))
+    plt.figure()
+    plt.plot(t, qual, drawstyle='steps-post')
+    plt.title("GPS Quality indicator (1=GPS, 2=DGPS, etc.)")
+    plt.xlabel("Time (s)")
+    plt.ylabel("Quality")
+    plt.yticks([0,1,2,3,4,5,6])
+    plt.grid(True, axis='y')
+    plt.show()
+
+# ---------- Statistics vs true values (simplified) ----------
+def plot_statistics(cache):
+    # This is a placeholder; real implementation would prompt for true coordinates.
+    print("Statistics plotting not fully implemented. Use plot_position and enter true coords manually.")
+    # Could open a dialog to input true lat/lon/alt and then compute errors.
+    pass
 
 # =========================================
 # RUN (optional)
@@ -405,7 +619,7 @@ def plot_velocity(cache):
 
 def run_all(cache):
     with ThreadPoolExecutor() as ex:
-        ex.submit(plot_cno, cache)
+        ex.submit(plot_cno_all_sv, cache)
         ex.submit(plot_position, cache)
         ex.submit(plot_sat, cache)
         ex.submit(plot_restarts, cache)
