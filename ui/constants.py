@@ -37,4 +37,6 @@ COLORS = {
     'text_muted': '#94A3B8',
     'border': '#2D3A4A',
     'hover': '#334155',
+    'graph_bg': '#FFFFFF',
+    'graph_font': "#210707",
 }
