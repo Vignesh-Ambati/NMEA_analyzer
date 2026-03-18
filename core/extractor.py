@@ -16,7 +16,6 @@ from typing import Optional
 class GSVDataset:
     """
     Holds sorted, extracted GSV data ready for plotting or querying.
-
     Attributes:
         time_data: Sorted numpy array of timestamps (float32).
         cno_data:  C/N0 values (dB-Hz, float32) aligned to time_data.

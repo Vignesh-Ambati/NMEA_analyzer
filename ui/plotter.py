@@ -63,7 +63,7 @@ class Plotter:
         self.ax.clear()
         if self.plot_idx == 0:
             time_data, cno_data = extract_plot_data(self.cache, plot_idx=0)
-            
+
             if time_data is not None and cno_data is not None:
                 # Plot the C/N0 data
                 self.ax.plot(time_data, cno_data, color=self.line_color, linewidth=1.5,
