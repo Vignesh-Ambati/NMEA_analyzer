@@ -118,34 +118,12 @@ def _parse_gsv_file(file_path: str, file_index: int, result_queue: Queue) -> Non
     result_queue.put((file_index, local_times, local_cnos))
 
 class GSVExtractor:
-    """
-    Discovers, parses, and aggregates ``_GSV.jsonl`` files from a directory.
-
-    Processing is parallelised: one :class:`~threading.Thread` per file.
-    Results are stored in a :class:`GSVDataset` that supports O(log n)
-    timestamp queries via binary search.
-
-    Example usage::
-
-        extractor = GSVExtractor("/path/to/data")
-        dataset   = extractor.extract()
-
-        if dataset:
-            t, cno = dataset.query_nearest(1_700_000_000.0)
-            subset  = dataset.query_range(t_start, t_end)
-    """
     FILE_SUFFIX = "_GSV.jsonl"
     def __init__(self, temp_dir: str) -> None:
         self.temp_dir = temp_dir
         self._dataset: Optional[GSVDataset] = None
 
     def extract(self) -> Optional[GSVDataset]:
-        """
-        Scan *temp_dir*, parse all matching files in parallel, and return
-        a sorted :class:`GSVDataset`.
-
-        Returns ``None`` when the directory is missing or holds no GSV files.
-        """
         file_paths = self._discover_files()
         if not file_paths:
             return None

@@ -94,7 +94,8 @@ class TaskPage(BasePage):
 
         # Mouse wheel scrolling
         def on_mousewheel(event):
-            canvas.yview_scroll(int(-1 * (event.delta / 60)), "units")
+            if canvas.winfo_exists():
+                canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
 
         canvas.bind("<Enter>", lambda e: canvas.bind_all("<MouseWheel>", on_mousewheel))
         canvas.bind("<Leave>", lambda e: canvas.unbind_all("<MouseWheel>"))
