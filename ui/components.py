@@ -1,441 +1,241 @@
-"""
-ui/components.py
-────────────────
-Reusable, themeable UI components.
-"""
-
 import tkinter as tk
 from tkinter import ttk
 from . import style, config
 
-
 class ThemedButton(tk.Button):
-    """A themed button with consistent styling."""
-    
-    def __init__(self, parent, text: str, command=None, is_primary: bool = False, **kwargs):
-        """
-        Create a themed button.
-        
-        Args:
-            parent: Parent widget
-            text: Button text
-            command: Command to execute on click
-            is_primary: True for primary styling, False for secondary
-            **kwargs: Additional button parameters
-        """
-        style_config = style.get_button_style(is_primary)
-        style_config.update(kwargs)
-        
-        super().__init__(parent, text=text, command=command, **style_config)
-        
-        self.is_primary = is_primary
-        self.default_bg = style_config['bg']
-        self.hover_bg = style_config['activebackground']
-        
+    def __init__(self, parent, text, command=None, is_primary=False, **kwargs):
+        cfg = style.get_button_style(is_primary)
+        cfg.update(kwargs)
+        # Force a visible border that matches the current text color
+        cfg['highlightthickness'] = 2
+        cfg['highlightbackground'] = style.COLORS['text_primary']
+        cfg['highlightcolor'] = style.COLORS['accent']
+        super().__init__(parent, text=text, command=command, **cfg)
+        self.default_bg = cfg['bg']
+        self.hover_bg = cfg['activebackground']
         self.bind('<Enter>', self._on_enter)
         self.bind('<Leave>', self._on_leave)
+    def _on_enter(self, e): self.configure(bg=self.hover_bg)
+    def _on_leave(self, e): self.configure(bg=self.default_bg)
     
-    def _on_enter(self, event):
-        self.configure(bg=self.hover_bg)
-    
-    def _on_leave(self, event):
-        self.configure(bg=self.default_bg)
-
-
 class ThemedLabel(tk.Label):
-    """A themed label with predefined styles."""
-    
-    def __init__(self, parent, text: str = "", style_type: str = 'normal', **kwargs):
-        """
-        Create a themed label.
-        
-        Args:
-            parent: Parent widget
-            text: Label text
-            style_type: 'normal', 'heading', 'muted', or 'error'
-            **kwargs: Additional label parameters
-        """
-        style_config = style.get_label_style(style_type)
-        style_config.update(kwargs)
-        
-        super().__init__(parent, text=text, **style_config)
-
+    def __init__(self, parent, text="", style_type='normal', **kwargs):
+        cfg = style.get_label_style(style_type)
+        cfg.update(kwargs)
+        super().__init__(parent, text=text, **cfg)
 
 class ThemedFrame(tk.Frame):
-    """A themed frame with consistent styling."""
-    
-    def __init__(self, parent, frame_type: str = 'default', **kwargs):
-        """
-        Create a themed frame.
-        
-        Args:
-            parent: Parent widget
-            frame_type: 'default', 'card', or 'input'
-            **kwargs: Additional frame parameters
-        """
-        frame_styles = {
-            'default': {
-                'bg': style.COLORS['bg_card'],
-                'highlightthickness': 0,
-            },
-            'card': {
-                'bg': style.COLORS['bg_card_light'],
-                'highlightbackground': style.COLORS['border'],
-                'highlightthickness': 1,
-            },
-            'input': {
-                'bg': style.COLORS['bg_input'],
-                'highlightbackground': style.COLORS['border'],
-                'highlightthickness': 1,
-            },
+    def __init__(self, parent, frame_type='default', **kwargs):
+        styles = {
+            'default': {'bg': style.COLORS['bg_card'], 'highlightthickness': 0},
+            'card': {'bg': style.COLORS['bg_card_light'], 'bd': 1, 'relief': 'solid', 'highlightthickness': 0},
+            'input': {'bg': style.COLORS['bg_input'], 'bd': 1, 'relief': 'solid'},
         }
-        
-        frame_config = frame_styles.get(frame_type, frame_styles['default'])
-        frame_config.update(kwargs)
-        
-        super().__init__(parent, **frame_config)
+        cfg = styles.get(frame_type, styles['default'])
+        cfg.update(kwargs)
+        super().__init__(parent, **cfg)
 
+class ThemedEntry(tk.Entry):
+    def __init__(self, parent, placeholder="", **kwargs):
+        super().__init__(parent, bg=style.COLORS['bg_input'], fg=style.COLORS['text_primary'],
+                         insertbackground=style.COLORS['accent'], relief='solid', bd=1,
+                         highlightthickness=0, font=('Segoe UI', 10), **kwargs)
+        self.placeholder = placeholder
+        self._insert_placeholder()
+        self.bind('<FocusIn>', self._clear_placeholder)
+        self.bind('<FocusOut>', self._insert_placeholder)
+    def _insert_placeholder(self, event=None):
+        if not self.get():
+            self.config(fg=style.COLORS['text_muted'])
+            self.insert(0, self.placeholder)
+    def _clear_placeholder(self, event):
+        if self.get() == self.placeholder:
+            self.delete(0, tk.END)
+            self.config(fg=style.COLORS['text_primary'])
+    def get_value(self):
+        val = self.get()
+        return '' if val == self.placeholder else val
 
 class FileInputFrame(tk.Frame):
-    """A file input component with browse button."""
-    
-    def __init__(self, parent, on_browse=None, placeholder: str = "Select file...", **kwargs):
-        """
-        Create a file input component.
-        
-        Args:
-            parent: Parent widget
-            on_browse: Callback when browse button is clicked
-            placeholder: Placeholder text for empty state
-            **kwargs: Additional frame parameters
-        """
-        super().__init__(parent, bg=style.COLORS['bg_input'], **kwargs)
-        
-        self.on_browse = on_browse
-        self.placeholder = placeholder
-        
-        # Input frame
-        input_container = tk.Frame(self, bg=style.COLORS['bg_input'])
-        input_container.pack(fill='x', expand=True)
-        
-        # Text entry
-        self.entry = tk.Entry(
-            input_container,
-            bg=style.COLORS['bg_card'],
-            fg=style.COLORS['text_primary'],
-            insertbackground=style.COLORS['accent'],
-            relief='flat',
-            borderwidth=0,
-            font=('Segoe UI', 10),
-        )
-        self.entry.pack(side='left', fill='both', expand=True, padx=config.SPACING['md'])
-        self.entry.insert(0, placeholder)
-        
-        # Browse button
-        browse_btn = ThemedButton(
-            input_container,
-            text="📁 Browse",
-            command=self._on_browse_click,
-            padx=config.SPACING['lg'],
-            pady=config.SPACING['sm'],
-        )
-        browse_btn.pack(side='right', padx=config.SPACING['md'])
-    
-    def _on_browse_click(self):
-        if self.on_browse:
-            self.on_browse()
-    
-    def set_value(self, value: str):
-        """Set the input value."""
+    def __init__(self, parent, on_browse=None, placeholder="Select file..."):
+        super().__init__(parent, bg=style.COLORS['bg_card'], bd=1, relief='solid')
+        self.entry = ThemedEntry(self, placeholder=placeholder)
+        self.entry.pack(side='left', fill='both', expand=True, padx=4, pady=4)
+        self.browse_btn = ThemedButton(self, text="📁 Browse", command=on_browse, is_primary=False)
+        self.browse_btn.pack(side='right', padx=4, pady=4)
+    def set_value(self, val):
         self.entry.delete(0, tk.END)
-        self.entry.insert(0, value)
-    
-    def get_value(self) -> str:
-        """Get the input value."""
-        value = self.entry.get()
-        return value if value != self.placeholder else ""
-
+        self.entry.insert(0, val)
+        self.entry.config(fg=style.COLORS['text_primary'])
+    def get_value(self):
+        return self.entry.get_value()
 
 class ScrollableFrame(tk.Frame):
-    """A scrollable frame container."""
-    
     def __init__(self, parent, **kwargs):
-        """
-        Create a scrollable frame.
-        
-        Args:
-            parent: Parent widget
-            **kwargs: Additional frame parameters
-        """
         super().__init__(parent, **kwargs)
-        
-        # Create canvas and scrollbar
-        self.canvas = tk.Canvas(
-            self,
-            bg=style.COLORS['bg_card_light'],
-            highlightthickness=0,
-        )
-        scrollbar = tk.Scrollbar(
-            self,
-            bg=style.COLORS['bg_card_light'],
-            troughcolor=style.COLORS['bg_input'],
-            activebackground=style.COLORS['accent'],
-            orient='vertical',
-        )
+        self.canvas = tk.Canvas(self, bg=style.COLORS['bg_card_light'], highlightthickness=0)
+        scrollbar = tk.Scrollbar(self, orient='vertical', command=self.canvas.yview)
         scrollbar.pack(side='right', fill='y')
         self.canvas.pack(side='left', fill='both', expand=True)
         self.canvas.config(yscrollcommand=scrollbar.set)
-        scrollbar.config(command=self.canvas.yview)
-        
-        # Create frame inside canvas
-        self.content_frame = tk.Frame(
-            self.canvas,
-            bg=style.COLORS['bg_card_light'],
-        )
-        self.canvas_window = self.canvas.create_window(
-            (0, 0),
-            window=self.content_frame,
-            anchor='nw',
-        )
-        
-        # Bindings
-        self.content_frame.bind('<Configure>', self._on_content_configure)
+        self.content_frame = tk.Frame(self.canvas, bg=style.COLORS['bg_card_light'])
+        self.canvas_window = self.canvas.create_window((0,0), window=self.content_frame, anchor='nw')
+        self.content_frame.bind('<Configure>', self._on_configure)
         self.canvas.bind('<Configure>', self._on_canvas_configure)
-        
-        # Mouse wheel binding
-        self.canvas.bind('<Enter>', self._on_canvas_enter)
-        self.canvas.bind('<Leave>', self._on_canvas_leave)
-    
-    def _on_content_configure(self, event):
-        """Update scroll region when content changes."""
+        self.canvas.bind('<Enter>', lambda e: self.canvas.bind_all('<MouseWheel>', self._on_mousewheel))
+        self.canvas.bind('<Leave>', lambda e: self.canvas.unbind_all('<MouseWheel>'))
+    def _on_configure(self, e):
         self.canvas.configure(scrollregion=self.canvas.bbox('all'))
-    
-    def _on_canvas_configure(self, event):
-        """Update content frame width when canvas is resized."""
-        self.canvas.itemconfig(self.canvas_window, width=event.width)
-    
-    def _on_canvas_enter(self, event):
-        """Bind mouse wheel when entering canvas."""
-        self.canvas.bind_all('<MouseWheel>', self._on_mousewheel)
-    
-    def _on_canvas_leave(self, event):
-        """Unbind mouse wheel when leaving canvas."""
-        self.canvas.unbind_all('<MouseWheel>')
-    
-    def _on_mousewheel(self, event):
-        """Handle mouse wheel scroll."""
-        self.canvas.yview_scroll(int(-1 * (event.delta / 120)), 'units')
-
+    def _on_canvas_configure(self, e):
+        self.canvas.itemconfig(self.canvas_window, width=e.width)
+    def _on_mousewheel(self, e):
+        self.canvas.yview_scroll(int(-1*(e.delta/120)), 'units')
 
 class ProgressIndicator(tk.Frame):
-    """A progress indicator with label."""
-    
-    def __init__(self, parent, **kwargs):
-        """
-        Create a progress indicator.
-        
-        Args:
-            parent: Parent widget
-            **kwargs: Additional frame parameters
-        """
-        super().__init__(parent, bg=style.COLORS['bg_dark'], **kwargs)
-        
-        # Label
-        self.label = tk.Label(
-            self,
-            text="Ready",
-            fg=style.COLORS['text_secondary'],
-            bg=style.COLORS['bg_dark'],
-            font=('Segoe UI', 8),
-        )
-        self.label.pack(side='left', padx=config.SPACING['md'])
-        
-        # Progress bar
-        self.progress = ttk.Progressbar(
-            self,
-            mode='indeterminate',
-            length=200,
-        )
-        self.progress.pack(side='left', padx=config.SPACING['md'])
-    
-    def set_text(self, text: str):
-        """Update progress label."""
-        self.label.configure(text=text)
-    
-    def start(self):
-        """Start progress animation."""
-        self.progress.start()
-    
-    def stop(self):
-        """Stop progress animation."""
-        self.progress.stop()
-
+    def __init__(self, parent):
+        super().__init__(parent, bg=style.COLORS['bg_dark'])
+        self.label = tk.Label(self, text="Ready", fg=style.COLORS['text_secondary'],
+                              bg=style.COLORS['bg_dark'], font=('Segoe UI', 9))
+        self.label.pack(side='left', padx=10)
+        self.progress = ttk.Progressbar(self, mode='indeterminate', length=200, style='TProgressbar')
+        self.progress.pack(side='left', fill='x', expand=True, padx=10, pady=5)
+    def set_text(self, t): self.label.config(text=t)
+    def start(self): self.progress.start(10)
+    def stop(self): self.progress.stop()
+    def update_theme(self):
+        self.configure(bg=style.COLORS['bg_dark'])
+        self.label.configure(bg=style.COLORS['bg_dark'], fg=style.COLORS['text_secondary'])
 
 class TaskCard(tk.Frame):
-    """A clickable task card."""
-    
-    def __init__(self, parent, icon: str, name: str, on_execute=None, is_implemented: bool = True, **kwargs):
-        """
-        Create a task card.
-        
-        Args:
-            parent: Parent widget
-            icon: Task icon/emoji
-            name: Task name
-            on_execute: Callback when card is clicked
-            is_implemented: Whether the task is implemented
-            **kwargs: Additional frame parameters
-        """
-        super().__init__(parent, bg=style.COLORS['bg_card_light'], **kwargs)
-        
+    def __init__(self, parent, icon, name, on_execute=None, is_implemented=True, **kwargs):
+        super().__init__(parent, bg=style.COLORS['bg_card_light'], bd=1, relief='solid', **kwargs)
         self.is_implemented = is_implemented
         self.on_execute = on_execute
-        
-        # Configure grid
         self.grid_propagate(False)
-        self.configure(height=140, width=160)
+        self.configure(height=120, width=140)
         
-        # Main content
-        content = tk.Frame(self, bg=style.COLORS['bg_card_light'])
-        content.pack(fill='both', expand=True, padx=config.SPACING['md'], pady=config.SPACING['md'])
-        
-        # Icon
-        icon_label = tk.Label(
-            content,
-            text=icon,
-            font=('Segoe UI', 28),
-            bg=style.COLORS['bg_card_light'],
-        )
-        icon_label.pack(pady=config.SPACING['sm'])
-        
-        # Name
-        name_label = tk.Label(
-            content,
-            text=name,
-            font=('Segoe UI', 9),
-            fg=style.COLORS['text_primary'],
-            bg=style.COLORS['bg_card_light'],
-            wraplength=140,
-            justify='center',
-        )
-        name_label.pack()
-        
-        # Status
-        if not is_implemented:
-            status = tk.Label(
-                content,
-                text="Coming Soon",
-                font=('Segoe UI', 7, 'italic'),
-                fg=style.COLORS['text_muted'],
-                bg=style.COLORS['bg_card_light'],
-            )
-            status.pack(pady=config.SPACING['sm'])
-        
-        # Bindings
         if is_implemented:
-            self.bind('<Button-1>', self._on_click)
-            content.bind('<Button-1>', self._on_click)
-            icon_label.bind('<Button-1>', self._on_click)
-            name_label.bind('<Button-1>', self._on_click)
-            
-            self.bind('<Enter>', self._on_enter)
-            self.bind('<Leave>', self._on_leave)
-            content.bind('<Enter>', self._on_enter)
-            icon_label.bind('<Enter>', self._on_enter)
-            name_label.bind('<Enter>', self._on_enter)
+            self.config(cursor="hand2")
+        
+        # Inner content frame – this will change on hover
+        self.content = tk.Frame(self, bg=style.COLORS['bg_card_light'])
+        self.content.pack(fill='both', expand=True, padx=6, pady=6)
+        
+        icon_lbl = tk.Label(self.content, text=icon, font=('Segoe UI', 24), bg=style.COLORS['bg_card_light'], fg=style.COLORS['text_primary'])
+        icon_lbl.pack(pady=2)
+        
+        name_lbl = tk.Label(self.content, text=name, font=('Segoe UI', 8), fg=style.COLORS['text_primary'],
+                            bg=style.COLORS['bg_card_light'], wraplength=120, justify='center')
+        name_lbl.pack()
+        
+        if not is_implemented:
+            tk.Label(self.content, text="Soon", font=('Segoe UI', 6, 'italic'),
+                     fg=style.COLORS['text_muted'], bg=style.COLORS['bg_card_light']).pack(pady=2)
+        
+        if is_implemented:
+            # Bind events to both the outer frame and inner content (to catch all areas)
+            for w in (self, self.content, icon_lbl, name_lbl):
+                w.bind('<Button-1>', self._on_click)
+                w.bind('<Enter>', self._on_enter)
+                w.bind('<Leave>', self._on_leave)
     
     def _on_enter(self, event):
-        """Handle mouse enter."""
         if self.is_implemented:
-            self.configure(bg=style.COLORS['hover'])
-            for widget in self.winfo_children():
-                if isinstance(widget, tk.Frame):
-                    widget.configure(bg=style.COLORS['hover'])
-                    for child in widget.winfo_children():
-                        if isinstance(child, tk.Label):
-                            child.configure(bg=style.COLORS['hover'])
+            # Only change inner content background – outer frame stays the same (border stable)
+            self.content.configure(bg=style.COLORS['hover'])
+            for child in self.content.winfo_children():
+                if isinstance(child, tk.Label):
+                    child.configure(bg=style.COLORS['hover'])
     
     def _on_leave(self, event):
-        """Handle mouse leave."""
         if self.is_implemented:
-            self.configure(bg=style.COLORS['bg_card_light'])
-            for widget in self.winfo_children():
-                if isinstance(widget, tk.Frame):
-                    widget.configure(bg=style.COLORS['bg_card_light'])
-                    for child in widget.winfo_children():
-                        if isinstance(child, tk.Label):
-                            child.configure(bg=style.COLORS['bg_card_light'])
+            self.content.configure(bg=style.COLORS['bg_card_light'])
+            for child in self.content.winfo_children():
+                if isinstance(child, tk.Label):
+                    child.configure(bg=style.COLORS['bg_card_light'])
     
     def _on_click(self, event):
-        """Handle card click."""
         if self.is_implemented and self.on_execute:
             self.on_execute()
 
-
 class ConsoleOutput(tk.Frame):
-    """A console output display."""
-    
-    def __init__(self, parent, **kwargs):
-        """
-        Create a console output widget.
-        
-        Args:
-            parent: Parent widget
-            **kwargs: Additional frame parameters
-        """
-        super().__init__(parent, bg=style.COLORS['bg_input'], **kwargs)
-        
-        # Header
-        header = tk.Frame(self, bg=style.COLORS['bg_card_light'], height=22)
-        header.pack(fill='x')
-        header.pack_propagate(False)
-        
-        tk.Label(
-            header,
-            text="⚡ CONSOLE OUTPUT",
-            fg=style.COLORS['accent_light'],
-            bg=style.COLORS['bg_card_light'],
-            font=('Segoe UI', 8, 'bold'),
-        ).pack(side='left', padx=config.SPACING['lg'], pady=config.SPACING['sm'])
-        
-        # Text area with scrollbar
-        text_frame = tk.Frame(self, bg=style.COLORS['bg_input'])
-        text_frame.pack(fill='both', expand=True)
-        
-        scrollbar = tk.Scrollbar(
-            text_frame,
-            bg=style.COLORS['bg_card_light'],
-            troughcolor=style.COLORS['bg_input'],
-            activebackground=style.COLORS['accent'],
-        )
+    """Modern console with gradient-like header and clean borders."""
+    def __init__(self, parent):
+        super().__init__(parent, bg=style.COLORS['bg_console'], bd=1, relief='solid', highlightthickness=0)
+        self._expanded = True
+        self._min_height = 36
+        self._max_height = 320
+
+        # Header with accent border
+        self.header = tk.Frame(self, bg=style.COLORS['bg_card_light'], height=36)
+        self.header.pack(fill='x')
+        self.header.pack_propagate(False)
+
+        # Left accent line
+        accent_line = tk.Frame(self.header, bg=style.COLORS['accent'], width=4)
+        accent_line.pack(side='left', fill='y')
+
+        tk.Label(self.header, text="⚡ CONSOLE OUTPUT", fg=style.COLORS['accent_light'],
+                 bg=style.COLORS['bg_card_light'], font=('Segoe UI', 9, 'bold')).pack(side='left', padx=12)
+
+        btn_frame = tk.Frame(self.header, bg=style.COLORS['bg_card_light'])
+        btn_frame.pack(side='right', padx=8)
+
+        self.clear_btn = tk.Button(btn_frame, text="🗑 Clear", command=self.clear,
+            bg=style.COLORS['bg_card_light'], fg=style.COLORS['text_secondary'],
+            activebackground=style.COLORS['hover'], relief='flat', cursor='hand2', padx=10, pady=4)
+        self.clear_btn.pack(side='left', padx=4)
+
+        self.toggle_btn = tk.Button(btn_frame, text="▼", command=self.toggle,
+            bg=style.COLORS['bg_card_light'], fg=style.COLORS['text_secondary'],
+            activebackground=style.COLORS['hover'], relief='flat', cursor='hand2', padx=10, pady=4)
+        self.toggle_btn.pack(side='left', padx=4)
+
+        # Text area with border
+        self.text_frame = tk.Frame(self, bg=style.COLORS['bg_console'])
+        self.text_frame.pack(fill='both', expand=True, padx=1, pady=1)
+
+        scrollbar = tk.Scrollbar(self.text_frame)
         scrollbar.pack(side='right', fill='y')
-        
-        self.text = tk.Text(
-            text_frame,
-            bg=style.COLORS['bg_input'],
-            fg='#E5E9F0',
-            font=('Consolas', 8),
-            wrap=tk.WORD,
-            relief=tk.FLAT,
-            borderwidth=0,
-            padx=config.SPACING['lg'],
-            pady=config.SPACING['md'],
-            yscrollcommand=scrollbar.set,
-        )
+
+        self.text = tk.Text(self.text_frame, bg=style.COLORS['bg_console'], fg=style.COLORS['text_secondary'],
+                            font=('Consolas', 9), wrap=tk.WORD, relief='flat', bd=0,
+                            yscrollcommand=scrollbar.set, padx=8, pady=6)
         self.text.pack(fill='both', expand=True)
-        
         scrollbar.config(command=self.text.yview)
         self.text.config(state=tk.DISABLED)
-    
-    def write(self, message: str):
-        """Write a message to console."""
+
+    def toggle(self):
+        if self._expanded:
+            self.text_frame.pack_forget()
+            self.configure(height=self._min_height)
+            self.toggle_btn.config(text="▲")
+        else:
+            self.text_frame.pack(fill='both', expand=True, padx=1, pady=1)
+            self.configure(height=self._max_height)
+            self.toggle_btn.config(text="▼")
+        self._expanded = not self._expanded
+
+    def write(self, msg):
         self.text.config(state=tk.NORMAL)
-        self.text.insert(tk.END, message + '\n')
+        self.text.insert(tk.END, msg + '\n')
         self.text.see(tk.END)
         self.text.config(state=tk.DISABLED)
-    
+
     def clear(self):
-        """Clear console output."""
         self.text.config(state=tk.NORMAL)
         self.text.delete(1.0, tk.END)
         self.text.config(state=tk.DISABLED)
+
+    def update_theme(self):
+        self.configure(bg=style.COLORS['bg_console'])
+        self.header.configure(bg=style.COLORS['bg_card_light'])
+        for child in self.header.winfo_children():
+            if isinstance(child, tk.Label):
+                child.configure(bg=style.COLORS['bg_card_light'])
+            elif isinstance(child, tk.Frame):
+                child.configure(bg=style.COLORS['bg_card_light'])
+                for btn in child.winfo_children():
+                    btn.configure(bg=style.COLORS['bg_card_light'], fg=style.COLORS['text_secondary'])
+        self.text_frame.configure(bg=style.COLORS['bg_console'])
+        self.text.configure(bg=style.COLORS['bg_console'], fg=style.COLORS['text_secondary'])

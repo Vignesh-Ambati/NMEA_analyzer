@@ -1,98 +1,80 @@
-"""
-ui/style.py
-───────────
-Centralized theming and style management.
-"""
-
 from tkinter import ttk
 
-# Color Palette - Modern, Vibrant Design
-COLORS = {
-    # Backgrounds
-    'bg_dark': '#0F1117',
-    'bg_card': '#161B22',
-    'bg_card_light': '#1C2128',
-    'bg_input': '#0D1117',
-    
-    # Primary accent - vibrant orange/red
-    'accent': '#FF6B35',
-    'accent_light': '#FF8A5B',
-    'accent_dark': '#E55A2B',
-    
-    # Secondary accent - teal
-    'secondary': '#00D4FF',
-    'secondary_light': '#33E0FF',
-    'secondary_dark': '#00B8D4',
-    
-    # Status colors
-    'success': '#34C759',
-    'success_light': '#5DD37F',
-    'warning': '#FF9500',
-    'error': '#FF3B30',
-    
-    # Text
-    'text_primary': '#F0F6FC',
-    'text_secondary': '#C9D1D9',
-    'text_muted': '#8B949E',
-    
-    # UI elements
-    'border': '#30363D',
-    'hover': '#21262D',
-    'disabled': '#444C56',
-    
-    # Graphs
-    'graph_bg': '#F8F9FA',
-    'graph_text': '#24292E',
+DARK_COLORS = {
+    'bg_dark': '#0A0E17',
+    'bg_card': '#11161F',
+    'bg_card_light': '#1A202C',
+    'bg_input': '#0F1419',
+    'bg_console': '#1E2433',          # darker, modern console background
+    'accent': "#FF4400",
+    'accent_light': "#C03F0C",
+    'accent_dark': "#A7330C",
+    'success': '#10B981',
+    'warning': '#F59E0B',
+    'error': '#EF4444',
+    'text_primary': '#FFFFFF',        # pure white on dark
+    'text_secondary': '#D1D5DB',
+    'text_muted': '#9CA3AF',
+    'border': '#374151',              # visible grey border
+    'border_light': '#4B5563',
+    'hover': '#2D3748',
+    'graph_bg': '#FFFFFF',
+    'graph_text': '#1F2937',
 }
 
+LIGHT_COLORS = {
+    'bg_dark': '#F9FAFB',
+    'bg_card': '#FFFFFF',
+    'bg_card_light': '#F3F4F6',
+    'bg_input': '#F3F4F6',
+    'bg_console': '#E5E7EB',          # light grey console
+    'accent': "#F0490C",
+    'accent_light': "#C03F0C",
+    'accent_dark': '#A7330C',
+    'success': '#10B981',
+    'warning': '#F59E0B',
+    'error': '#EF4444',
+    'text_primary': "#000000",        # near black
+    'text_secondary': "#060F1D",
+    'text_muted': "#2B2323",
+    'border': '#D1D5DB',
+    'border_light': '#E5E7EB',
+    'hover': '#E5E7EB',
+    'graph_bg': '#FFFFFF',
+    'graph_text': '#1F2937',
+}
 
-def get_color(name: str, fallback: str = None) -> str:
-    """
-    Get a color from the palette.
-    
-    Args:
-        name: Color name (key in COLORS dict)
-        fallback: Fallback color if name not found
-        
-    Returns:
-        Color hex value
-    """
+COLORS = DARK_COLORS.copy()
+_current_theme = 'dark'
+
+def get_color(name, fallback=None):
     return COLORS.get(name, fallback or COLORS['text_primary'])
 
+def set_theme(theme):
+    global COLORS, _current_theme
+    if theme == 'light':
+        COLORS.update(LIGHT_COLORS)
+        _current_theme = 'light'
+    else:
+        COLORS.update(DARK_COLORS)
+        _current_theme = 'dark'
 
-def setup_ttk_style() -> ttk.Style:
-    """
-    Configure ttk widget styling for the application.
-    
-    Returns:
-        Configured ttk.Style instance
-    """
+def get_current_theme():
+    return _current_theme
+
+def setup_ttk_style():
     style = ttk.Style()
     style.theme_use('clam')
-    
-    # Configure Progressbar
-    style.configure(
-        'Accent.Horizontal.TProgressbar',
-        background=COLORS['accent'],
-        troughcolor=COLORS['bg_card_light'],
-        bordercolor=COLORS['border'],
-        lightcolor=COLORS['accent_light'],
-        darkcolor=COLORS['accent_dark'],
-    )
-    
+    style.configure('TProgressbar',
+                    background=COLORS['accent'],
+                    troughcolor=COLORS['bg_input'],
+                    bordercolor=COLORS['border'],
+                    lightcolor=COLORS['accent_light'],
+                    darkcolor=COLORS['accent_dark'],
+                    thickness=12)               # thicker bar
     return style
 
-
-def get_button_style(is_primary: bool = False) -> dict:
-    """
-    Get button styling configuration.
-    
-    Args:
-        is_primary: True for primary button, False for secondary
-        
-    Returns:
-        Dictionary of button style parameters
-    """
+def get_button_style(is_primary=False):
     return {
         'bg': COLORS['accent'] if is_primary else COLORS['bg_card_light'],
         'fg': COLORS['text_primary'],
@@ -100,42 +82,17 @@ def get_button_style(is_primary: bool = False) -> dict:
         'activeforeground': COLORS['text_primary'],
         'relief': 'flat',
         'bd': 0,
-        'highlightthickness': 1,
-        'highlightbackground': COLORS['border'],
         'cursor': 'hand2',
+        'font': ('Segoe UI', 10, 'bold'),
+        'padx': 20,
+        'pady': 10,
     }
 
-
-def get_label_style(style: str = 'normal') -> dict:
-    """
-    Get label styling configuration.
-    
-    Args:
-        style: 'normal', 'heading', 'muted', or 'error'
-        
-    Returns:
-        Dictionary of label style parameters
-    """
+def get_label_style(style_type='normal'):
     styles = {
-        'normal': {
-            'bg': COLORS['bg_card'],
-            'fg': COLORS['text_primary'],
-            'font': ('Segoe UI', 10),
-        },
-        'heading': {
-            'bg': COLORS['bg_card'],
-            'fg': COLORS['text_primary'],
-            'font': ('Segoe UI', 14, 'bold'),
-        },
-        'muted': {
-            'bg': COLORS['bg_card'],
-            'fg': COLORS['text_muted'],
-            'font': ('Segoe UI', 9),
-        },
-        'error': {
-            'bg': COLORS['bg_card'],
-            'fg': COLORS['error'],
-            'font': ('Segoe UI', 10, 'bold'),
-        },
+        'normal': {'bg': COLORS['bg_card'], 'fg': COLORS['text_primary'], 'font': ('Segoe UI', 10)},
+        'heading': {'bg': COLORS['bg_card'], 'fg': COLORS['text_primary'], 'font': ('Segoe UI', 14, 'bold')},
+        'muted': {'bg': COLORS['bg_card'], 'fg': COLORS['text_muted'], 'font': ('Segoe UI', 9)},
+        'error': {'bg': COLORS['bg_card'], 'fg': COLORS['error'], 'font': ('Segoe UI', 10, 'bold')},
     }
-    return styles.get(style, styles['normal'])
+    return styles.get(style_type, styles['normal'])

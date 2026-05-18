@@ -1,127 +1,70 @@
-"""
-ui/pages/file_page.py
-─────────────────────
-File selection page.
-"""
-
 import tkinter as tk
+import os
+from pathlib import Path
 from .base_page import BasePage
 from .. import style, config, dialogs
-from ..components import ThemedLabel, ThemedFrame, ThemedButton, FileInputFrame
-from ..state import AppState
-
+from ..components import ThemedLabel, ThemedButton, FileInputFrame
 
 class FilePage(BasePage):
-    """File selection page for loading NMEA log files."""
-    
     def setup_ui(self):
-        """Build the file selection UI."""
-        # Main container
-        main_frame = tk.Frame(self, bg=style.COLORS['bg_card'])
-        main_frame.pack(fill='both', expand=True, padx=config.SPACING['xl'], pady=config.SPACING['xl'])
-        
-        # Left panel - branding
-        left_panel = tk.Frame(main_frame, bg=style.COLORS['bg_card'])
-        left_panel.pack(side='left', fill='y', padx=(0, config.SPACING['xl']))
-        
-        branding_box = tk.Frame(left_panel, bg=style.COLORS['bg_card_light'], width=200)
-        branding_box.pack(fill='y')
-        branding_box.pack_propagate(False)
-        
-        icon_label = ThemedLabel(branding_box, "📊", style_type='normal')
-        icon_label.config(font=('Segoe UI', 48))
-        icon_label.pack(pady=config.SPACING['lg'])
-        
-        title = ThemedLabel(branding_box, "ACCORD", style_type='heading')
-        title.config(font=('Segoe UI', 24, 'bold'))
-        title.pack()
-        
-        subtitle = ThemedLabel(branding_box, "Log Analyzer", style_type='muted')
-        subtitle.pack(pady=config.SPACING['md'])
-        
-        description = ThemedLabel(
-            branding_box,
-            "GNSS Analysis & Visualization",
-            style_type='muted'
-        )
-        description.config(font=('Segoe UI', 8), wraplength=180, justify='center')
-        description.pack(padx=config.SPACING['md'])
-        
-        # Right panel - file selection
-        right_panel = tk.Frame(main_frame, bg=style.COLORS['bg_card'])
-        right_panel.pack(side='right', fill='both', expand=True)
-        
-        # Card
-        card = ThemedFrame(right_panel, frame_type='card')
+        main = tk.Frame(self, bg=style.COLORS['bg_card'])
+        main.pack(fill='both', expand=True)
+
+        # Left panel – slightly narrower
+        left = tk.Frame(main, bg=style.COLORS['bg_card_light'], width=260)
+        left.pack(side='left', fill='y')
+        left.pack_propagate(False)
+
+        tk.Label(left, text="⚙️ CONFIGURATION", font=('Segoe UI', 10, 'bold'),
+                 fg=style.COLORS['accent'], bg=style.COLORS['bg_card_light']).pack(anchor='w', padx=15, pady=(15,5))
+
+        placeholder_frame = tk.Frame(left, bg=style.COLORS['bg_input'], bd=1, relief='solid')
+        placeholder_frame.pack(fill='both', expand=True, padx=10, pady=10)
+
+        tk.Label(placeholder_frame, text="🔧 Advanced settings will appear here", 
+                 fg=style.COLORS['text_muted'], bg=style.COLORS['bg_input'],
+                 font=('Segoe UI', 9), wraplength=220).pack(pady=15)
+
+        tk.Label(placeholder_frame, text="(Coming soon)", 
+                 fg=style.COLORS['text_muted'], bg=style.COLORS['bg_input'],
+                 font=('Segoe UI', 8, 'italic')).pack()
+
+        tk.Label(left, text="💡 Tip: Supports NMEA, UBX, .log, .txt", 
+                 fg=style.COLORS['text_secondary'], bg=style.COLORS['bg_card_light'],
+                 font=('Segoe UI', 8)).pack(side='bottom', pady=8)
+
+        # Right panel – reduced outer/inner padding
+        right = tk.Frame(main, bg=style.COLORS['bg_card'])
+        right.pack(side='right', fill='both', expand=True, padx=20, pady=20)   # reduced from 30
+
+        card = tk.Frame(right, bg=style.COLORS['bg_card_light'], bd=1, relief='solid')
         card.pack(fill='both', expand=True)
-        
-        card_content = tk.Frame(card, bg=style.COLORS['bg_card_light'])
-        card_content.pack(fill='both', expand=True, padx=config.SPACING['xl'], pady=config.SPACING['xl'])
-        
-        # Instructions
-        title_label = ThemedLabel(card_content, "Load GNSS Log File", style_type='heading')
-        title_label.pack(anchor='w', pady=(0, config.SPACING['md']))
-        
-        instructions = ThemedLabel(
-            card_content,
-            "Select a NMEA, UBX, or log file to analyze",
-            style_type='muted'
-        )
-        instructions.pack(anchor='w', pady=(0, config.SPACING['lg']))
-        
-        # File input
-        self.file_input = FileInputFrame(
-            card_content,
-            on_browse=self._browse_file,
-            placeholder="No file selected",
-        )
-        self.file_input.pack(fill='x', pady=config.SPACING['md'])
-        
-        # Buttons
-        button_frame = tk.Frame(card_content, bg=style.COLORS['bg_card_light'])
-        button_frame.pack(fill='x', pady=(config.SPACING['lg'], 0))
-        
-        start_btn = ThemedButton(
-            button_frame,
-            text="🚀 Start Analysis",
-            command=self._start_processing,
-            is_primary=True,
-            font=('Segoe UI', 10, 'bold'),
-            padx=config.SPACING['xl'],
-            pady=config.SPACING['md'],
-        )
-        start_btn.pack(side='left', fill='x', expand=True)
-        
-        cancel_btn = ThemedButton(
-            button_frame,
-            text="Cancel",
-            command=self.controller.root.quit,
-            font=('Segoe UI', 10),
-            padx=config.SPACING['lg'],
-            pady=config.SPACING['md'],
-        )
-        cancel_btn.pack(side='right', padx=(config.SPACING['md'], 0))
-    
+
+        inner = tk.Frame(card, bg=style.COLORS['bg_card_light'])
+        inner.pack(fill='both', expand=True, padx=20, pady=20)                 # reduced from 30
+
+        ThemedLabel(inner, "Load GNSS Log File", style_type='heading').pack(anchor='w', pady=(0,5))
+        ThemedLabel(inner, "Select a NMEA, UBX, or log file to analyze", style_type='muted').pack(anchor='w', pady=(0,20))
+
+        self.file_input = FileInputFrame(inner, on_browse=self._browse_file, placeholder="No file selected")
+        self.file_input.pack(fill='x', pady=10)
+
+        btn_frame = tk.Frame(inner, bg=style.COLORS['bg_card_light'])
+        btn_frame.pack(fill='x', pady=20)                                      # reduced from 30
+        start_btn = ThemedButton(btn_frame, "🚀 Start Analysis", command=self._start_processing, is_primary=True)
+        start_btn.pack(side='left', fill='x', expand=True, padx=(0,15))
+        cancel_btn = ThemedButton(btn_frame, "Exit", command=self.controller.root.quit)  # renamed from Cancel
+        cancel_btn.pack(side='right')
+
     def _browse_file(self):
-        """Handle browse button click."""
-        file_path = dialogs.ask_file(parent=self.controller.root)
-        if file_path:
-            self.file_input.set_value(file_path)
-    
+        path = dialogs.ask_file(parent=self.controller.root)
+        if path:
+            self.file_input.set_value(path)
+
     def _start_processing(self):
-        """Start processing the selected file."""
-        file_path = self.file_input.get_value()
-        
-        if not file_path:
-            dialogs.show_warning(
-                "No File Selected",
-                "Please select a log file to analyze.",
-                parent=self.controller.root,
-            )
+        path = self.file_input.get_value()
+        if not path:
+            dialogs.show_warning("No File", "Please select a file.", parent=self.controller.root)
             return
-        
-        # Update state
-        self.controller.state.set_file(file_path)
-        
-        # Start processing
-        self.controller.process_file(file_path)
+        self.controller.state.set_file(path)
+        self.controller.process_file(path)

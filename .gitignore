@@ -3,3 +3,4 @@ __pycache__/
 .logcache/
 *.md
 .images/
+*.zip

@@ -1,170 +1,123 @@
-"""
-ui/app.py
-─────────
-Main application controller.
-"""
-
 import tkinter as tk
-from tkinter import ttk
-
 from . import style, config, dialogs
 from .state import AppState
 from .services import ProcessingService
 from .components import ProgressIndicator, ConsoleOutput
 from .pages import FilePage, TaskPage, GraphPage
 
-
 class LogAnalyzerApp:
-    """
-    Main application controller.
-    
-    Responsibilities:
-    - Window management
-    - Page navigation
-    - State management
-    - Backend integration
-    """
-    
     def __init__(self):
-        """Initialize the application."""
         self.root = tk.Tk()
-        self.root.title("ACCORD - NMEA Log Analyzer")
-        self.root.geometry(f"{config.WINDOW_WIDTH}x{config.WINDOW_HEIGHT}")
-        self.root.minsize(config.WINDOW_MIN_WIDTH, config.WINDOW_MIN_HEIGHT)
-        self.root.resizable(True, True)
-        
-        # Application state
+        self.root.title("NMEA Log Analyzer")
+        self.root.geometry("1000x600")
+        self.root.minsize(800, 400)
+        self.root.configure(bg=style.COLORS['bg_dark'])
+
         self.state = AppState()
-        
-        # Services
         self.processing_service = ProcessingService()
-        
-        # UI state
         self.current_page = None
         self.current_page_instance = None
-        
-        # Setup UI
-        self._setup_style()
-        self._setup_layout()
-        
-        # Start with file page
+        self._setup_top_bar()
+        self._setup_main_layout()
         self.navigate_to_file_page()
-        
-        # Start event loop
         self.root.mainloop()
-    
-    # ── Style Setup ──────────────────────────────────────────────────────────
-    
-    def _setup_style(self):
-        """Configure application styling."""
-        style.setup_ttk_style()
-    
-    # ── Layout Setup ─────────────────────────────────────────────────────────
-    
-    def _setup_layout(self):
-        """Setup main application layout."""
-        # Main container
-        self.container = tk.Frame(self.root, bg=style.COLORS['bg_dark'])
-        self.container.pack(fill='both', expand=True)
-        self.container.pack_propagate(False)
+
+    def _setup_top_bar(self):
+        top = tk.Frame(self.root, bg=style.COLORS['bg_dark'], height=40)
+        top.pack(fill='x', side='top')
+        top.pack_propagate(False)
         
-        # Content area
-        self.content_frame = tk.Frame(self.container, bg=style.COLORS['bg_card'])
-        self.content_frame.pack(fill='both', expand=True, padx=0, pady=0)
-        
-        # Console output
-        self.console = ConsoleOutput(self.container)
-        self.console.pack(fill='x', padx=config.SPACING['lg'], pady=config.SPACING['md'])
-        
-        # Progress indicator
-        self.progress = ProgressIndicator(self.container)
-        self.progress.pack(fill='x', padx=config.SPACING['lg'], pady=(0, config.SPACING['md']))
-    
-    # ── Navigation ───────────────────────────────────────────────────────────
-    
+        self.title_label = tk.Label(top, text="NMEA Log Analyzer", fg=style.COLORS['accent'], bg=style.COLORS['bg_dark'],
+                            font=('Segoe UI', 12, 'bold'))
+        self.title_label.pack(side='left', padx=15)
+        self.theme_btn = tk.Button(top, text="🌙 Dark", command=self._toggle_theme,
+            bg=style.COLORS['bg_card_light'], fg=style.COLORS['text_primary'],
+            activebackground=style.COLORS['accent'], relief='flat', cursor='hand2', padx=10)
+        self.theme_btn.pack(side='right', padx=15)
+
+    def _setup_main_layout(self):
+        main_container = tk.Frame(self.root, bg=style.COLORS['bg_dark'])
+        main_container.pack(fill='both', expand=True)
+        self.content_frame = tk.Frame(main_container, bg=style.COLORS['bg_card'])
+        self.content_frame.pack(fill='both', expand=True)
+        self.progress = ProgressIndicator(main_container)
+        self.progress.pack(fill='x', side='bottom')
+        self.console = ConsoleOutput(main_container)
+        self.console.pack(fill='x', side='bottom')
+        self.console.toggle()
+
+    def _toggle_theme(self):
+        current = style.get_current_theme()
+        new = 'light' if current == 'dark' else 'dark'
+        style.set_theme(new)
+        self.root.configure(bg=style.COLORS['bg_dark'])
+        if hasattr(self, 'title_label'):
+            self.title_label.configure(bg=style.COLORS['bg_dark'])
+        for child in self.root.winfo_children():
+            if isinstance(child, tk.Frame):
+                child.configure(bg=style.COLORS['bg_dark'])
+        self.theme_btn.config(text="☀️ Light" if new == 'light' else "🌙 Dark")
+        self.progress.update_theme()
+        self.console.update_theme()
+        if self.current_page:
+            self._load_page(self.current_page)
+        self.console.write(f"✨ Switched to {new} theme")
+
     def _clear_content(self):
-        """Clear current page."""
         if self.current_page_instance:
             self.current_page_instance.pack_forget()
             self.current_page_instance.destroy()
-            self.current_page_instance = None
-    
+
     def _load_page(self, page_class):
-        """Load a new page."""
         self._clear_content()
         self.current_page_instance = page_class(self.content_frame, self)
         self.current_page_instance.pack(fill='both', expand=True)
         self.current_page = page_class
-    
+
     def navigate_to_file_page(self):
-        """Navigate to file selection page."""
         self.state.clear_navigation()
-        self._load_page(FilePage)
+        self._load_page(TaskPage)
         self.progress.set_text("Ready")
         self.console.write("✓ Ready to load file")
-    
+        if self.console._expanded:
+            self.console.toggle()
+
     def navigate_to_task_page(self):
-        """Navigate to task selection page."""
         if not self.state.file_path:
-            dialogs.show_warning(
-                "No File Loaded",
-                "Please load a file first.",
-                parent=self.root,
-            )
+            dialogs.show_warning("No File", "Please load a file first.", parent=self.root)
             return
-        
         self._load_page(TaskPage)
         self.progress.set_text("Select a task")
-    
-    def navigate_to_graph_page(self, task_index: int):
-        """Navigate to graph page for a specific task."""
+        if self.console._expanded:
+            self.console.toggle()
+
+    def navigate_to_graph_page(self, task_index):
+        self.state.set_task(task_index)
         self._load_page(GraphPage)
         self.progress.set_text(f"Executing: {config.TASKS[task_index]}")
-        self.console.write(f"▶ Starting task {task_index}: {config.TASKS[task_index]}")
-    
-    # ── File Processing ─────────────────────────────────────────────────────
-    
-    def process_file(self, file_path: str):
-        """
-        Process a NMEA log file.
-        
-        Args:
-            file_path: Path to the log file
-        """
-        self.progress.set_text(f"Processing: {file_path}")
+        self.console.write(f"▶ Starting task: {config.TASKS[task_index]}")
+        if self.console._expanded:
+            self.console.toggle()
+
+    def process_file(self, file_path):
+        self.progress.set_text("Processing...")
         self.progress.start()
-        self.console.write(f"⏳ Processing file: {file_path}")
-        
+        self.console.write(f"⏳ Processing {file_path}")
         def on_complete(cache):
-            """Called when processing completes."""
             self.progress.stop()
-            self.progress.set_text("Processing complete")
+            self.progress.set_text("Complete")
             self.state.set_cache(cache)
-            self.console.write("✓ File processed successfully")
+            self.console.write("✓ File processed")
             self.navigate_to_task_page()
-        
-        def on_error(error_msg):
-            """Called if processing fails."""
+        def on_error(err):
             self.progress.stop()
             self.progress.set_text("Error")
-            self.console.write(f"✗ Error: {error_msg}")
-            dialogs.show_error(
-                "Processing Error",
-                error_msg,
-                parent=self.root,
-            )
-        
-        self.processing_service.process_file(
-            file_path,
-            on_complete=on_complete,
-            on_error=on_error,
-        )
-
+            self.console.write(f"✗ {err}")
+            dialogs.show_error("Processing Error", err, parent=self.root)
+        self.processing_service.process_file(file_path, on_complete, on_error)
 
 def main():
-    """Entry point for the application."""
-    app = LogAnalyzerApp()
-
+    LogAnalyzerApp()
 
 if __name__ == '__main__':
     main()

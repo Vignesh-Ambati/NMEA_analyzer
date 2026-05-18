@@ -5,8 +5,8 @@ Centralized configuration and constants for the UI.
 """
 
 # Application dimensions
-WINDOW_WIDTH = 1400
-WINDOW_HEIGHT = 800
+WINDOW_WIDTH = 1000
+WINDOW_HEIGHT = 600
 WINDOW_MIN_WIDTH = 1000
 WINDOW_MIN_HEIGHT = 600
 
