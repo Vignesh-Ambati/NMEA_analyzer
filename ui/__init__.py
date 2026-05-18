@@ -1,9 +1,12 @@
 """
 ui/__init__.py
 ──────────────
-Public surface of the `ui` package.
+ACCORD Log Analyzer UI package.
+
+Public exports:
+    LogAnalyzerApp - Main application class
 """
 
-from .app import LogAnalyserApp
+from .app import LogAnalyzerApp, main
 
-__all__ = ["LogAnalyserApp"]
+__all__ = ['LogAnalyzerApp', 'main']

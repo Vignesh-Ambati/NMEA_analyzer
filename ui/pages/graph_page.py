@@ -1,33 +1,95 @@
-# accord_analyser/pages/graph_page.py
-"""Graph display page with controls and scrollable sidebar."""
+"""
+ui/pages/graph_page.py
+──────────────────────
+Graph visualization page.
+"""
 
 import tkinter as tk
-from tkinter import filedialog, messagebox, colorchooser
-
 from .base_page import BasePage
-from ..constants import COLORS
-from ..plotter import Plotter
+from .. import style, config
+from ..components import ThemedLabel, ThemedFrame, ThemedButton, ProgressIndicator
 
 
 class GraphPage(BasePage):
-    """Page for displaying and interacting with the generated plot."""
-
-    SIDEBAR_WIDTH = 220
-
+    """Graph visualization and analysis page."""
+    
     def setup_ui(self):
-        """Set up the main UI components: plot area and scrollable control sidebar."""
-        main_container = tk.Frame(self, bg=COLORS['bg_card'])
-        main_container.pack(fill="both", expand=True)
-
-        content = tk.Frame(main_container, bg=COLORS['bg_card'])
-        content.pack(fill="both", expand=True, padx=10, pady=(0, 5))
-
-        # Left: plot container
-        plot_container = tk.Frame(content, bg=COLORS['bg_card'])
-        plot_container.pack(side="left", fill="both", expand=True, padx=(0, 10))
-
-        # Right: sidebar container (fixed width)
-        sidebar_container = tk.Frame(content, bg=COLORS['bg_card_light'], width=self.SIDEBAR_WIDTH)
+        """Build the graph visualization UI."""
+        # Header
+        header = tk.Frame(self, bg=style.COLORS['bg_card'])
+        header.pack(fill='x', padx=config.SPACING['lg'], pady=config.SPACING['md'])
+        
+        task_index = self.controller.state.current_task
+        task_name = config.TASKS[task_index] if task_index is not None else "Analysis"
+        
+        title = ThemedLabel(header, task_name, style_type='heading')
+        title.pack(side='left')
+        
+        # Toolbar
+        toolbar = tk.Frame(header, bg=style.COLORS['bg_card'])
+        toolbar.pack(side='right')
+        
+        back_btn = ThemedButton(
+            toolbar,
+            text="← Back",
+            command=self.controller.navigate_to_task_page,
+            padx=config.SPACING['lg'],
+        )
+        back_btn.pack(side='left', padx=(0, config.SPACING['md']))
+        
+        home_btn = ThemedButton(
+            toolbar,
+            text="⌂ Home",
+            command=self.controller.navigate_to_file_page,
+            padx=config.SPACING['lg'],
+        )
+        home_btn.pack(side='left')
+        
+        # Content area
+        content = tk.Frame(self, bg=style.COLORS['bg_card_light'])
+        content.pack(fill='both', expand=True, padx=config.SPACING['lg'], pady=config.SPACING['lg'])
+        
+        # Placeholder for graph
+        placeholder = tk.Frame(content, bg=style.COLORS['bg_input'], relief=tk.SUNKEN, borderwidth=2)
+        placeholder.pack(fill='both', expand=True)
+        
+        placeholder_label = ThemedLabel(
+            placeholder,
+            "📊 Graph will be displayed here\nTask execution in progress...",
+            style_type='muted'
+        )
+        placeholder_label.config(font=('Segoe UI', 14))
+        placeholder_label.pack(expand=True)
+        
+        # Footer - controls
+        footer = tk.Frame(self, bg=style.COLORS['bg_dark'])
+        footer.pack(fill='x', padx=config.SPACING['lg'], pady=config.SPACING['md'])
+        
+        export_btn = ThemedButton(
+            footer,
+            text="💾 Export Data",
+            command=self._export_data,
+            padx=config.SPACING['lg'],
+        )
+        export_btn.pack(side='left', padx=(0, config.SPACING['md']))
+        
+        save_btn = ThemedButton(
+            footer,
+            text="💿 Save Plot",
+            command=self._save_plot,
+            padx=config.SPACING['lg'],
+        )
+        save_btn.pack(side='left')
+    
+    def _export_data(self):
+        """Export graph data to CSV."""
+        # Placeholder - implement with backend
+        pass
+    
+    def _save_plot(self):
+        """Save plot image."""
+        # Placeholder - implement with backend
+        pass
         sidebar_container.pack(side="right", fill="y")
         sidebar_container.pack_propagate(False)
 

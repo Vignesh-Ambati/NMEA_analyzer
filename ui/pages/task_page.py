@@ -1,103 +1,70 @@
-# accord_analyser/pages/task_page.py
-"""Task selection page with responsive grid."""
+"""
+ui/pages/task_page.py
+─────────────────────
+Task selection page.
+"""
 
 import tkinter as tk
-import threading
 from .base_page import BasePage
-from ..constants import TASKS
-from ..theme import Theme, SPACING, IMPLEMENTED_TASKS
-from ..widgets import ThemedLabel, ThemedFrame, TaskCard
-from ..pages.graph_page import GraphPage
+from .. import style, config
+from ..components import ThemedLabel, ThemedFrame, TaskCard, ScrollableFrame
 
 
 class TaskPage(BasePage):
-    """Task selection page with responsive grid layout."""
-
+    """Task selection page for choosing analysis operations."""
+    
     def setup_ui(self):
-        """Build the task selection UI with responsive grid."""
+        """Build the task selection UI."""
         # Header
-        header = ThemedFrame(self, style='container')
-        header.pack(fill="x", padx=SPACING['lg'], pady=(SPACING['lg'], SPACING['md']))
-
-        ThemedLabel(header, "Select Analysis Task", style='heading').pack(side="left")
-        ThemedLabel(header, f"  •  {len(TASKS)} tasks available", style='muted').pack(side="left")
-
-        canvas_frame = ThemedFrame(self, style='card')
-        canvas_frame.pack(fill="both", expand=True, padx=SPACING['md'], pady=(0, SPACING['md']))
-
-        # Canvas + scrollbar
-        canvas = tk.Canvas(canvas_frame, bg=Theme.get_color('bg_card_light'), highlightthickness=0)
-        scrollbar = tk.Scrollbar(
-            canvas_frame,
-            bg=Theme.get_color('bg_card_light'),
-            troughcolor=Theme.get_color('bg_input'),
-            activebackground=Theme.get_color('accent'),
-            orient="vertical"
+        header = tk.Frame(self, bg=style.COLORS['bg_card'])
+        header.pack(fill='x', padx=config.SPACING['lg'], pady=(config.SPACING['lg'], config.SPACING['md']))
+        
+        title = ThemedLabel(header, "Select Analysis Task", style_type='heading')
+        title.pack(side='left')
+        
+        count = ThemedLabel(
+            header,
+            f"  •  {len(config.TASKS)} tasks available",
+            style_type='muted'
         )
-        scrollbar.pack(side="right", fill="y")
-        canvas.pack(side="left", fill="both", expand=True)
-        canvas.config(yscrollcommand=scrollbar.set)
-        scrollbar.config(command=canvas.yview)
-
-        # Grid frame inside canvas (this holds the task cards)
-        grid_frame = tk.Frame(canvas, bg=Theme.get_color('bg_card_light'))
-        canvas_window = canvas.create_window((0, 0), window=grid_frame, anchor="nw")
-
-        # Create task cards (initial layout: 4 columns)
+        count.pack(side='left', padx=(config.SPACING['md'], 0))
+        
+        # Content area with scrollable task grid
+        scrollable = ScrollableFrame(self, bg=style.COLORS['bg_card_light'])
+        scrollable.pack(fill='both', expand=True, padx=config.SPACING['md'], pady=config.SPACING['md'])
+        
+        # Create task grid
         COLS = 4
-        for i, task in enumerate(TASKS):
-            icon = task.split()[0]
-            name = " ".join(task.split()[1:])
-            is_implemented = i in IMPLEMENTED_TASKS
-
+        for i, task in enumerate(config.TASKS):
+            # Extract icon and name from task string
+            parts = task.split(maxsplit=1)
+            icon = parts[0]
+            name = parts[1] if len(parts) > 1 else f"Task {i}"
+            
+            # Check if task is implemented
+            is_implemented = i in config.IMPLEMENTED_TASKS
+            
+            # Create task card
             card = TaskCard(
-                grid_frame,
+                scrollable.content_frame,
                 icon=icon,
                 name=name,
-                on_execute=lambda idx=i: self._run_task(idx),
-                is_implemented=is_implemented
+                on_execute=lambda idx=i: self._on_task_selected(idx),
+                is_implemented=is_implemented,
             )
+            
             row = i // COLS
             col = i % COLS
-            card.grid(row=row, column=col, padx=4, pady=4, sticky="nsew")
-
-        # Make columns expand evenly
-        for c in range(COLS):
-            grid_frame.grid_columnconfigure(c, weight=1, minsize=220)
-
-        # Keep canvas window width in sync with the canvas (important for initial layout)
-        def _update_canvas_window_width(event=None):
-            # Use the canvas's real width (event.width when called from canvas Configure)
-            width = event.width if (event and hasattr(event, "width")) else canvas.winfo_width()
-            # Guard: when called very early width may be 1 — skip in that case
-            if width <= 1:
-                return
-            try:
-                canvas.itemconfig(canvas_window, width=width)
-            except Exception:
-                # itemconfig may occasionally fail if window not yet available — ignore and let later call fix it
-                pass
-
-        # Update scrollregion; ensure canvas window width updated as well
-        def _update_scrollregion(event=None):
-            canvas.update_idletasks()
-            # Ensure canvas window width follows the canvas width so the grid wraps/wraplengths compute correctly
-            _update_canvas_window_width(event)
-            bbox = canvas.bbox("all")
-            if bbox is not None:
-                canvas.configure(scrollregion=bbox)
-
-        # Bindings: when grid_frame size changes, update scrollregion;
-        # when canvas size changes, ensure the canvas window uses the canvas width
-        grid_frame.bind("<Configure>", _update_scrollregion)
-        canvas.bind("<Configure>", lambda e: (_update_canvas_window_width(e), _update_scrollregion(e)))
-
-        # Mouse wheel scrolling
-        def on_mousewheel(event):
-            if canvas.winfo_exists():
-                canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
-
-        canvas.bind("<Enter>", lambda e: canvas.bind_all("<MouseWheel>", on_mousewheel))
+            card.grid(row=row, column=col, padx=config.SPACING['sm'], pady=config.SPACING['sm'], sticky='nsew')
+        
+        # Configure grid columns
+        for col in range(COLS):
+            scrollable.content_frame.grid_columnconfigure(col, weight=1, minsize=180)
+    
+    def _on_task_selected(self, task_index: int):
+        """Handle task selection."""
+        self.controller.state.set_task(task_index)
+        self.controller.navigate_to_graph_page(task_index)
         canvas.bind("<Leave>", lambda e: canvas.unbind_all("<MouseWheel>"))
 
         # --- Crucial initialisation: ensure sizes are correct after widget realization ---

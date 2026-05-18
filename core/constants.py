@@ -2,13 +2,13 @@
 core/constants.py
 ─────────────────
 Static lookup tables shared across NMEA processing modules.
-
-  TALKER_MAP  — maps two-character NMEA talker IDs to constellation names.
-  ID_MAP      — maps numeric system IDs (used in GN-prefixed messages) to
-                constellation names.
 """
 
-TALKER_MAP = {
+import re
+from re import search
+
+
+CONSTELLATION_DICT = {
     "GP": "GPS",
     "GL": "GLONASS",
     "GA": "GALILEO",
@@ -16,8 +16,11 @@ TALKER_MAP = {
     "GQ": "QZSS",
     "GI": "IRNSS"
 }
+"""
+    # CONSTELLATION DICT LOOKS FOR THE CONSTELLATION TYPE IN GSV MESSAGES
+"""
 
-ID_MAP = {
+CONSTELLATION_ID = {
     1: "GPS",
     2: "GLONASS",
     3: "GALILEO",
@@ -25,3 +28,58 @@ ID_MAP = {
     5: "QZSS",
     6: "IRNSS"
 }
+"""
+    # CONSTELLATION ID LOOKS FOR THE CONSTELLATION ID IN GSA CHECKSUM FIELD
+"""
+
+
+LINE_PATTERN = re.compile(r'(?:\[(?P<ts>.*?)\])?\s*(?P<nmea>\$.*)')
+"""
+    # Regex breakdown:
+    # (?:\[(?P<ts>.*?)\])? -> Non-capturing group for optional [...] timestamp
+    # \s*                  -> Any whitespace
+    # (?P<nmea>\$.*)       -> Captures everything starting from '$' as the NMEA sentence
+"""
+
+
+#Keys used in GGA
+KEY_TYPE = "type"
+KEY_TIME = "time"
+KEY_LAT  = "lat"
+KEY_LON  = "lon"
+KEY_QUAL = "quality"
+KEY_SVS  = "fix_sv"
+KEY_HDOP = "hdop"
+KEY_ALT  = "alt"
+KEY_GHEIGHT = "geoid_height"
+
+KEY_SPD  = "speed_knots" 
+KEY_COG  = "course"
+KEY_DATE = "date"
+KEY_STATUS = "status"
+
+KEY_MODE = "mode_indicator"
+KEY_TOTAL_SVS = "total_svs" #TODO: Confirm if this accurate
+
+KEY_PDOP = "pdop"
+KEY_VDOP = "vdop"
+KEY_FIX_TYPE = "fix_type"
+KEY_SV_IDS = "sv_ids"
+KEY_CONSTELLATION = "constellation_type"
+KEY_MSG_NUM = "msg_num"
+KEY_TOTAL_MSGS = "total_msgs"
+KEY_SATELLITES = "satellites"
+
+KEY_OFFSET ="local_offset"
+
+
+
+BATCH_SIZE:int = 50000
+"""No of lines we write at each time. This is sweet spot. Can be modified as per user's need"""
+
+CACHE_BASE_NAME = ".logcache"
+""" Base name for folder where we store the data"""
+
+RETENTION_WINDOW_SECONDS = 3 * 24 * 60 * 60
+"""Time until we retain the log before clean up"""
+

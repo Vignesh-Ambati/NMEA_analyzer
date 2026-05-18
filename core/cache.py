@@ -5,24 +5,69 @@ Temporary on-disk cache used to store split NMEA message streams
 between the processing stage and the query/plot stage.
 """
 
+import atexit
 import os
+from pathlib import Path
 import tempfile
-import shutil
-
-
-class DataCache:
-    def __init__(self):
-        base_dir = os.getcwd()
-        self.temp_directory = os.path.join(base_dir, ".logcache")
-        os.makedirs(self.temp_directory, exist_ok=True)
-
+import time
+from typing import Optional
+import zlib
+import pyarrow as _pyArrow
+import pyarrow.parquet as _parquet
+from . import constants as _constantPage
+        
+class CacheManager:
+    def __init__(self) -> None:
+        _baseDirectory = os.getcwd()
+        self._tempDirectory = os.path.join(_baseDirectory, _constantPage.CACHE_BASE_NAME)
+        os.makedirs(self._tempDirectory, exist_ok=True)
+        
+        self._purgeExpiredEntries(self._tempDirectory, _constantPage.RETENTION_WINDOW_SECONDS)
         self.temp_dir = tempfile.mkdtemp(
-            prefix=".logcache_",
-            dir=self.temp_directory
+            prefix=".logcache_session_",
+            dir= self._tempDirectory
         )
-
-    def path(self, name):
-        return os.path.join(self.temp_dir, name)
-
-    def cleanup(self):
-        shutil.rmtree(self.temp_dir, ignore_errors=True)
+        
+        atexit.register(self.cleanup)
+    
+    @staticmethod
+    def _generateFingerPrint(_logPath: Path) -> str:
+        try:
+            _stat = _logPath.stat()
+            _size = _stat.st_size
+            _mtime = int(_stat.st_mtime)
+            
+            with _logPath.open("rb") as _fp:
+                _chunk = _fp.read(65536)
+            _crc = zlib.crc23(_chunk) & 0xffffffff
+            return f"{_size}_{_mtime}_{_crc:08x}"
+        except Exception as e:
+            return f"fallback_{_logPath.stem}"
+    
+    @staticmethod
+    def get_parquetPath(_logPath: Path, _targetDir: str) -> Path:
+        _fingerprint = CacheManager.generate_fingerprint(_logPath)
+        return Path(_targetDir) / f"cache_{_fingerprint}.parquet"
+    
+    @classmethod
+    def load_existingCache(cls, _logPath:Path, _targetDir: str) -> Optional[_pyArrow.Table]:
+        _parquetPath = cls.get_parquetPath(_logPath, _targetDir)
+        if _parquetPath.exists() and _parquetPath.stat().st_size > 0:
+            try:
+                os.utime(str(_parquetPath), None)
+                return _parquet.read_table(str(_parquetPath))
+            except Exception as e:
+                print(f"[!] Warning: Found existing cache at {_parquetPath} but failed to read: {e}")
+                return None
+        return None
+    
+    @staticmethod
+    def _purgeExpiredEntries(_targetDir: str, _cutoffSeconds: int) -> None:
+        try:
+            _now = time.time()
+            for _entry in os.scandir(_targetDir):
+                if(_now - _entry.stat().st_mtime) > _cutoffSeconds:
+                    try: os.remove(_entry.path)
+                    except OSError: pass
+        except Exception as e:
+            print(f"[!] Retention engine sweep met exception: {e}")
