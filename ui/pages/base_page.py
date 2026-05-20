@@ -37,9 +37,4 @@ class BasePage(tk.Frame):
         self.setup_ui()
     
     def setup_ui(self):
-        """
-        Build the page UI.
-        
-        Override in subclasses to implement page-specific layout.
-        """
         pass

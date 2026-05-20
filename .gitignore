@@ -4,3 +4,5 @@ __pycache__/
 *.md
 .images/
 *.zip
+LOGS/
+*.md

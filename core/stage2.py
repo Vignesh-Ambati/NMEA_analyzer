@@ -46,11 +46,14 @@ class ParquetStorageEngine:
             if self._writer is None:
                 self._writer = _parquet.ParquetWriter(str(self._outputPath), self._schema, compression='snappy')
             _table = _pyArrow.Table.from_pylist(_chunkBuffer, schema=self._schema)
-            self.writer.write_table(_table)
+            self._writer.write_table(_table)
         except Exception as e:
             print(f"[!] Critical Error writing columnar batch to Parquet: {e}")
     
     def close(self) -> None:
         if self._writer is not None:
-            self._writer.close()
+            try:
+                self._writer.close()
+            except Exception:
+                pass
             self._writer = None

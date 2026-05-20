@@ -109,6 +109,7 @@ class BaseParsers:
                 _constantPage.KEY_TIME: _time,
                 _constantPage.KEY_LAT: _toDecimalConverter(_fields[2], _fields[3]),
                 _constantPage.KEY_LON: _toDecimalConverter(_fields[4], _fields[5]),
+                # TODO:KEY_MODE is needed to be confirmed
                 _constantPage.KEY_MODE: (not (_mode := _fields[6]) or _mode.startswith('N')),
                 _constantPage.KEY_SVS: int(_fields[7]) if _fields[7] else 0,
                 _constantPage.KEY_HDOP: float(_fields[8]) if _fields[8] else 0.0,
@@ -154,11 +155,12 @@ class BaseParsers:
         _fields += [""] * (19 - len(_fields))
         try:            
             _idChar = _fields[18][:1]
-            _constellation = _constantPage.CONSTELLATION_DICT.get(int(_idChar) if _idChar else 0, "Unknown")
+            _constellation = _constantPage.CONSTELLATION_ID.get(int(_idChar) if _idChar else 0, "Unknown")
             _activeSvs = tuple(sv for sv in _fields[3:15] if sv)
             return {
                 _constantPage.KEY_TYPE: "GSA",
                 _constantPage.KEY_CONSTELLATION: _constellation,
+                # TODO:fix type is needed to be confirmed
                 _constantPage.KEY_FIX_TYPE: int(_fields[2]) if _fields[2] else 1,
                 _constantPage.KEY_SV_IDS: _activeSvs,
                 _constantPage.KEY_PDOP: float(_fields[15]) if _fields[15] else 0.0,
@@ -183,8 +185,8 @@ class BaseParsers:
                     print(f"[!] CORRUPTION DETECTED: Missing GSV message for {_constellation} at {self._latestTime}. "
                     f"Expected part {self._lastGSVSeq + 1}, got {_msgNum}. Please clean this log section.")
                 self._lastGSVSeq = _msgNum
-                                    
-            _svData = tuple(tuple(_fields[i:i+4]) for i in range(4, 17, 4) if _fields[i])    
+            #TODO: Here the tuple will be filled with '' if there is no almanac or ephemeris data like elevation and azimuth    
+            _svData = tuple(tuple(_fields[i:i+4]) for i in range(4, 17, 4) if _fields[i] and '*' not in _fields[i])    
             return {
                 _constantPage.KEY_TYPE: "GSV",
                 _constantPage.KEY_TIME: _time,

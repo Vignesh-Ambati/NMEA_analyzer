@@ -97,11 +97,12 @@ class ProgressIndicator(tk.Frame):
         self.label = tk.Label(self, text="Ready", fg=style.COLORS['text_secondary'],
                               bg=style.COLORS['bg_dark'], font=('Segoe UI', 9))
         self.label.pack(side='left', padx=10)
-        self.progress = ttk.Progressbar(self, mode='indeterminate', length=200, style='TProgressbar')
+        self.progress = ttk.Progressbar(self, mode='determinate',maximum=100, length=200, style='TProgressbar')
         self.progress.pack(side='left', fill='x', expand=True, padx=10, pady=5)
     def set_text(self, t): self.label.config(text=t)
-    def start(self): self.progress.start(10)
-    def stop(self): self.progress.stop()
+    def start(self): self.progress['value'] = 0
+    def stop(self): self.progress['value'] = 100
+    def set_value(self, val): self.progress['value'] = min(100.0, max(0.0, val))
     def update_theme(self):
         self.configure(bg=style.COLORS['bg_dark'])
         self.label.configure(bg=style.COLORS['bg_dark'], fg=style.COLORS['text_secondary'])

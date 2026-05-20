@@ -8,6 +8,7 @@ between the processing stage and the query/plot stage.
 import atexit
 import os
 from pathlib import Path
+import shutil
 import tempfile
 import time
 from typing import Optional
@@ -17,18 +18,20 @@ import pyarrow.parquet as _parquet
 from . import constants as _constantPage
         
 class CacheManager:
-    def __init__(self) -> None:
-        _baseDirectory = os.getcwd()
-        self._tempDirectory = os.path.join(_baseDirectory, _constantPage.CACHE_BASE_NAME)
-        os.makedirs(self._tempDirectory, exist_ok=True)
-        
-        self._purgeExpiredEntries(self._tempDirectory, _constantPage.RETENTION_WINDOW_SECONDS)
-        self.temp_dir = tempfile.mkdtemp(
-            prefix=".logcache_session_",
-            dir= self._tempDirectory
-        )
-        
-        atexit.register(self.cleanup)
+    _baseDirectory = os.getcwd()
+    _tempDirectory = os.path.join(_baseDirectory, _constantPage.CACHE_BASE_NAME)
+    
+    @classmethod
+    def getCacheDirectory(cls) -> str:
+        os.makedirs(cls._tempDirectory, exist_ok=True)
+        return cls._tempDirectory
+    
+    def __init__(self, log_path: Optional[Path] = None) -> None:
+        self._cacheDir = CacheManager.getCacheDirectory()
+        CacheManager._purgeExpiredEntries(self._cacheDir, _constantPage.RETENTION_WINDOW_SECONDS)
+        self.log_path = log_path
+        self.parquet_path = CacheManager.get_parquetPath(log_path, self._cacheDir) if log_path else None
+        self.temp_dir = self._cacheDir
     
     @staticmethod
     def _generateFingerPrint(_logPath: Path) -> str:
@@ -39,14 +42,14 @@ class CacheManager:
             
             with _logPath.open("rb") as _fp:
                 _chunk = _fp.read(65536)
-            _crc = zlib.crc23(_chunk) & 0xffffffff
+            _crc = zlib.crc32(_chunk) & 0xffffffff
             return f"{_size}_{_mtime}_{_crc:08x}"
         except Exception as e:
             return f"fallback_{_logPath.stem}"
     
     @staticmethod
     def get_parquetPath(_logPath: Path, _targetDir: str) -> Path:
-        _fingerprint = CacheManager.generate_fingerprint(_logPath)
+        _fingerprint = CacheManager._generateFingerPrint(_logPath)
         return Path(_targetDir) / f"cache_{_fingerprint}.parquet"
     
     @classmethod

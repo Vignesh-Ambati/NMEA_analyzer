@@ -65,6 +65,6 @@ class FilePage(BasePage):
         path = self.file_input.get_value()
         if not path:
             dialogs.show_warning("No File", "Please select a file.", parent=self.controller.root)
-            return
+            return None
         self.controller.state.set_file(path)
         self.controller.process_file(path)

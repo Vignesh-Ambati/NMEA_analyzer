@@ -23,7 +23,7 @@ Public functions
 
 import tkinter as tk
 import numpy as np
-from .theme import COLORS
+from .style import COLORS
 
 # ── Optional backends ────────────────────────────────────────────────────────
 

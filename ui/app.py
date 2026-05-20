@@ -76,16 +76,16 @@ class LogAnalyzerApp:
 
     def navigate_to_file_page(self):
         self.state.clear_navigation()
-        self._load_page(TaskPage)
+        self._load_page(FilePage)
         self.progress.set_text("Ready")
         self.console.write("✓ Ready to load file")
-        if self.console._expanded:
+        if not self.console._expanded:
             self.console.toggle()
 
     def navigate_to_task_page(self):
         if not self.state.file_path:
             dialogs.show_warning("No File", "Please load a file first.", parent=self.root)
-            return
+            return None
         self._load_page(TaskPage)
         self.progress.set_text("Select a task")
         if self.console._expanded:
@@ -99,22 +99,39 @@ class LogAnalyzerApp:
         if self.console._expanded:
             self.console.toggle()
 
+    def _safe_ui_update(self, percentage: float):
+        _displayPercentage = int(percentage * 100)
+        self.progress.set_text(f"Processing... {_displayPercentage}%")
+        self.progress.set_value(_displayPercentage)
+        
+    def _safe_ui_complete(self, cache):
+        self.progress.stop()
+        self.progress.set_text("Complete")
+        self.state.set_cache(cache)
+        self.console.write("✓ File processed")
+        self.navigate_to_task_page()
+
+    def _safe_ui_error(self, err):
+        self.progress.stop()
+        self.progress.set_text("Error")
+        self.console.write(f"✗ {err}")
+        dialogs.show_error("Processing Error", err, parent=self.root)
+    
     def process_file(self, file_path):
         self.progress.set_text("Processing...")
         self.progress.start()
-        self.console.write(f"⏳ Processing {file_path}")
-        def on_complete(cache):
-            self.progress.stop()
-            self.progress.set_text("Complete")
-            self.state.set_cache(cache)
-            self.console.write("✓ File processed")
-            self.navigate_to_task_page()
-        def on_error(err):
-            self.progress.stop()
-            self.progress.set_text("Error")
-            self.console.write(f"✗ {err}")
-            dialogs.show_error("Processing Error", err, parent=self.root)
-        self.processing_service.process_file(file_path, on_complete, on_error)
+        self.console.write(f"⏳ Dispatching {file_path}")
+        
+        cb_complete = lambda cache: self.root.after(0, self._safe_ui_complete, cache)
+        cb_error    = lambda err:   self.root.after(0, self._safe_ui_error, err)
+        cb_update   = lambda pct:   self.root.after(0, self._safe_ui_update, pct)
+        
+        self.processing_service.process_file(
+            file_path, 
+            on_complete=cb_complete, 
+            on_error=cb_error, 
+            on_progress=cb_update
+        )
 
 def main():
     LogAnalyzerApp()
