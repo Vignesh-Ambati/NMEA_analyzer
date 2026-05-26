@@ -27,8 +27,7 @@ class TaskPage(BasePage):
 
         for col in range(COLS):
             scroll.content_frame.grid_columnconfigure(col, weight=1, minsize=140)
-        
-        # Force update to avoid initial geometry glitches
+
         self.after(10, lambda: scroll.canvas.configure(scrollregion=scroll.canvas.bbox('all')))
 
     def _on_task_selected(self, task_index):

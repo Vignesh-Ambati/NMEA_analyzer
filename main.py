@@ -15,3 +15,4 @@ if __name__ == "__main__":
 # TODO: BATCH_SIZE is to be added to config buttons list
 # TODO: RETENTION_WINDOW_SECONDS is to be added to buttons list
 # TODO: Number of times reset happened.
+# TODO: Integrate the KML file generation and google map plot

@@ -5,7 +5,7 @@ matplotlib.use('TkAgg')
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 from . import style
-from .utils import extract_plot_data
+# from .utils import extract_plot_data
 
 class Plotter:
     def __init__(self, cache, plot_idx):
@@ -48,6 +48,8 @@ class Plotter:
 
     def _draw_plot(self):
         self.ax.clear()
+        def extract_plot_data(a, b):
+            return None, None
         time_data, cno_data = extract_plot_data(self.cache, self.plot_idx)
         if time_data is not None and cno_data is not None and len(time_data) > 0:
             self.ax.plot(time_data, cno_data, color=self.line_color, linewidth=1.5, marker='o', markersize=2, alpha=0.7)
