@@ -7,6 +7,6 @@ Public exports:
     LogAnalyzerApp - Main application class
 """
 
-from .app import LogAnalyzerApp, main
+from .app import LogAnalyzerApp
 
-__all__ = ['LogAnalyzerApp', 'main']
+__all__ = ['LogAnalyzerApp']

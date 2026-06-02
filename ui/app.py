@@ -1,7 +1,7 @@
 import tkinter as tk
 from . import style, config, dialogs
 from .state import AppState
-from .services import ProcessingService
+from .services import ExtractionService, ProcessingService
 from .components import ProgressIndicator, ConsoleOutput
 from .pages import FilePage, TaskPage, GraphPage
 
@@ -15,6 +15,7 @@ class LogAnalyzerApp:
 
         self.state = AppState()
         self.processing_service = ProcessingService()
+        self.extraction_service = ExtractionService()
         self.current_page = None
         self.current_page_instance = None
         self._setup_top_bar()
@@ -103,12 +104,14 @@ class LogAnalyzerApp:
         _displayPercentage = int(percentage * 100)
         self.progress.set_text(f"Processing... {_displayPercentage}%")
         self.progress.set_value(_displayPercentage)
-        
+
     def _safe_ui_complete(self, cache):
         self.progress.stop()
         self.progress.set_text("Complete")
         self.state.set_cache(cache)
         self.console.write("✓ File processed")
+        if cache and hasattr(cache, 'log_path'):
+            self.console.write(f"📁 Associated file path: {cache.log_path}")
         self.navigate_to_task_page()
 
     def _safe_ui_error(self, err):
@@ -116,7 +119,7 @@ class LogAnalyzerApp:
         self.progress.set_text("Error")
         self.console.write(f"✗ {err}")
         dialogs.show_error("Processing Error", err, parent=self.root)
-    
+
     def process_file(self, file_path):
         self.progress.set_text("Processing...")
         self.progress.start()
@@ -132,9 +135,3 @@ class LogAnalyzerApp:
             on_error=cb_error, 
             on_progress=cb_update
         )
-
-def main():
-    LogAnalyzerApp()
-
-if __name__ == '__main__':
-    main()

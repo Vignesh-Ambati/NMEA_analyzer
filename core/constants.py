@@ -34,7 +34,7 @@ CONSTELLATION_ID = {
 
 
 LINE_PATTERN = re.compile(r'(?:\[(?P<ts>.*?)\])?\s*(?P<nmea>\$.*)')
-"""
+r"""
     # Regex breakdown:
     # (?:\[(?P<ts>.*?)\])? -> Non-capturing group for optional [...] timestamp
     # \s*                  -> Any whitespace

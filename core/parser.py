@@ -86,10 +86,11 @@ class BaseParsers:
         _fields += [""] * (10 - len(_fields))
         try:
             #TODO: Confirm if this accurate
-            
+            _time = self._latestTime
             _toKmphConverter = self._knotsToKmph
             return {
                 _constantPage.KEY_TYPE: "VTG",
+                _constantPage.KEY_TIME: _time,
                 _constantPage.KEY_COG: float(_fields[1]) if _fields[1] else 0.0,
                 _constantPage.KEY_SPD: float(_fields[7]) if _fields[7] else _toKmphConverter(_fields[5])
             }
@@ -157,8 +158,10 @@ class BaseParsers:
             _idChar = _fields[18][:1]
             _constellation = _constantPage.CONSTELLATION_ID.get(int(_idChar) if _idChar else 0, "Unknown")
             _activeSvs = tuple(sv for sv in _fields[3:15] if sv)
+            _time = self._latestTime
             return {
                 _constantPage.KEY_TYPE: "GSA",
+                _constantPage.KEY_TIME: _time,
                 _constantPage.KEY_CONSTELLATION: _constellation,
                 # TODO:fix type is needed to be confirmed
                 _constantPage.KEY_FIX_TYPE: int(_fields[2]) if _fields[2] else 1,
