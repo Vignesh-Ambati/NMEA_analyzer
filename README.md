@@ -13,6 +13,7 @@
 **ACCORD** is an enterprise-grade GNSS (Global Navigation Satellite System) data analysis platform designed to process, visualize, and analyze satellite positioning logs from NMEA-compliant receivers. The application extracts critical metrics from raw binary log files and presents them through an intuitive graphical interface with 14+ specialized analysis tasks.
 
 ### Key Metrics
+
 - **Processing Speed**: High-speed binary streaming with 8 MB buffering for optimal performance
 - **Data Support**: Comprehensive GNSS constellations (GPS, GLONASS, GALILEO, BEIDOU, QZSS, IRNSS, SBAS)
 - **Analysis Tasks**: 14+ pre-built visualization and analysis modes
@@ -25,6 +26,7 @@
 ### 🎯 Core Capabilities
 
 #### Data Processing
+
 - **High-Speed NMEA Parsing**: Binary-safe streaming reader with configurable buffering
 - **Multi-Constellation Support**: Automatic detection and routing of GPS, GLONASS, Galileo, BeiDou, QZSS, and IRNSS signals
 - **Robust Time Handling**: Epoch-based processing with precise second-resolution timestamps
@@ -32,18 +34,18 @@
 
 #### Visualization & Analysis (14 Tasks)
 
-| Task | Description |
-|------|-------------|
+| Task                           | Description                                                  |
+| ------------------------------ | ------------------------------------------------------------ |
 | 📈 **Plot C/N₀ (Single/Dual)** | Carrier-to-noise density visualization across constellations |
-| ⚙️ **MIPS Analysis** | Monitor satellite usage efficiency (SVs used vs. in-view) |
-| 📍 **Position Loss Detection** | Identify and track fix acquisition/loss events |
-| 🏔️ **Altitude Plots** | Track receiver altitude from GGA/GNS messages |
-| 🎯 **DOP Visualization** | Display Dilution of Precision (PDOP, HDOP, VDOP) trends |
-| 🔢 **Satellite Count** | Monitor visible and tracked satellite quantities |
-| 🔄 **Reset Detection** | Count system resets and fix reacquisition events |
-| 🛰️ **SBAS Analysis** | Track SBAS (Space-Based Augmentation System) usage |
-| 📐 **Statistical Comparison** | Compare receiver metrics against reference truth values |
-| 💨 **Velocity Tracking** | Visualize speed and course data in real-time |
+| ⚙️ **MIPS Analysis**           | Monitor satellite usage efficiency (SVs used vs. in-view)    |
+| 📍 **Position Loss Detection** | Identify and track fix acquisition/loss events               |
+| 🏔️ **Altitude Plots**          | Track receiver altitude from GGA/GNS messages                |
+| 🎯 **DOP Visualization**       | Display Dilution of Precision (PDOP, HDOP, VDOP) trends      |
+| 🔢 **Satellite Count**         | Monitor visible and tracked satellite quantities             |
+| 🔄 **Reset Detection**         | Count system resets and fix reacquisition events             |
+| 🛰️ **SBAS Analysis**           | Track SBAS (Space-Based Augmentation System) usage           |
+| 📐 **Statistical Comparison**  | Compare receiver metrics against reference truth values      |
+| 💨 **Velocity Tracking**       | Visualize speed and course data in real-time                 |
 
 ### 🎨 User Experience
 
@@ -107,14 +109,14 @@ Raw NMEA Log File
 
 ## 🔧 Technical Stack
 
-| Component | Technology | Purpose |
-|-----------|-----------|---------|
-| **Language** | Python 3.9+ | Core implementation |
-| **GUI Framework** | Tkinter (ttk) | Cross-platform desktop UI |
-| **Plotting** | Matplotlib / Plotly | Advanced visualization |
-| **Data Processing** | NumPy | Efficient array indexing |
-| **Image Handling** | PIL (Pillow) | Logo & asset rendering |
-| **Storage** | JSONL + Binary Cache | Efficient data persistence |
+| Component           | Technology           | Purpose                    |
+| ------------------- | -------------------- | -------------------------- |
+| **Language**        | Python 3.9+          | Core implementation        |
+| **GUI Framework**   | Tkinter (ttk)        | Cross-platform desktop UI  |
+| **Plotting**        | Matplotlib / Plotly  | Advanced visualization     |
+| **Data Processing** | NumPy                | Efficient array indexing   |
+| **Image Handling**  | PIL (Pillow)         | Logo & asset rendering     |
+| **Storage**         | JSONL + Binary Cache | Efficient data persistence |
 
 ### Key Design Patterns
 
@@ -186,12 +188,14 @@ FixEventPoint(t, event)                         # Loss/reacquire events
 ## 💾 Performance Optimizations
 
 ### Caching Strategy
+
 - **JSONL Format**: Human-readable, line-based JSON for quick iteration
 - **NumPy Indexing**: Pre-computed time arrays for sub-millisecond range queries
 - **Temporary Storage**: Automatic cleanup of `.logcache/` directories
 - **8 MB Buffering**: Configurable I/O buffering for large files
 
 ### Memory Management
+
 - **Streaming Reader**: Never loads entire file into memory
 - **Epoch Aggregation**: Processes one time-window at a time
 - **Temporary Cache**: Deletes intermediate data after analysis completes
@@ -200,36 +204,40 @@ FixEventPoint(t, event)                         # Loss/reacquire events
 
 ## 📈 Version History
 
-| Version | Date | Highlights |
-|---------|------|-----------|
+| Version    | Date       | Highlights                                                    |
+| ---------- | ---------- | ------------------------------------------------------------- |
 | **v4.3.0** | 2026-03-23 | Stage 2 backend optimization, improved processing performance |
-| **v4.2.0** | 2026-03-18 | JSONL logging, cache system, structured data storage |
-| **v4.1.0** | 2026-03-17 | Graph visualization system, Plotter UI integration |
-| **v4.0.0** | 2026-03-11 | Modular architecture (EXP structure), core/UI separation |
-| **v3.0.0** | 2026-03-05 | Filesystem-based architecture |
-| **v2.x** | 2026-02-XX | Database-based processing, backend optimization |
-| **v1.x** | 2026-01-XX | Initial system, UI foundation |
+| **v4.2.0** | 2026-03-18 | JSONL logging, cache system, structured data storage          |
+| **v4.1.0** | 2026-03-17 | Graph visualization system, Plotter UI integration            |
+| **v4.0.0** | 2026-03-11 | Modular architecture (EXP structure), core/UI separation      |
+| **v3.0.0** | 2026-03-05 | Filesystem-based architecture                                 |
+| **v2.x**   | 2026-02-XX | Database-based processing, backend optimization               |
+| **v1.x**   | 2026-01-XX | Initial system, UI foundation                                 |
 
 ---
 
 ## 🎯 Use Cases
 
 ### 🛰️ GNSS Receiver Testing
+
 - Validate receiver performance across constellation types
 - Identify signal dropouts and reacquisition patterns
 - Analyze positioning accuracy metrics (DOP, altitude)
 
 ### 📡 Network Monitoring
+
 - Monitor SBAS augmentation effectiveness
 - Track satellite visibility and geometry changes
 - Detect environmental interference patterns
 
 ### 🔬 Research & Development
+
 - Extract metrics for algorithm development
 - Visualize multi-constellation interactions
 - Compare receiver firmware versions
 
 ### 🏗️ System Integration
+
 - Pre-flight verification for UAV/drone systems
 - Marine navigation system validation
 - Automotive GNSS diagnostics
@@ -262,24 +270,28 @@ FixEventPoint(t, event)                         # Loss/reacquire events
 ### Skills Demonstrated
 
 ✅ **Backend Engineering**
+
 - Binary file I/O and streaming protocols
 - Data parsing and validation (NMEA protocol)
 - Time-series data processing and aggregation
 - NumPy for scientific computing
 
 ✅ **Frontend Development**
+
 - Tkinter GUI design and layout management
 - Responsive UI with dynamic grid systems
 - Real-time progress tracking and logging
 - Integration with matplotlib/plotly
 
 ✅ **Software Architecture**
+
 - Modular design patterns
 - Clean separation of concerns
 - Extensible task-based system
 - Theme/design token system
 
 ✅ **Performance Optimization**
+
 - High-speed I/O with buffering strategies
 - Intelligent caching with indexing
 - Non-blocking UI with threading
@@ -303,6 +315,7 @@ GNSS/Satellite Systems Developer
 ## 📞 Support
 
 For issues, feature requests, or questions:
+
 - Open an issue on GitHub
 - Check the CHANGELOG.md for recent updates
 - Review the inline documentation in source files

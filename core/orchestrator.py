@@ -7,6 +7,8 @@ without blocking the main GUI event loop.
 
 from multiprocessing import Manager
 import os
+import glob
+import pandas as pd
 from pathlib import Path
 from typing import Callable, Dict, Optional
 from concurrent.futures import Future, ProcessPoolExecutor
@@ -56,3 +58,14 @@ class JobOrchestrator:
     def shutdown(self) -> None:
         print("[*] Shutting down processing orchestrator...")
         self._pool.shutdown(wait=False, cancel_futures=True)
+    
+    def _loadTaskFrame(self, stage2_dir: str, task_id: int) -> Optional[pd.DataFrame]:
+        search_pattern = os.path.join(stage2_dir, f"task_{task_id:02d}_*.parquet")
+        matching_shards = glob.glob(search_pattern)
+        if not matching_shards: return None
+        try:
+            dataFrame_list = [pd.read_parquet(shard, columns=["Time", "Value"]) for shard in matching_shards]
+            combined_dataFrame = pd.concat(dataFrame_list, ignore_index=True)
+            return combined_dataFrame
+        except Exception:
+            return None

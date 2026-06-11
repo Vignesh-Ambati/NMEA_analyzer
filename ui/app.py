@@ -84,7 +84,7 @@ class LogAnalyzerApp:
             self.console.toggle()
 
     def navigate_to_task_page(self):
-        if not self.state.file_path:
+        if not self.state.file_paths:
             dialogs.show_warning("No File", "Please load a file first.", parent=self.root)
             return None
         self._load_page(TaskPage)
@@ -100,34 +100,51 @@ class LogAnalyzerApp:
         if self.console._expanded:
             self.console.toggle()
 
-    def _safe_ui_update(self, percentage: float):
-        _displayPercentage = int(percentage * 100)
-        self.progress.set_text(f"Processing... {_displayPercentage}%")
-        self.progress.set_value(_displayPercentage)
+    def _safe_ui_update(self, percentage: float, file_path: str):
+        job_id = str(file_path)
+        filename = file_path.split("/")[-1].split("\\")[-1]
+        self.progress.set_job_progress(job_id, percentage, filename)
 
-    def _safe_ui_complete(self, cache):
-        self.progress.stop()
-        self.progress.set_text("Complete")
-        self.state.set_cache(cache)
-        self.console.write("✓ File processed")
+    def _safe_ui_complete(self, cache, file_path: str):
+        job_id = str(file_path)
+        filename = file_path.split("/")[-1].split("\\")[-1]
+        
+        self.progress.remove_job(job_id)
+        self.state.add_cache(file_path, cache)
+        self.console.write(f"✓ Processed {filename}")
+        
         if cache and hasattr(cache, 'log_path'):
-            self.console.write(f"📁 Associated file path: {cache.log_path}")
-        self.navigate_to_task_page()
+            self.console.write(f"📁 Cached: {cache.log_path}")
+            
+        # Seamless Navigation Logic
+        if self.current_page == FilePage:
+            self.navigate_to_task_page()
+        elif self.current_page == GraphPage:
+            # If the user added a file while viewing a graph, force the graph to reload the new data instantly
+            if hasattr(self.current_page_instance, 'plotter') and self.current_page_instance.plotter:
+                self.current_page_instance.plotter.request_lod_data(initial_load=True)
 
-    def _safe_ui_error(self, err):
-        self.progress.stop()
-        self.progress.set_text("Error")
-        self.console.write(f"✗ {err}")
-        dialogs.show_error("Processing Error", err, parent=self.root)
+    def _safe_ui_error(self, err: str, file_path: str):
+        job_id = str(file_path)
+        filename = file_path.split("/")[-1].split("\\")[-1]
+        self.progress.remove_job(job_id)
+        self.console.write(f"✗ Failed {filename}: {err}")
+        # Only show a pop-up if they are trying to load their very first file
+        if not self.state.caches:
+            dialogs.show_error("Processing Error", err, parent=self.root)
 
     def process_file(self, file_path):
-        self.progress.set_text("Processing...")
-        self.progress.start()
-        self.console.write(f"⏳ Dispatching {file_path}")
+        job_id = str(file_path)
+        filename = file_path.split("/")[-1].split("\\")[-1]
         
-        cb_complete = lambda cache: self.root.after(0, self._safe_ui_complete, cache)
-        cb_error    = lambda err:   self.root.after(0, self._safe_ui_error, err)
-        cb_update   = lambda pct:   self.root.after(0, self._safe_ui_update, pct)
+        self.state.set_file(file_path)
+        self.progress.add_job(job_id, filename)
+        self.console.write(f"⏳ Dispatching {filename} to background workers...")
+        
+        # Closures to trap the specific file path for thread-safe UI updates
+        cb_complete = lambda cache, path: self.root.after(0, lambda: self._safe_ui_complete(cache, path))
+        cb_error    = lambda err, path:   self.root.after(0, lambda: self._safe_ui_error(err, path))
+        cb_update   = lambda pct, path:   self.root.after(0, lambda: self._safe_ui_update(pct, path))
         
         self.processing_service.process_file(
             file_path, 

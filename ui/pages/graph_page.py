@@ -13,21 +13,16 @@ from .. import style, config
 from ..components import (
     InteractivePlotCanvas, 
     NoBackendDisplay, 
-    PlotErrorDisplay, 
-    MATPLOTLIB_AVAILABLE
+    PlotErrorDisplay
 )
 
-
 class GraphPage(BasePage):
-    """
-    A view controller page that manages the sidebar control panels, navigation triggers,
-    and interactive plot layouts for the current analytical tracking metrics.
-    """
     def __init__(self, parent: tk.Misc, controller: Any) -> None:
+        super().__init__(parent, controller)
+        
         self.plotter: Optional[InteractivePlotCanvas] = None
         self.plot_container: Optional[tk.Frame] = None
         self.title_label: Optional[tk.Label] = None
-        super().__init__(parent, controller)
 
     def setup_ui(self) -> None:
         """Constructs the visual components, layout grids, and interactive sidebars."""
@@ -98,14 +93,8 @@ class GraphPage(BasePage):
         for child in self.plot_container.winfo_children():
             child.destroy()
 
-        if not MATPLOTLIB_AVAILABLE:
-            no_engine_view = NoBackendDisplay(self.plot_container)
-            no_engine_view.pack(fill='both', expand=True)
-            self._write_console("⚠️ Aborted plotting: Matplotlib backend dependencies are missing.")
-            return
-
         try:
-            # Instantiate interactive canvas directly mapped against active parsing states
+            # Instantiate the high-performance Tkinter/Datashader canvas directly
             self.plotter = InteractivePlotCanvas(
                 parent=self.plot_container,
                 controller=self.controller,
@@ -119,28 +108,24 @@ class GraphPage(BasePage):
             self._write_console(f"❌ Initialization error during chart generation: {err}")
 
     def _build_sidebar(self, parent: tk.Frame) -> None:
-        """Generates tool parameters buttons list directly on the sidebar frame panel."""
         sidebar_frame = tk.Frame(parent, bg=style.COLORS['bg_card_light'], width=200)
         sidebar_frame.pack(side='right', fill='y', padx=(10, 0))
         sidebar_frame.pack_propagate(False)
 
         tk.Label(
-            sidebar_frame, text="⚙️ Controls", fg=style.COLORS['accent'], 
+            sidebar_frame, text="⚙️ Graph Matrix", fg=style.COLORS['accent'], 
             bg=style.COLORS['bg_card_light'], font=('Segoe UI', 10, 'bold')
         ).pack(pady=(10, 5), padx=10, anchor='w')
         
         tk.Frame(sidebar_frame, bg=style.COLORS['border'], height=1).pack(fill='x', padx=10, pady=5)
 
-        # Interactive controls command map configuration tuples
         sidebar_controls: List[Tuple[str, Callable[[], None]]] = [
-            ("💾 Save Image", self._save_image),
+            ("🏠 Reset Axis", self._autoscale),
+            ("⏪ Step Back", lambda: self.plotter.history_back() if self.plotter else None),
+            ("⏩ Step Forward", lambda: self.plotter.history_forward() if self.plotter else None),
             ("⊞ Toggle Grid", self._toggle_grid),
-            ("↔ Auto Scale", self._autoscale),
-            ("🎨 Plot Background", self._change_bg_color),
-            ("🖊 Line Color", self._change_line_color),
-            ("📝 Text Color", self._change_text_color),
-            ("🔲 Grid Color", self._change_grid_color),
-            ("📐 Axis Color", self._change_spine_color),
+            ("🎨 Theme & Colors", self._open_theme_popup),
+            ("💾 Export Frame", self._save_image),
         ]
 
         for button_text, command_func in sidebar_controls:
@@ -152,9 +137,62 @@ class GraphPage(BasePage):
             )
             btn.pack(fill='x', padx=10, pady=3)
             
-            # Safe binding closures to isolate visual pointer state interactions smoothly
             btn.bind("<Enter>", lambda e, target_btn=btn: target_btn.configure(bg=style.COLORS['accent'], fg='white'))
             btn.bind("<Leave>", lambda e, target_btn=btn: target_btn.configure(bg=style.COLORS['bg_card'], fg=style.COLORS['text_secondary']))
+            
+    def _open_theme_popup(self) -> None:
+        """Opens a modal dialog to cluster all plot styling settings together."""
+        popup = tk.Toplevel(self.winfo_toplevel())
+        popup.title("Theme & Colors")
+        popup.geometry("260x340")
+        popup.configure(bg=style.COLORS['bg_card'])
+        popup.transient(self.winfo_toplevel()) # Keep on top of main app
+        popup.grab_set() # Block interaction with main window until closed
+
+        # Center the popup relative to the main window
+        popup.update_idletasks()
+        x = self.winfo_toplevel().winfo_x() + (self.winfo_toplevel().winfo_width() // 2) - (260 // 2)
+        y = self.winfo_toplevel().winfo_y() + (self.winfo_toplevel().winfo_height() // 2) - (340 // 2)
+        popup.geometry(f"+{x}+{y}")
+
+        # Modal Header
+        tk.Label(
+            popup, text="🎨 Appearance Settings", fg=style.COLORS['accent'], 
+            bg=style.COLORS['bg_card'], font=('Segoe UI', 11, 'bold')
+        ).pack(pady=(15, 10))
+
+        tk.Frame(popup, bg=style.COLORS['border'], height=1).pack(fill='x', padx=20, pady=(0, 10))
+
+        # The Clustered Color Controls
+        color_controls: List[Tuple[str, Callable[[], None]]] = [
+            ("🎨 Plot Background", self._change_bg_color),
+            ("🖊 Line Color", self._change_line_color),
+            ("📝 Text Color", self._change_text_color),
+            ("🔲 Grid Color", self._change_grid_color),
+            ("📐 Axis Color", self._change_spine_color),
+        ]
+
+        for text, cmd in color_controls:
+            btn = tk.Button(
+                popup, text=text, command=cmd,
+                bg=style.COLORS['bg_card_light'], fg=style.COLORS['text_primary'],
+                activebackground=style.COLORS['accent'], activeforeground='white',
+                relief='flat', anchor='w', padx=15, pady=8, cursor='hand2'
+            )
+            btn.pack(fill='x', padx=20, pady=4)
+            
+            # Replicate the smooth hover effects
+            btn.bind("<Enter>", lambda e, target_btn=btn: target_btn.configure(bg=style.COLORS['accent'], fg='white'))
+            btn.bind("<Leave>", lambda e, target_btn=btn: target_btn.configure(bg=style.COLORS['bg_card_light'], fg=style.COLORS['text_primary']))
+            
+        # Modal Dismissal Button
+        close_btn = tk.Button(
+            popup, text="Close", command=popup.destroy,
+            bg=style.COLORS['bg_card'], fg=style.COLORS['text_muted'],
+            activebackground=style.COLORS['hover'], activeforeground=style.COLORS['text_primary'],
+            relief='flat', cursor='hand2'
+        )
+        close_btn.pack(pady=(10, 5))
 
     def _go_back(self) -> None:
         self.controller.navigate_to_task_page()

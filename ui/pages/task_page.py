@@ -1,7 +1,9 @@
 import tkinter as tk
+
+from ui import dialogs
 from .base_page import BasePage
 from .. import style, config
-from ..components import ThemedLabel, TaskCard, ScrollableFrame
+from ..components import ThemedButton, ThemedLabel, TaskCard, ScrollableFrame
 
 class TaskPage(BasePage):
     def setup_ui(self):
@@ -9,6 +11,14 @@ class TaskPage(BasePage):
         header.pack(fill='x', padx=15, pady=(15,5))
         ThemedLabel(header, "Select Analysis Task", style_type='heading').pack(side='left')
         ThemedLabel(header, f"  •  {len(config.TASKS)} tasks available", style_type='muted').pack(side='left', padx=10)
+        
+        add_file_btn = ThemedButton(
+            header,
+            text="➕ Add File",
+            command= self.__addFileClicked,
+            is_primary=False
+        )
+        add_file_btn.pack(side="right")
 
         scroll = ScrollableFrame(self, bg=style.COLORS['bg_card_light'])
         scroll.pack(fill='both', expand=True, padx=10, pady=10)
@@ -33,3 +43,8 @@ class TaskPage(BasePage):
     def _on_task_selected(self, task_index):
         self.controller.state.set_task(task_index)
         self.controller.navigate_to_graph_page(task_index)
+    
+    def __addFileClicked(self):
+        path = dialogs.ask_file(parent=self.controller.root)
+        if path:
+            self.controller.process_file(path)

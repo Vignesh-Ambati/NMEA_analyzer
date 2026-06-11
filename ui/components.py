@@ -1,18 +1,10 @@
+import datetime
 import tkinter as tk
-import numpy as np
 from tkinter import ttk
+from PIL import Image, ImageTk
 from typing import Any, Dict, Optional, Callable, Tuple, List
-from . import style, config
+from . import style
 
-try:
-    import matplotlib
-    matplotlib.use('TkAgg')
-    from matplotlib.figure import Figure
-    from matplotlib.lines import Line2D
-    from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
-    MATPLOTLIB_AVAILABLE = True
-except ImportError:
-    MATPLOTLIB_AVAILABLE = False
 
 class ThemedButton(tk.Button):
     def __init__(self, parent, text, command=None, is_primary=False, **kwargs):
@@ -106,17 +98,100 @@ class ScrollableFrame(tk.Frame):
 class ProgressIndicator(tk.Frame):
     def __init__(self, parent):
         super().__init__(parent, bg=style.COLORS['bg_dark'])
-        self.label = tk.Label(self, text="Ready", fg=style.COLORS['text_secondary'],
-                              bg=style.COLORS['bg_dark'], font=('Segoe UI', 9))
+        
+        # State tracking for round-robin rotation
+        self.active_jobs: Dict[str, Dict[str, Any]] = {}
+        self.display_keys: List[str] = []
+        self.current_idx: int = 0
+        self.rotation_timer: Optional[str] = None
+        
+        # The Single UI Row
+        self.container = tk.Frame(self, bg=style.COLORS['bg_dark'])
+        self.container.pack(fill='x', expand=True, pady=5)
+        
+        self.label = tk.Label(self.container, text="Ready", fg=style.COLORS['text_secondary'],
+                              bg=style.COLORS['bg_dark'], font=('Segoe UI', 9), width=45, anchor='w')
         self.label.pack(side='left', padx=10)
-        self.progress = ttk.Progressbar(self, mode='determinate',maximum=100, length=200, style='TProgressbar')
-        self.progress.pack(side='left', fill='x', expand=True, padx=10, pady=5)
-    def set_text(self, t): self.label.config(text=t)
-    def start(self): self.progress['value'] = 0
-    def stop(self): self.progress['value'] = 100
-    def set_value(self, val): self.progress['value'] = min(100.0, max(0.0, val))
+        
+        self.progress = ttk.Progressbar(self.container, mode='determinate', maximum=100, style='TProgressbar')
+        self.progress.pack(side='left', fill='x', expand=True, padx=10)
+
+    def add_job(self, job_id: str, filename: str) -> None:
+        """Registers a new file process and starts the rotation if needed."""
+        if job_id not in self.active_jobs:
+            self.active_jobs[job_id] = {"filename": filename, "pct": 0}
+            self.display_keys.append(job_id)
+            
+            # If this is the only job, show it instantly
+            if len(self.display_keys) == 1:
+                self._update_ui_for_current()
+            # If we now have multiple jobs and aren't rotating yet, start the carousel
+            elif not self.rotation_timer:
+                self._rotate_display()
+
+    def set_job_progress(self, job_id: str, percentage: float, filename: str) -> None:
+        """Updates the internal percentage. Updates the UI immediately if it's the currently focused job."""
+        if job_id in self.active_jobs:
+            pct = int(percentage * 100)
+            self.active_jobs[job_id]["pct"] = pct
+            
+            # Instant UI feedback if this job is currently in the display spotlight
+            if self.display_keys and self.display_keys[self.current_idx] == job_id:
+                self._update_ui_for_current()
+
+    def remove_job(self, job_id: str) -> None:
+        """Removes a finished job and adjusts the carousel."""
+        if job_id in self.active_jobs:
+            del self.active_jobs[job_id]
+            self.display_keys.remove(job_id)
+            
+            if not self.display_keys:
+                self._stop_rotation()
+                self.label.config(text="Ready")
+                self.progress['value'] = 0
+            else:
+                # Ensure index stays in bounds
+                self.current_idx %= len(self.display_keys)
+                self._update_ui_for_current()
+                # Stop carousel if only 1 job remains
+                if len(self.display_keys) == 1:
+                    self._stop_rotation()
+
+    def _rotate_display(self) -> None:
+        """The 2-second ticker loop to switch the visible progress bar."""
+        if self.rotation_timer:
+            self.after_cancel(self.rotation_timer)
+            
+        if len(self.display_keys) > 1:
+            self.current_idx = (self.current_idx + 1) % len(self.display_keys)
+            self._update_ui_for_current()
+            self.rotation_timer = self.after(2000, self._rotate_display)
+
+    def _stop_rotation(self) -> None:
+        if self.rotation_timer:
+            self.after_cancel(self.rotation_timer)
+            self.rotation_timer = None
+
+    def _update_ui_for_current(self) -> None:
+        """Paints the currently selected job data to the single Tkinter progress bar."""
+        if not self.display_keys: return
+        job_id = self.display_keys[self.current_idx]
+        job_data = self.active_jobs[job_id]
+        
+        queue_text = f" (File {self.current_idx + 1}/{len(self.display_keys)})" if len(self.display_keys) > 1 else ""
+        self.label.config(text=f"Parsing {job_data['filename']}{queue_text} ... {job_data['pct']}%")
+        self.progress['value'] = job_data['pct']
+
+    # --- Legacy Methods to prevent App crashes before Phase 2 ---
+    def set_text(self, t): 
+        if not self.active_jobs: self.label.config(text=t)
+    def start(self): pass
+    def stop(self): pass
+    def set_value(self, val): pass
+    
     def update_theme(self):
         self.configure(bg=style.COLORS['bg_dark'])
+        self.container.configure(bg=style.COLORS['bg_dark'])
         self.label.configure(bg=style.COLORS['bg_dark'], fg=style.COLORS['text_secondary'])
 
 class TaskCard(tk.Frame):
@@ -176,7 +251,7 @@ class ConsoleOutput(tk.Frame):
     def __init__(self, parent):
         super().__init__(parent, bg=style.COLORS['bg_console'], bd=1, relief='solid', highlightthickness=0)
         self._expanded = True
-        self._min_height = 36
+        self._min_height = 70 #30
         self._max_height = 320
 
         # Header with accent border
@@ -254,6 +329,10 @@ class ConsoleOutput(tk.Frame):
         self.text.configure(bg=style.COLORS['bg_console'], fg=style.COLORS['text_secondary'])
 
 class InteractivePlotCanvas(tk.Frame):
+    """
+    Ultra-Fast Pure Tkinter Rendering Engine integrated with Datashader.
+    Completely replaces Matplotlib for O(1) performance on millions of points.
+    """
     def __init__(
         self, 
         parent: tk.Misc, 
@@ -263,206 +342,332 @@ class InteractivePlotCanvas(tk.Frame):
         **kwargs: Any
     ) -> None:
         super().__init__(parent, bg=style.COLORS['bg_card'], **kwargs)
-        self.controller = controller  # Direct access to the app orchestrator
-        self.task_index: int = task_index
-        self.log_fn: Optional[Callable[[str], None]] = log_fn
+        self.controller = controller
+        self.task_index = task_index
+        self.log_fn = log_fn
         
-        self.fig: Optional[Figure] = None
-        self.ax: Optional[matplotlib.axes.Axes] = None
-        self.canvas: Optional[FigureCanvasTkAgg] = None
-        
+        # --- State & Rendering Caches ---
+        self._tk_img: Optional[ImageTk.PhotoImage] = None
+        self._x_bounds: Optional[Tuple[float, float]] = None
+        self._y_bounds: Optional[Tuple[float, float]] = None
         self.grid_visible: bool = True
-        self.max_display_points: int = 2000
+        
+        # --- Modern Interaction State Machine ---
+        self._view_history: List[Tuple[Tuple[float, float], Tuple[float, float]]] = []
+        self._view_index: int = -1
         self._dragging: bool = False
-        self._last_mouse_pos: Optional[Tuple[float, float]] = None
+        self._is_drawing_zoom_box: bool = False
+        self._last_mouse_pos: Optional[Tuple[int, int]] = None 
+        self._zoom_rect_id: Optional[int] = None
         self._debounce_job: Optional[str] = None
         
-        self._lines: Dict[str, Line2D] = {}
+        # --- Target View Selector State ---
+        self.active_file_list: List[str] = []
+        self.target_view = tk.StringVar(value="Combined")
+        self.target_view.trace_add("write", lambda *args: self._on_target_view_changed())
 
-        self.plot_bg_color: str = style.COLORS.get('bg_card_light', '#1A202C')
-        self.text_color: str = style.COLORS.get('text_primary', '#FFFFFF')
-        self.grid_color: str = style.COLORS.get('text_muted', '#9CA3AF')
-        self.spine_color: str = style.COLORS.get('border', '#374151')
+        # --- Theme Defaults ---
+        self.plot_bg_color = style.COLORS.get('bg_card_light', '#1A202C')
+        self.text_color = style.COLORS.get('text_primary', '#FFFFFF')
+        self.grid_color = style.COLORS.get('border', '#374151')
+        self.spine_color = style.COLORS.get('border', '#374151')
+        self.color_cycle = ['#FF4400', '#00E5FF', '#00FF7F', '#FF00FF', '#FFD700']
 
-        self.color_cycle: List[str] = ['#FF4400', '#00E5FF', '#00FF7F', '#FF00FF', '#FFD700']
-
-        if MATPLOTLIB_AVAILABLE:
-            self._initialize_canvas()
-        else:
-            self._log("Initialization failed: matplotlib is unavailable.")
+        self._initialize_canvas()
 
     def _initialize_canvas(self) -> None:
-        self.fig = Figure(figsize=(6, 4), dpi=100, facecolor=style.COLORS['bg_card'])
-        self.ax = self.fig.add_subplot(111, facecolor=self.plot_bg_color)
+        # 1. Setup the Pure Tkinter Canvas Workspace
+        self.canvas = tk.Canvas(self, bg=self.plot_bg_color, highlightthickness=0)
+        self.canvas.pack(fill='both', expand=True, padx=5, pady=5)
         
+        # 2. Setup the Dropdown View Selector (Top Right)
+        self.dropdown_combo = ttk.Combobox(
+            self.canvas, 
+            textvariable=self.target_view, 
+            state="readonly",
+            width=20,
+            font=('Segoe UI', 9)
+        )
+        self.dropdown_combo.place(relx=0.98, rely=0.02, anchor='ne')
+        
+        # 3. Canvas Resizing and Input Bindings
+        self.canvas.bind("<Configure>", lambda e: self._schedule_lod_update())
+        self.canvas.bind("<MouseWheel>", self._on_scroll)
+        self.canvas.bind("<ButtonPress-1>", self._on_press)
+        self.canvas.bind("<B1-Motion>", self._on_move)
+        self.canvas.bind("<ButtonRelease-1>", self._on_release)
+        
+        # Initial call to populate data
         self.request_lod_data(initial_load=True)
+
+    # --- View History Engine ---
+    def _push_view(self) -> None:
+        if not self._x_bounds or not self._y_bounds: return
+        bounds = (self._x_bounds, self._y_bounds)
+        self._view_history = self._view_history[:self._view_index + 1]
+        self._view_history.append(bounds)
+        self._view_index += 1
+
+    def history_back(self) -> None:
+        if self._view_index > 0:
+            self._view_index -= 1
+            self._x_bounds, self._y_bounds = self._view_history[self._view_index]
+            self.request_lod_data(initial_load=False)
+
+    def history_forward(self) -> None:
+        if self._view_index < len(self._view_history) - 1:
+            self._view_index += 1
+            self._x_bounds, self._y_bounds = self._view_history[self._view_index]
+            self.request_lod_data(initial_load=False)
+
+    def reset_scale(self) -> None:
+        """Triggered by double-click or Home button to reset global boundaries."""
+        self._x_bounds = None
+        self._y_bounds = None
+        self.request_lod_data(initial_load=True)
+
+    def _on_target_view_changed(self) -> None:
+        """Fires when user selects a different file or 'Combined' from the dropdown."""
+        self.reset_scale()
+
+    # --- Plot Layout Math Helpers ---
+    def _get_plot_geometry(self) -> Tuple[int, int, int, int]:
+        """Calculates internal padding for axis labels. Returns: pad_left, pad_top, plot_w, plot_h"""
+        w, h = self.canvas.winfo_width(), self.canvas.winfo_height()
+        if w < 50 or h < 50: return 50, 15, 10, 10
+        pad_left, pad_top, pad_right, pad_bottom = 60, 15, 20, 30
+        return pad_left, pad_top, w - pad_left - pad_right, h - pad_top - pad_bottom
+
+    def _px_to_data(self, px_x: float, px_y: float) -> Tuple[float, float]:
+        """Converts screen pixels to mathematical data coordinates."""
+        pad_left, pad_top, plot_w, plot_h = self._get_plot_geometry()
+        x_min, x_max = self._x_bounds or (0, 1)
+        y_min, y_max = self._y_bounds or (0, 1)
         
-        self.canvas = FigureCanvasTkAgg(self.fig, master=self)
-        self.canvas.draw()
-        self.canvas.get_tk_widget().pack(fill='both', expand=True)
+        data_x = x_min + ((px_x - pad_left) / plot_w) * (x_max - x_min)
+        data_y = y_max - ((px_y - pad_top) / plot_h) * (y_max - y_min) # Y is inverted in Tkinter
+        return data_x, data_y
 
-        self.toolbar_frame = tk.Frame(self, bg=self.plot_bg_color, height=35)
-        self.toolbar_frame.pack(fill='x')
-        NavigationToolbar2Tk(self.canvas, self.toolbar_frame).update()
+    # --- Native Tkinter Interaction State Machine ---
+    def _on_scroll(self, event: Any) -> None:
+        if not self._x_bounds or not self._y_bounds: return
+        pad_left, pad_top, plot_w, plot_h = self._get_plot_geometry()
+        
+        # Only zoom if mouse is inside the actual plot area
+        if not (pad_left <= event.x <= pad_left + plot_w and pad_top <= event.y <= pad_top + plot_h):
+            return
 
-        self.canvas.mpl_connect("scroll_event", self._on_scroll)
-        self.canvas.mpl_connect("button_press_event", self._on_press)
-        self.canvas.mpl_connect("button_release_event", self._on_release)
-        self.canvas.mpl_connect("motion_notify_event", self._on_move)
+        data_x, data_y = self._px_to_data(event.x, event.y)
+        zoom_factor = 0.85 if event.delta > 0 else 1.15
+        
+        x_min, x_max = self._x_bounds
+        y_min, y_max = self._y_bounds
+        
+        # Zoom centered on cursor coordinate
+        new_x_min = data_x - (data_x - x_min) * zoom_factor
+        new_x_max = data_x + (x_max - data_x) * zoom_factor
+        new_y_min = data_y - (data_y - y_min) * zoom_factor
+        new_y_max = data_y + (y_max - data_y) * zoom_factor
+        
+        self._x_bounds = (new_x_min, new_x_max)
+        self._y_bounds = (new_y_min, new_y_max)
+        
+        self._schedule_lod_update()
 
+    def _on_press(self, event: Any) -> None:
+        # Double Click
+        # event.state handling: Check if Shift is held down (state bit 0)
+        is_shift = (event.state & 0x0001) != 0
+        
+        pad_left, pad_top, plot_w, plot_h = self._get_plot_geometry()
+        if not (pad_left <= event.x <= pad_left + plot_w and pad_top <= event.y <= pad_top + plot_h):
+            return
+            
+        self._dragging = True
+        self._last_mouse_pos = (event.x, event.y)
+        
+        if is_shift:
+            self._is_drawing_zoom_box = True
+            self._zoom_rect_id = self.canvas.create_rectangle(
+                event.x, event.y, event.x, event.y, 
+                outline=style.COLORS['accent'], dash=(4, 4), width=1.5
+            )
+        else:
+            self._is_drawing_zoom_box = False
+
+    def _on_move(self, event: Any) -> None:
+        if not self._dragging or not self._last_mouse_pos or not self._x_bounds: return
+        
+        if self._is_drawing_zoom_box and self._zoom_rect_id:
+            # Update visual zoom box
+            x0, y0 = self._last_mouse_pos
+            self.canvas.coords(self._zoom_rect_id, x0, y0, event.x, event.y)
+        else:
+            # Mathematical Panning
+            pad_left, pad_top, plot_w, plot_h = self._get_plot_geometry()
+            dx_px = event.x - self._last_mouse_pos[0]
+            dy_px = event.y - self._last_mouse_pos[1]
+            self._last_mouse_pos = (event.x, event.y)
+            
+            x_range = self._x_bounds[1] - self._x_bounds[0]
+            y_range = self._y_bounds[1] - self._y_bounds[0]
+            
+            # Map pixels moved to data scale
+            dx_data = (dx_px / plot_w) * x_range
+            dy_data = (dy_px / plot_h) * y_range
+            
+            self._x_bounds = (self._x_bounds[0] - dx_data, self._x_bounds[1] - dx_data)
+            self._y_bounds = (self._y_bounds[0] + dy_data, self._y_bounds[1] + dy_data) # Y is inverted natively
+            
+            self._schedule_lod_update()
+
+    def _on_release(self, event: Any) -> None:
+        if not self._dragging: return
+        self._dragging = False
+        
+        if self._is_drawing_zoom_box and self._zoom_rect_id and self._x_bounds:
+            self.canvas.delete(self._zoom_rect_id)
+            self._zoom_rect_id = None
+            
+            x0_data, y0_data = self._px_to_data(*self._last_mouse_pos)
+            x1_data, y1_data = self._px_to_data(event.x, event.y)
+            
+            # Prevent 0-area zoom crashes
+            if abs(x1_data - x0_data) > 1e-5 and abs(y1_data - y0_data) > 1e-5:
+                self._x_bounds = (min(x0_data, x1_data), max(x0_data, x1_data))
+                self._y_bounds = (min(y0_data, y1_data), max(y0_data, y1_data))
+                self.request_lod_data(initial_load=False)
+                
+        elif not self._is_drawing_zoom_box:
+            self._push_view()
+
+    # --- Engine Handoff (The Core Call) ---
     def request_lod_data(self, initial_load: bool = False) -> None:
-        if not self.ax or not self.fig: return
-
-        x_bounds = None if initial_load else self.ax.get_xlim()
-
-        # Securely pass the State and bounds to the Extraction Service
-        multi_file_data = self.controller.extraction_service.get_plot_data(
+        if not hasattr(self.controller, 'extraction_service'): return
+        
+        pad_left, pad_top, plot_w, plot_h = self._get_plot_geometry()
+        if plot_w < 10 or plot_h < 10: return
+        
+        # Request Datashader image buffer from the backend
+        pil_img, bounds = self.controller.extraction_service._getRasterizedFrame(
             state=self.controller.state,
-            visible_time_bounds=x_bounds,
-            max_points_budget=self.max_display_points
+            controller=self.controller,
+            task_id=self.task_index,
+            target_view=self.target_view.get(),
+            canvas_width=plot_w,
+            canvas_height=plot_h,
+            x_range=None if initial_load else self._x_bounds,
+            y_range=None if initial_load else self._y_bounds,
+            color_cycle=self.color_cycle
         )
 
-        if multi_file_data:
-            self._update_lines(multi_file_data)
+        if initial_load and bounds:
+            self._x_bounds = (bounds[0], bounds[1])
+            self._y_bounds = (bounds[2], bounds[3])
+            self._push_view()
+
+        self._draw_canvas_overlay(pil_img)
+        self._update_dropdown_options()
+
+    def _update_dropdown_options(self) -> None:
+        """Dynamically updates the dropdown list as background files finish parsing."""
+        if hasattr(self.controller.extraction_service, '_dataframeCache'):
+            cache_keys = list(self.controller.extraction_service._dataframeCache.keys())
+            options = ["Combined"] + cache_keys
+            self.dropdown_combo['values'] = options
+
+    def _draw_canvas_overlay(self, pil_img: Optional[Image.Image]) -> None:
+        """Clears canvas, mounts the new Datashader image, and draws X/Y structural axes manually."""
+        # 1. Purge previous drawings safely
+        for item in self.canvas.find_all():
+            # Don't delete the Combobox window
+            if self.canvas.type(item) != "window":
+                self.canvas.delete(item)
+
+        pad_left, pad_top, plot_w, plot_h = self._get_plot_geometry()
+
+        # 2. Draw Structural Spines
+        self.canvas.create_rectangle(
+            pad_left, pad_top, pad_left + plot_w, pad_top + plot_h, 
+            outline=self.spine_color, width=1.2
+        )
+
+        # 3. Mount Datashader Image
+        if pil_img:
+            # Anchor image directly inside the padding constraints
+            self._tk_img = ImageTk.PhotoImage(pil_img)
+            self.canvas.create_image(pad_left, pad_top, image=self._tk_img, anchor='nw')
         else:
-            # Fallback/Empty state rendering
-            x = np.linspace(x_bounds[0] if x_bounds else 0, x_bounds[1] if x_bounds else 100, 500)
-            sample_data = {"Awaiting Data Validation": (x, np.zeros_like(x))}
-            self._update_lines(sample_data)
-            self.ax.set_title("No valid data returned for this task.", color=style.COLORS['text_muted'], fontsize=10, style='italic')
+            self.canvas.create_text(
+                pad_left + plot_w/2, pad_top + plot_h/2, 
+                text="Awaiting Initial Dataset Stream...", 
+                fill=self.grid_color, font=('Segoe UI', 10, 'italic')
+            )
+            return
 
-        self.apply_theme_properties()
+        # 4. Generate Professional Axis Ticks and Gridlines
+        if self._x_bounds and self._y_bounds:
+            # X Axis Lines (Time)
+            x_span = self._x_bounds[1] - self._x_bounds[0]
+            for i in range(1, 6):
+                x_val = self._x_bounds[0] + (x_span * i / 6.0)
+                px_x = pad_left + (plot_w * i / 6.0)
+                if self.grid_visible:
+                    self.canvas.create_line(px_x, pad_top, px_x, pad_top + plot_h, fill=self.grid_color, dash=(2, 4))
+                try:
+                    dt_label = datetime.datetime.fromtimestamp(x_val).strftime("%y-%m-%d\n%H:%M:%S")
+                except:
+                    dt_label = f"{x_val:.1f}"
 
-        if initial_load:
-            self.ax.autoscale()
-            self.fig.tight_layout()
-            
-        if self.canvas:
-            self.canvas.draw_idle()
-
-    def _update_lines(self, data_dict: Dict[str, Tuple[np.ndarray, np.ndarray]]) -> None:
-        current_names = set(data_dict.keys())
-        existing_names = set(self._lines.keys())
-
-        for removed in existing_names - current_names:
-            self._lines[removed].remove()
-            del self._lines[removed]
-
-        for idx, (file_name, (x_arr, y_arr)) in enumerate(data_dict.items()):
-            if file_name in self._lines:
-                self._lines[file_name].set_data(x_arr, y_arr)
-            else:
-                color = self.color_cycle[idx % len(self.color_cycle)]
-                line, = self.ax.plot(
-                    x_arr, y_arr, 
-                    label=file_name, color=color, 
-                    linewidth=1.5, marker='o', markersize=2, alpha=0.85
+                self.canvas.create_text(
+                    px_x, pad_top + plot_h + 16, 
+                    text=dt_label, fill=self.text_color, 
+                    font=('Segoe UI', 8), justify='center'
                 )
-                self._lines[file_name] = line
 
-        self.ax.set_xlabel("Time Bounds (s)", color=self.text_color, fontsize=9)
-        self.ax.set_ylabel("Measured Data Range", color=self.text_color, fontsize=9)
-        if len(self._lines) > 0:
-            legend = self.ax.legend(facecolor=style.COLORS['bg_card_light'], edgecolor=style.COLORS['border'])
-            for text in legend.get_texts():
-                text.set_color(self.text_color)
+            # Y Axis Lines (Metrics)
+            y_span = self._y_bounds[1] - self._y_bounds[0]
+            for i in range(1, 5):
+                y_val = self._y_bounds[0] + (y_span * i / 5.0)
+                px_y = pad_top + plot_h - (plot_h * i / 5.0) # Inverted placement
+                if self.grid_visible:
+                    self.canvas.create_line(pad_left, px_y, pad_left + plot_w, px_y, fill=self.grid_color, dash=(2, 4))
+                self.canvas.create_text(pad_left - 8, px_y, text=f"{y_val:.1f}", fill=self.text_color, font=('Segoe UI', 8), anchor='e')
 
     def _schedule_lod_update(self) -> None:
         if self._debounce_job:
             self.after_cancel(self._debounce_job)
-        self._debounce_job = self.after(250, lambda: self.request_lod_data(initial_load=False))
-
-    def _on_scroll(self, event: Any) -> None:
-        if not event.inaxes or not self.ax or not self.canvas: return
-        scale_factor = 1/1.2 if event.button == 'up' else 1.2 if event.button == 'down' else 1.0
-        xl, yl = self.ax.get_xlim(), self.ax.get_ylim()
-        xc, yc = event.xdata or (xl[0]+xl[1])/2, event.ydata or (yl[0]+yl[1])/2
-        
-        self.ax.set_xlim([xc - (xc - xl[0]) * scale_factor, xc + (xl[1] - xc) * scale_factor])
-        self.ax.set_ylim([yc - (yc - yl[0]) * scale_factor, yc + (yl[1] - yc) * scale_factor])
-        self.canvas.draw_idle()
-        self._schedule_lod_update()
-
-    def _on_press(self, event: Any) -> None:
-        if event.inaxes and event.button == 1:
-            self._dragging = True
-            self._last_mouse_pos = (event.x, event.y)
-
-    def _on_release(self, event: Any) -> None:
-        if self._dragging:
-            self._dragging = False
-            self._last_mouse_pos = None
-            self._schedule_lod_update()
-
-    def _on_move(self, event: Any) -> None:
-        if not self._dragging or not event.inaxes or not self._last_mouse_pos or not self.ax or not self.canvas: return
-        xl, yl = self.ax.get_xlim(), self.ax.get_ylim()
-        bbox = self.ax.get_window_extent()
-        
-        dx = (event.x - self._last_mouse_pos[0]) * (xl[1] - xl[0]) / bbox.width
-        dy = (event.y - self._last_mouse_pos[1]) * (yl[1] - yl[0]) / bbox.height
-        
-        self.ax.set_xlim(xl[0] - dx, xl[1] - dx)
-        self.ax.set_ylim(yl[0] - dy, yl[1] - dy)
-        self._last_mouse_pos = (event.x, event.y)
-        self.canvas.draw_idle()
+        self._debounce_job = self.after(30, lambda: self.request_lod_data(initial_load=False))
 
     def toggle_grid(self) -> bool:
         self.grid_visible = not self.grid_visible
-        self.apply_theme_properties()
-        if self.canvas: self.canvas.draw_idle()
+        self._draw_canvas_overlay(None if not self._tk_img else ImageTk.getimage(self._tk_img))
         return self.grid_visible
 
-    def reset_scale(self) -> None:
-        if self.ax and self.canvas:
-            self.ax.relim()
-            self.ax.autoscale()
-            self.canvas.draw_idle()
-
     def export_to_file(self, target_path: str) -> bool:
-        if self.fig:
-            self.fig.savefig(target_path, dpi=300, bbox_inches='tight', facecolor=style.COLORS['bg_card'])
+        try:
+            from PIL import ImageGrab
+            x = self.canvas.winfo_rootx()
+            y = self.canvas.winfo_rooty()
+            img = ImageGrab.grab(bbox=(x, y, x + self.canvas.winfo_width(), y + self.canvas.winfo_height()))
+            img.save(target_path)
             return True
-        return False
+        except Exception as e:
+            if self.log_fn: self.log_fn(f"Export failed: {e}")
+            return False
 
-    def _log(self, message: str) -> None:
-        if self.log_fn:
-            self.log_fn(message)
-    
-    def apply_theme_properties(self) -> None:
-        if not self.ax: return
-        self.ax.set_facecolor(self.plot_bg_color)
-        self.ax.grid(self.grid_visible, color=self.grid_color, linestyle='--', linewidth=0.5)
-        
-        self.ax.xaxis.label.set_color(self.text_color)
-        self.ax.yaxis.label.set_color(self.text_color)
-        if self.ax.title:
-            self.ax.title.set_color(self.text_color)
-        self.ax.tick_params(colors=self.text_color, which='both')
-        for spine in self.ax.spines.values():
-            spine.set_color(self.spine_color)
-        legend = self.ax.get_legend()
-        if legend:
-            legend.get_frame().set_facecolor(style.COLORS.get('bg_card_light', '#1A202C'))
-            legend.get_frame().set_edgecolor(style.COLORS.get('border', '#374151'))
-            for text in legend.get_texts():
-                text.set_color(self.text_color)
-
-class NoBackendDisplay(tk.Frame):
-    """Fallback UI view rendered automatically when visualization backends are missing."""
-    def __init__(self, parent: tk.Misc, **kwargs: Any) -> None:
+class NoBackendDisplay(tk.Frame): 
+    def __init__(self, parent, **kwargs):
         super().__init__(parent, bg=style.COLORS['bg_card'], **kwargs)
-        
-        tk.Label(self, text="📊", fg=style.COLORS['error'], bg=style.COLORS['bg_card'], font=("Segoe UI", 44)).pack(pady=(30, 5))
-        tk.Label(self, text="No Graphing Backend Available", fg=style.COLORS['text_primary'], bg=style.COLORS['bg_card'], font=("Segoe UI", 13, "bold")).pack(pady=5)
-        tk.Label(self, text="Install visualization modules to view runtime graphics:\npip install matplotlib", 
-                 fg=style.COLORS['text_secondary'], bg=style.COLORS['bg_card'], font=("Segoe UI", 9), justify="center").pack(pady=10)
+        tk.Label(
+            self, text="Backend not available.", 
+            fg=style.COLORS['text_muted'], bg=style.COLORS['bg_card']
+        ).pack(expand=True)
 
-class PlotErrorDisplay(tk.Frame):
-    """Graceful error container displayed if parsing data components hits a snag."""
-    def __init__(self, parent: tk.Misc, exception_msg: str, **kwargs: Any) -> None:
+class PlotErrorDisplay(tk.Frame): 
+    def __init__(self, parent, error_msg, **kwargs):
         super().__init__(parent, bg=style.COLORS['bg_card'], **kwargs)
-        
-        tk.Label(self, text="⚠️", fg=style.COLORS['error'], bg=style.COLORS['bg_card'], font=("Segoe UI", 44)).pack(pady=(30, 5))
-        tk.Label(self, text="Pipeline Drawing Failure", fg=style.COLORS['error'], bg=style.COLORS['bg_card'], font=("Segoe UI", 13, "bold")).pack(pady=5)
-        tk.Label(self, text=f"Details: {exception_msg}", fg=style.COLORS['text_secondary'], bg=style.COLORS['bg_card'], font=("Segoe UI", 9), wraplength=380, justify="center").pack(pady=10)
+        tk.Label(
+            self, text=f"❌ Error rendering plot:\n{error_msg}", 
+            fg=style.COLORS['error'], bg=style.COLORS['bg_card']
+        ).pack(expand=True)
