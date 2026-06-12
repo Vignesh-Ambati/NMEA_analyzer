@@ -5,7 +5,7 @@ Application entry point for ACCORD Log Analyzer.
 Run with:
     python main.py
 """
-# import pycache_config
+import pycache_config
 from ui.app import LogAnalyzerApp
 
 if __name__ == "__main__":

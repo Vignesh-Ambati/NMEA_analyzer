@@ -13,11 +13,9 @@ from datashader import transfer_functions
 from typing import Dict, List, Tuple, Optional, Callable, Any
 from pathlib import Path
 
-from core.debug import DebugExportService
-
 try:
     from core import CacheManager, JobOrchestrator
-    from core.extractors import CnoExtractor, AltitudeExtractor
+    from core.extractors import AltitudeExtractor
     CORE_AVAILABLE = True
 except ImportError:
     CORE_AVAILABLE = False
@@ -63,13 +61,11 @@ class ProcessingService:
 
 class ExtractionService:
     def __init__(self) -> None:
-        # self.queryEngine: QueryEngine = QueryEngine()
         self._dataframeCache: Dict[str, pd.DataFrame] = {}
-        
         self.extractors = {
-            0: CnoExtractor(),
             3: AltitudeExtractor(),
         }
+        
     def _clearCache(self) -> None:
         self._dataframeCache.clear()
     
@@ -90,23 +86,8 @@ class ExtractionService:
                 if not extractor: continue
                 result = extractor._extract(Path(parquet_path))
                 
-                if result is not None:
-                    # Smart Wrapper: If the extractor returns an old tuple, convert it.
-                    # If it returns a DataFrame, use it natively.
-                    if isinstance(result, tuple) and len(result) == 2:
-                        t_vec, v_vec = result
-                        if t_vec is not None and v_vec is not None and len(t_vec) > 0:
-                            dataframe = pd.DataFrame({'Time': t_vec, 'Value': v_vec})
-                        else:
-                            continue
-                    elif isinstance(result, pd.DataFrame):
-                        dataframe = result
-                    else:
-                        continue
-
-                    if not dataframe.empty:
-                        dataframe = dataframe.sort_values(by="Time").reset_index(drop=True)
-                        self._dataframeCache[fileId] = dataframe
+                if result is not None and isinstance(result, pd.DataFrame) and not result.empty:
+                    self._dataframeCache[fileId] = result
         return available_files
     
     def _getRasterizedFrame(
@@ -121,9 +102,11 @@ class ExtractionService:
         y_range: Optional[Tuple[float,float]] = None,
         color_cycle: Optional[List[str]] = None
         ) -> Tuple[Optional[Any], Tuple[float, float, float, float]]:
+        
         allCachedFiles = self._syncActiveCache(state, controller, task_id)
         if not self._dataframeCache:
             return None, (0.0, 1.0, 0.0, 1.0)
+            
         renderTargets: List[str] = []
         if target_view.lower() == "combined": renderTargets = list(self._dataframeCache.keys())
         elif target_view in self._dataframeCache: renderTargets = [target_view]
@@ -139,6 +122,7 @@ class ExtractionService:
                 global_Xmaximum = max(global_Xmaximum, dataframe["Time"].max())
                 global_Yminimum = min(global_Yminimum, dataframe["Value"].min())
                 global_Ymaximum = max(global_Ymaximum, dataframe["Value"].max())
+                
             x_span = (global_Xmaximum - global_Xminimum) if global_Xmaximum > global_Xminimum else 1.0
             y_span = (global_Ymaximum - global_Yminimum) if global_Ymaximum > global_Yminimum else 1.0
             
@@ -149,27 +133,29 @@ class ExtractionService:
             return None, (x_range[0], x_range[1], y_range[0], y_range[1])
         
         canvas = ds.Canvas(
-            plot_width=max(10, canvas_width),
-            plot_height=max(10, canvas_height),
+            plot_width=max(10, int(canvas_width)),
+            plot_height=max(10, int(canvas_height)),
             x_range=x_range,
             y_range=y_range
         )
-        colors = color_cycle or ['#FF4400', "#24C9BB", '#00FF7F', '#FF00FF', '#FFD700']
+        
+        # Default to the exact Matplotlib blue from the White Image replica
+        colors = color_cycle or ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd']
         raster_layers = []
         
         for index, file_id in enumerate(renderTargets):
             dataframe = self._dataframeCache[file_id]
-            DebugExportService.dump(dataframe, "Stage3_PrePlotting", file_id)
             aggregate = canvas.line(dataframe, x='Time', y='Value')
             if aggregate is not None and not aggregate.isnull().all():
                 layer_color = colors[index % len(colors)]
                 image = transfer_functions.shade(aggregate, cmap=[layer_color], how='linear')
                 raster_layers.append(image)
+                
         if not raster_layers:
             return None, (x_range[0], x_range[1], y_range[0], y_range[1])
+            
         final_Canvas = raster_layers[0]
         for next_layer in raster_layers[1:]:
             final_Canvas = transfer_functions.stack(final_Canvas, next_layer)
-        pilImage = final_Canvas.to_pil()
-        return pilImage, (x_range[0], x_range[1], y_range[0], y_range[1])
-    
+            
+        return final_Canvas.to_pil(), (x_range[0], x_range[1], y_range[0], y_range[1])

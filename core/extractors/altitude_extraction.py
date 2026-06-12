@@ -11,8 +11,6 @@ import pyarrow.parquet as parquet
 from .base_extractor import BaseExtractor
 from core.constants import KEY_TYPE, KEY_TIME, KEY_DATE, KEY_ALT, KEY_GHEIGHT
 
-from core.debug import DebugExportService
-
 class AltitudeExtractor(BaseExtractor):
     @staticmethod
     def _smartStreamLine(dataframe: pd.DataFrame) -> pd.DataFrame:
@@ -22,14 +20,16 @@ class AltitudeExtractor(BaseExtractor):
         
         keep_mask = np.ones(len(dataframe), dtype=bool)
         last_kept_index = 0
+        outage_set = {"000000.00", "0.0", "", "nan", "<NA>"}
+        
         for i in range(1, len(dataframe)):
             current_time = times[i]
             previous_time = times[last_kept_index]
             
-            if current_time == previous_time and current_time not in ["000000.00", "0.0", "", "nan"]:
+            if current_time == previous_time and current_time not in outage_set:
                 keep_mask[i] = False
                 continue
-            if current_time in ["000000.00", "0.0", "", "nan"] and previous_time in ["000000.00", "0.0", "", "nan"]:
+            if current_time in outage_set and previous_time in outage_set:
                 current_type = types[i]
                 previous_type = types[last_kept_index]
                 
@@ -49,34 +49,31 @@ class AltitudeExtractor(BaseExtractor):
     
     def _extract(self, parquet_path: Path) -> Optional[pd.DataFrame]:
         try:
+            # 1. High-Speed Bulk Load
             table = parquet.read_table(
                 parquet_path,
                 columns=[KEY_DATE, KEY_TIME, KEY_TYPE, KEY_ALT, KEY_GHEIGHT],
-                filters=[
-                    (KEY_TYPE, 'in', ['GGA', 'GNS'])
-                ]
+                filters=[(KEY_TYPE, 'in', ['GGA', 'GNS'])]
             )
-            DebugExportService.dump(table, "Stage1_RawParquet", parquet_path.name)
-              
             if table.num_rows == 0: return None
             dataframe = table.to_pandas()
             
+            # 2. Vectorized Math
             alt_numeric = pd.to_numeric(dataframe[KEY_ALT], errors='coerce')
             gheight_numeric = pd.to_numeric(dataframe[KEY_GHEIGHT], errors='coerce')
             dataframe['Value'] = alt_numeric - gheight_numeric
             
+            # 3. Streamline & Time Conversion
             dataframe = self._smartStreamLine(dataframe)
-            
             dataframe['Time'] = self._convertToAbsoluteEpoch(dataframe[KEY_DATE], dataframe[KEY_TIME])
             
+            # 4. Replica Fix: Outages to 0.0 instead of NaN for straight vertical drops
             outage_mask = dataframe[KEY_TIME].astype(str).isin(["", "None", "000000.00", "0.0", "nan", "<NA>"])
-            dataframe.loc[outage_mask, 'Value'] = np.nan
+            dataframe.loc[outage_mask, 'Value'] = 0.0
             
             dataframe = dataframe.dropna(subset=['Time'])
-            dataframe = dataframe.sort_values(by=['Time']).reset_index(drop=True)
+            return dataframe.sort_values(by=['Time']).reset_index(drop=True)[['Time', 'Value']]
             
-            DebugExportService.dump(dataframe[['Time', 'Value']], "Stage2_ExtractorOutput", parquet_path.name)
-            return dataframe[['Time', 'Value']]
         except Exception as e:
             print(f"[!] Altitude Extractor Error: {e}")
             return None

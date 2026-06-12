@@ -32,7 +32,6 @@ class BaseExtractor(ABC):
         time_seconds = (_hour * 3600) + (_minute * 60) + _second
         
         interpolated_seconds = pd.Series(time_seconds).interpolate(method='linear').values
-        interpolated_seconds = pd.Series(time_seconds).interpolate(method='linear').values
         
         time_diffs = np.diff(interpolated_seconds, prepend=interpolated_seconds[0])
         crossovers = np.cumsum(time_diffs < -43200)
