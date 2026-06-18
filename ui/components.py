@@ -1,13 +1,20 @@
 import datetime
-import math
-import queue
 import threading
+import json
+import os
+import time
+import numpy as np
 import tkinter as tk
 from tkinter import ttk
-from PIL import Image, ImageTk
+from PIL import Image
 from typing import Any, Dict, Optional, Callable, Tuple, List
-from . import style
+from matplotlib.figure import Figure
+from matplotlib.ticker import FuncFormatter, StrMethodFormatter
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
+from . import config as ui_config
 
+from . import style
+from . import dialogs
 
 class ThemedButton(tk.Button):
     def __init__(self, parent, text, command=None, is_primary=False, **kwargs):
@@ -89,14 +96,19 @@ class ScrollableFrame(tk.Frame):
         self.canvas_window = self.canvas.create_window((0,0), window=self.content_frame, anchor='nw')
         self.content_frame.bind('<Configure>', self._on_configure)
         self.canvas.bind('<Configure>', self._on_canvas_configure)
-        self.canvas.bind('<Enter>', lambda e: self.canvas.bind_all('<MouseWheel>', self._on_mousewheel))
-        self.canvas.bind('<Leave>', lambda e: self.canvas.unbind_all('<MouseWheel>'))
+        # Bind the mousewheel to the canvas only while the mouse is over it.
+        self.canvas.bind('<Enter>', lambda e: self.canvas.bind('<MouseWheel>', self._on_mousewheel))
+        self.canvas.bind('<Leave>', lambda e: self.canvas.unbind('<MouseWheel>'))
     def _on_configure(self, e):
         self.canvas.configure(scrollregion=self.canvas.bbox('all'))
     def _on_canvas_configure(self, e):
         self.canvas.itemconfig(self.canvas_window, width=e.width)
     def _on_mousewheel(self, e):
-        self.canvas.yview_scroll(int(-1*(e.delta/120)), 'units')
+        try:
+            self.canvas.yview_scroll(int(-1*(e.delta/120)), 'units')
+        except Exception:
+            # Widget may have been destroyed; ignore
+            pass
 
 class ProgressIndicator(tk.Frame):
     def __init__(self, parent):
@@ -332,307 +344,255 @@ class ConsoleOutput(tk.Frame):
         self.text.configure(bg=style.COLORS['bg_console'], fg=style.COLORS['text_secondary'])
 
 class InteractivePlotCanvas(tk.Frame):
-    """
-    Pure Tkinter + Async Datashader Engine.
-    Flawlessly replicates Matplotlib's aesthetic while handling 100 million+ rows without freezing.
-    """
     def __init__(self, parent: tk.Misc, controller: Any, task_index: int, log_fn: Optional[Callable[[str], None]] = None, **kwargs: Any) -> None:
-        super().__init__(parent, bg='#FFFFFF', **kwargs)
+        super().__init__(parent, bg=style.COLORS['bg_card'], **kwargs)
         self.controller = controller
         self.task_index = task_index
         self.log_fn = log_fn
         
         self.target_view = tk.StringVar(value="Combined")
-        self.target_view.trace_add("write", lambda *args: self.reset_scale())
+        self.target_view.trace_add("write", lambda *args: self.request_lod_data(initial_load=True))
         
-        self._tk_img: Optional[ImageTk.PhotoImage] = None
-        self._x_bounds: Optional[Tuple[float, float]] = None
-        self._y_bounds: Optional[Tuple[float, float]] = None
+        self._is_rendering = False
         
-        self._view_history: List[Tuple[Tuple[float, float], Tuple[float, float]]] = []
-        self._view_index: int = -1
-        self._dragging: bool = False
-        self._is_drawing_zoom_box: bool = False
-        self._last_mouse_pos: Optional[Tuple[int, int]] = None 
-        self._zoom_rect_id: Optional[int] = None
-        self._debounce_job: Optional[str] = None
-        self._is_rendering: bool = False
-        self.interaction_mode = 'pan'
+        # Current Axis Bounds tracking for Datashader updates
+        self._current_xlim = None
+        self._current_ylim = None
         
-        # White Image Replica Style Definitions
-        self.plot_bg_color = '#FFFFFF'
-        self.text_color = '#000000'
-        self.spine_color = '#000000'
-        self.grid_color = '#E5E7EB'
-        self.grid_visible = False
-        self.color_cycle = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728']
+        self.plot_bg_color = style.COLORS['bg_card']
+        self.text_color = style.COLORS['text_primary']
+        self.grid_color = style.COLORS['border']
+        self.grid_visible = True
+        self.color_cycle = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd']
 
         self._initialize_canvas()
 
     def _initialize_canvas(self) -> None:
-        self.canvas = tk.Canvas(self, bg=self.plot_bg_color, highlightthickness=0, cursor="fleur")
-        self.canvas.pack(fill='both', expand=True, padx=5, pady=5)
+        self.top_control_frame = tk.Frame(self, bg=style.COLORS['bg_card'])
+        self.top_control_frame.pack(fill='x', padx=5, pady=5)
         
-        self.dropdown_combo = ttk.Combobox(self.canvas, textvariable=self.target_view, state="readonly", width=18)
-        
-        self.canvas.bind("<Configure>", lambda e: self._schedule_lod_update())
-        self.canvas.bind("<MouseWheel>", self._on_scroll)
-        self.canvas.bind("<ButtonPress-1>", self._on_press)
-        self.canvas.bind("<B1-Motion>", self._on_move)
-        self.canvas.bind("<ButtonRelease-1>", self._on_release)
+        self.dropdown_combo = ttk.Combobox(self.top_control_frame, textvariable=self.target_view, state="readonly", width=25)
+        self.dropdown_combo.pack(side='right')
 
+        # 1. Matplotlib Native Figure Setup
+        self.fig = Figure(figsize=(6, 4), dpi=getattr(ui_config, 'PLOT_DPI', 100))
+        self.fig.patch.set_facecolor(self.plot_bg_color)
+        self.ax = self.fig.add_subplot(111)
+        self._format_axes()
+
+        # 2. Tkinter Integration
+        self.canvas = FigureCanvasTkAgg(self.fig, master=self)
+        self.canvas.get_tk_widget().pack(fill='both', expand=True)
+
+        # 3. HIDDEN NATIVE TOOLBAR
+        # We instantiate it to use its logic, but we DO NOT pack() it into the UI.
+        self.hidden_toolbar_frame = tk.Frame(self) 
+        self.toolbar = NavigationToolbar2Tk(self.canvas, self.hidden_toolbar_frame)
+        self.toolbar.update()
+
+        # 4. Bind Mouse Release to trigger Datashader updates after panning/zooming
+        self.canvas.mpl_connect('button_release_event', self._on_mouse_release)
+        self.ax_image = None
+
+        # Lightweight in-memory render cache to avoid unnecessary recompute
+        # key: (target_view, width, height, x0, x1, y0, y1)
+        self._render_cache: Dict[Tuple, Tuple[Image.Image, Tuple[float,float,float,float]]] = {}
+
+    def _format_axes(self) -> None:
+        self.ax.clear()
+        self.ax.set_facecolor(self.plot_bg_color)
+        self.ax.tick_params(colors=self.text_color)
+        for spine in self.ax.spines.values():
+            spine.set_color(self.grid_color)
+            
+        self.ax.set_title(f"Dashboard: {self.target_view.get()}", color=self.text_color)
+        self.ax.set_ylabel("Altitude (meters)" if self.task_index == 3 else "Value", color=self.text_color)
+        self.ax.set_xlabel("Date & Time", color=self.text_color)
+
+        if self.grid_visible:
+            self.ax.grid(True, linestyle='--', color=self.grid_color, alpha=0.5)
+
+        self.ax.yaxis.set_major_formatter(StrMethodFormatter('{x:,.0f}'))
+
+        def format_date(x, pos):
+            try: return datetime.datetime.fromtimestamp(x).strftime('%Y-%m-%d\n%H:%M:%S')
+            except: return ""
+        self.ax.xaxis.set_major_formatter(FuncFormatter(format_date))
+        # Improve spacing to avoid cramped x-axis labels
+        try:
+            self.fig.tight_layout()
+        except Exception:
+            # fallback to manual adjustment
+            self.fig.subplots_adjust(bottom=0.18, left=0.1, right=0.98, top=0.92)
+        for label in self.ax.get_xticklabels():
+            label.set_rotation(25)
+            label.set_ha('right')
+
+    def _on_mouse_release(self, event):
+        """Catches when the user finishes zooming or panning using the toolbar."""
+        if self.toolbar.mode != '': 
+            self._refresh_datashader_bounds()
+
+    # ──────────────────────────────────────────────────────────
+    # SIDEBAR TOOLBAR HIJACKING METHODS
+    # ──────────────────────────────────────────────────────────
     def set_interaction_mode(self, mode: str) -> None:
-        self.interaction_mode = mode
-        self.canvas.config(cursor="crosshair" if mode == 'zoom' else "fleur")
-
-    def _push_view(self) -> None:
-        if not self._x_bounds or not self._y_bounds: return
-        self._view_history = self._view_history[:self._view_index + 1]
-        self._view_history.append((self._x_bounds, self._y_bounds))
-        self._view_index += 1
-
-    def history_back(self) -> None:
-        if self._view_index > 0:
-            self._view_index -= 1
-            self._x_bounds, self._y_bounds = self._view_history[self._view_index]
-            self.request_lod_data(initial_load=False)
-
-    def history_forward(self) -> None:
-        if self._view_index < len(self._view_history) - 1:
-            self._view_index += 1
-            self._x_bounds, self._y_bounds = self._view_history[self._view_index]
-            self.request_lod_data(initial_load=False)
+        """Programmatically triggers the hidden Matplotlib toolbar modes."""
+        if mode == 'pan':
+            if self.toolbar.mode == 'zoom rect':
+                self.toolbar.zoom() # Toggle off zoom
+            if self.toolbar.mode != 'pan/zoom':
+                self.toolbar.pan()  # Toggle on pan
+            if self.log_fn: self.log_fn("✋ Drag-Pan mode activated.")
+                
+        elif mode == 'zoom':
+            if self.toolbar.mode == 'pan/zoom':
+                self.toolbar.pan() # Toggle off pan
+            if self.toolbar.mode != 'zoom rect':
+                self.toolbar.zoom() # Toggle on zoom
+            if self.log_fn: self.log_fn("🔍 Box-Zoom mode activated. Draw a box on the graph.")
 
     def reset_scale(self) -> None:
-        self._x_bounds = self._y_bounds = None
         self.request_lod_data(initial_load=True)
 
-    def _get_plot_geometry(self) -> Tuple[int, int, int, int]:
-        w, h = self.canvas.winfo_width(), self.canvas.winfo_height()
-        if w < 100 or h < 100: return 60, 30, 10, 10
-        pad_left, pad_top, pad_right, pad_bottom = 80, 40, 20, 70 
-        return pad_left, pad_top, w - pad_left - pad_right, h - pad_top - pad_bottom
+    def history_back(self) -> None:
+        """Step backwards through zoom states and update Datashader."""
+        self.toolbar.back()
+        self._refresh_datashader_bounds()
 
-    def _px_to_data(self, px_x: float, px_y: float) -> Tuple[float, float]:
-        pad_left, pad_top, plot_w, plot_h = self._get_plot_geometry()
-        x_min, x_max = self._x_bounds or (0, 1)
-        y_min, y_max = self._y_bounds or (0, 1)
-        data_x = x_min + ((px_x - pad_left) / plot_w) * (x_max - x_min)
-        data_y = y_max - ((px_y - pad_top) / plot_h) * (y_max - y_min)
-        return data_x, data_y
+    def history_forward(self) -> None:
+        """Step forwards through zoom states and update Datashader."""
+        self.toolbar.forward()
+        self._refresh_datashader_bounds()
 
-    def _on_scroll(self, event: Any) -> None:
-        if not self._x_bounds or not self._y_bounds: return
-        pad_left, pad_top, plot_w, plot_h = self._get_plot_geometry()
-        if not (pad_left <= event.x <= pad_left + plot_w and pad_top <= event.y <= pad_top + plot_h): return
+    def export_to_file(self, target_path: str) -> bool:
+        """Uses Matplotlib's native high-res save function."""
+        try:
+            self.fig.savefig(target_path, bbox_inches='tight', dpi=300)
+            if self.log_fn: self.log_fn(f"[✓] Canvas snapshot saved to: {target_path}")
+            return True
+        except Exception as err:
+            if self.log_fn: self.log_fn(f"[!] Export failed: {err}")
+            return False
 
-        data_x, data_y = self._px_to_data(event.x, event.y)
-        zoom_factor = 0.85 if event.delta > 0 else 1.15
-        
-        x_min, x_max = self._x_bounds; y_min, y_max = self._y_bounds
-        self._x_bounds = (data_x - (data_x - x_min) * zoom_factor, data_x + (x_max - data_x) * zoom_factor)
-        self._y_bounds = (data_y - (data_y - y_min) * zoom_factor, data_y + (y_max - data_y) * zoom_factor)
-        self._schedule_lod_update()
-
-    def _on_press(self, event: Any) -> None:
-        pad_left, pad_top, plot_w, plot_h = self._get_plot_geometry()
-        if not (pad_left <= event.x <= pad_left + plot_w and pad_top <= event.y <= pad_top + plot_h): return
-        
-        self._dragging = True
-        self._last_mouse_pos = (event.x, event.y)
-        
-        if self.interaction_mode == 'zoom':
-            self._is_drawing_zoom_box = True
-            self._zoom_rect_id = self.canvas.create_rectangle(event.x, event.y, event.x, event.y, outline=style.COLORS['accent'], dash=(4, 4), width=1.5)
-        else:
-            self._is_drawing_zoom_box = False
-
-    def _on_move(self, event: Any) -> None:
-        if not self._dragging or not self._last_mouse_pos or not self._x_bounds: return
-        
-        if self._is_drawing_zoom_box and self._zoom_rect_id:
-            self.canvas.coords(self._zoom_rect_id, self._last_mouse_pos[0], self._last_mouse_pos[1], event.x, event.y)
-        else:
-            pad_left, pad_top, plot_w, plot_h = self._get_plot_geometry()
-            dx_data = ((event.x - self._last_mouse_pos[0]) / plot_w) * (self._x_bounds[1] - self._x_bounds[0])
-            dy_data = ((event.y - self._last_mouse_pos[1]) / plot_h) * (self._y_bounds[1] - self._y_bounds[0])
-            self._last_mouse_pos = (event.x, event.y)
+    def _refresh_datashader_bounds(self):
+        new_xlim = self.ax.get_xlim()
+        new_ylim = self.ax.get_ylim()
+        if self._current_xlim != new_xlim or self._current_ylim != new_ylim:
+            self.request_lod_data(initial_load=False, x_range=new_xlim, y_range=new_ylim)
             
-            self._x_bounds = (self._x_bounds[0] - dx_data, self._x_bounds[1] - dx_data)
-            self._y_bounds = (self._y_bounds[0] + dy_data, self._y_bounds[1] + dy_data)
-            self._schedule_lod_update()
+    # ──────────────────────────────────────────────────────────
 
-    def _on_release(self, event: Any) -> None:
-        if not self._dragging: return
-        self._dragging = False
-        
-        if self._is_drawing_zoom_box and self._zoom_rect_id and self._x_bounds:
-            self.canvas.delete(self._zoom_rect_id)
-            self._zoom_rect_id = None
-            x0, y0 = self._px_to_data(*self._last_mouse_pos)
-            x1, y1 = self._px_to_data(event.x, event.y)
-            if abs(x1 - x0) > 1e-5 and abs(y1 - y0) > 1e-5:
-                self._x_bounds = (min(x0, x1), max(x0, x1))
-                self._y_bounds = (min(y0, y1), max(y0, y1))
-                self.request_lod_data(initial_load=False)
-        elif not self._is_drawing_zoom_box:
-            self._push_view()
+    def request_lod_data(self, initial_load: bool = False, x_range=None, y_range=None) -> None:
+        # State Safety Check
+        if hasattr(self.controller, 'state') and getattr(self.controller.state, 'is_parsing', getattr(self.controller.state, 'is_processing', False)):
+            if initial_load:
+                dialogs.show_info("Parsing in Progress", "Files are currently being processed.\nPlease wait.", parent=self.controller.root)
+            return
 
-    # --- ASYNC DATASHADER PIPELINE ---
-    def request_lod_data(self, initial_load: bool = False) -> None:
-        if not hasattr(self.controller, 'extraction_service'): return
-        pad_left, pad_top, plot_w, plot_h = self._get_plot_geometry()
-        if plot_w < 10 or plot_h < 10 or self._is_rendering: return
-        
+        if self._is_rendering: return
         self._is_rendering = True
         
-        self.canvas.delete("loading")
-        self.canvas.create_text(
-            pad_left + plot_w/2, pad_top + plot_h/2, 
-            text="⏳ Rendering Viewport...", 
-            fill=style.COLORS['accent'], font=('Segoe UI', 12, 'bold'), tags="loading"
-        )
-        self.canvas.update_idletasks()
+        self.controller.progress.add_job("plot_render", "Datashader Engine")
+
+        w, h = self.canvas.get_width_height()
+
+        # Normalize ranges for caching key
+        xr = None if x_range is None else (float(x_range[0]), float(x_range[1]))
+        yr = None if y_range is None else (float(y_range[0]), float(y_range[1]))
+        cache_key = (self.target_view.get(), w, h, xr, yr)
+
+        # Serve from cache if available and initial_load is False (fresh loads prefer recompute)
+        if not initial_load and cache_key in self._render_cache:
+            pil_img, extent = self._render_cache[cache_key]
+            if self.log_fn: self.log_fn('ℹ️ Using cached render for viewport.')
+            self._on_render_complete(pil_img, extent, initial_load)
+            return
+
+        def _progress_cb(pct: float, msg: str):
+            self.after(0, lambda: self.controller.progress.set_job_progress("plot_render", pct, "Matplotlib Engine"))
 
         def _worker_thread():
             try:
-                pil_img, bounds = self.controller.extraction_service._getRasterizedFrame(
-                    state=self.controller.state, controller=self.controller, task_id=self.task_index,
-                    target_view=self.target_view.get(), canvas_width=plot_w, canvas_height=plot_h,
-                    x_range=None if initial_load else self._x_bounds, y_range=None if initial_load else self._y_bounds,
-                    color_cycle=self.color_cycle
-                )
-                self.after(0, lambda: self._on_render_complete(pil_img, bounds, initial_load))
+                if hasattr(self.controller, 'extraction_service'):
+                    pil_img, extent = self.controller.extraction_service.get_datashader_image(
+                        state=self.controller.state, controller=self.controller, task_id=self.task_index,
+                        target_view=self.target_view.get(), canvas_width=w, canvas_height=h,
+                        color_cycle=self.color_cycle, x_range=x_range, y_range=y_range,
+                        progress_callback=_progress_cb
+                    )
+                    self.after(0, lambda: self._on_render_complete(pil_img, extent, initial_load))
+                else:
+                    self.after(0, lambda: self._on_render_error("Service unavailable."))
             except Exception as e:
-                self.after(0, lambda: print(f"Render error: {e}"))
-                self._is_rendering = False
+                self.after(0, lambda: self._on_render_error(str(e)))
 
         threading.Thread(target=_worker_thread, daemon=True).start()
 
-    def _on_render_complete(self, pil_img, bounds, initial_load):
+    def _on_render_complete(self, pil_img: Optional[Image.Image], extent: Tuple[float,float,float,float], initial_load: bool) -> None:
         self._is_rendering = False
-        if initial_load and bounds:
-            self._x_bounds = (bounds[0], bounds[1])
-            self._y_bounds = (bounds[2], bounds[3])
-            self._push_view()
-            
+        self.controller.progress.set_job_progress("plot_render", 1.0, "Done")
+        self.after(1000, lambda: self.controller.progress.remove_job("plot_render"))
+        
         self._update_dropdown_options()
-        self._draw_canvas_overlay(pil_img)
+        
+        if pil_img is None:
+            if self.log_fn: self.log_fn("ℹ️ No data available for viewport.")
+            return
+        # Cache the result to speed up repeated views
+        try:
+            xr = (float(extent[0]), float(extent[1]))
+            yr = (float(extent[2]), float(extent[3]))
+            w, h = self.canvas.get_width_height()
+            cache_key = (self.target_view.get(), w, h, xr, yr)
+            self._render_cache[cache_key] = (pil_img.copy(), extent)
+        except Exception:
+            pass
+
+        self._format_axes()
+        # Use imshow to paint the datashader output
+        self.ax_image = self.ax.imshow(np.array(pil_img), extent=extent, origin='lower', aspect='auto')
+        self.ax.set_xlim(extent[0], extent[1])
+        self.ax.set_ylim(extent[2], extent[3])
+        
+        self._current_xlim = self.ax.get_xlim()
+        self._current_ylim = self.ax.get_ylim()
+
+        self.canvas.draw_idle()
+        if self.log_fn: self.log_fn("✓ Dashboard updated.")
+        # Optional debug export of the rendered image and extent
+        try:
+            if getattr(ui_config, 'GUI_DEBUG', False):
+                out_dir = getattr(ui_config, 'DEBUG_EXPORT_DIR', 'debug_exports')
+                os.makedirs(out_dir, exist_ok=True)
+                ts = time.strftime('%Y%m%d_%H%M%S')
+                img_path = os.path.join(out_dir, f"render_task{self.task_index}_{self.target_view.get()}_{ts}.png")
+                pil_img.save(img_path)
+                meta = {'task_index': self.task_index, 'target_view': self.target_view.get(), 'extent': extent, 'timestamp': ts}
+                with open(os.path.join(out_dir, f"render_task{self.task_index}_{ts}.json"), 'w', encoding='utf-8') as mf:
+                    json.dump(meta, mf, indent=2)
+                if self.log_fn: self.log_fn(f"[DEBUG] Render exported: {img_path}")
+        except Exception as e:
+            if self.log_fn: self.log_fn(f"[DEBUG] Export failed: {e}")
+
+    def _on_render_error(self, err_msg: str) -> None:
+        self._is_rendering = False
+        self.controller.progress.remove_job("plot_render")
+        if self.log_fn: self.log_fn(f"❌ Render error: {err_msg}")
 
     def _update_dropdown_options(self) -> None:
-        if hasattr(self.controller.extraction_service, '_dataframeCache'):
+        options = ["Combined"]
+        if hasattr(self.controller, 'extraction_service') and hasattr(self.controller.extraction_service, '_dataframeCache'):
             cache_keys = list(self.controller.extraction_service._dataframeCache.keys())
-            if len(cache_keys) > 1:
-                options = ["Combined"] + cache_keys
-                self.dropdown_combo['values'] = options
-                if self.target_view.get() not in options: self.target_view.set("Combined")
-                self.dropdown_combo.place(relx=0.98, rely=0.02, anchor='ne')
-            elif len(cache_keys) == 1:
-                self.target_view.set(cache_keys[0])
-                self.dropdown_combo.place_forget()
-            else:
-                self.dropdown_combo.place_forget()
+            if cache_keys: options += cache_keys
 
-    def _calculate_nice_ticks(self, min_val: float, max_val: float, num_ticks: int = 5) -> List[float]:
-        span = max_val - min_val
-        if span == 0: return [min_val]
-        rough_step = span / (num_ticks - 1)
-        if rough_step <= 0: rough_step = 1e-9
-        
-        magnitude = 10 ** math.floor(math.log10(rough_step))
-        rel = rough_step / magnitude
-        
-        if rel <= 1.5: step = 1 * magnitude
-        elif rel <= 3: step = 2 * magnitude
-        elif rel <= 7: step = 5 * magnitude
-        else: step = 10 * magnitude
-        
-        start = math.ceil(min_val / step) * step
-        ticks, val = [], start
-        while val <= max_val + (step * 0.1):
-            ticks.append(val); val += step
-        return ticks
-
-    def _draw_canvas_overlay(self, pil_img: Optional[Image.Image]) -> None:
-        self.canvas.delete("all")
-        self.canvas.configure(bg=self.plot_bg_color)
-        pad_left, pad_top, plot_w, plot_h = self._get_plot_geometry()
-
-        if pil_img:
-            self._tk_img = ImageTk.PhotoImage(pil_img)
-            self.canvas.create_image(pad_left, pad_top, image=self._tk_img, anchor='nw')
-        
-        self.canvas.create_rectangle(pad_left, pad_top, pad_left + plot_w, pad_top + plot_h, outline=self.spine_color, width=1.0)
-
-        # Exact White Image Replica Labels
-        self.canvas.create_text(pad_left + plot_w/2, pad_top - 15, text="altitude plot", fill=self.text_color, font=('Segoe UI', 12))
-        self.canvas.create_text(pad_left + plot_w/2, pad_top + plot_h + 50, text="time", fill=self.text_color, font=('Segoe UI', 10))
-        self.canvas.create_text(pad_left - 60, pad_top + plot_h/2, text="altitude - meters", fill=self.text_color, font=('Segoe UI', 10), angle=90)
-
-        if self._x_bounds and self._y_bounds:
-            y_ticks = self._calculate_nice_ticks(self._y_bounds[0], self._y_bounds[1], 6)
-            span_y = self._y_bounds[1] - self._y_bounds[0]
-            
-            for y_val in y_ticks:
-                px_y = pad_top + plot_h - ((y_val - self._y_bounds[0]) / span_y) * plot_h
-                if px_y < pad_top or px_y > pad_top + plot_h: continue
-                
-                if self.grid_visible: self.canvas.create_line(pad_left, px_y, pad_left + plot_w, px_y, fill=self.grid_color, dash=(2, 4))
-                self.canvas.create_line(pad_left, px_y, pad_left - 4, px_y, fill=self.spine_color)
-                
-                fmt_y = f"{int(y_val)}" if y_val.is_integer() else f"{y_val:.1f}"
-                self.canvas.create_text(pad_left - 8, px_y, text=fmt_y, fill=self.text_color, font=('Segoe UI', 9), anchor='e')
-
-            x_span = self._x_bounds[1] - self._x_bounds[0]
-            for i in range(1, 6):
-                x_val = self._x_bounds[0] + (x_span * i / 6.0)
-                px_x = pad_left + (plot_w * i / 6.0)
-                if self.grid_visible: self.canvas.create_line(px_x, pad_top, px_x, pad_top + plot_h, fill=self.grid_color, dash=(2, 4))
-                self.canvas.create_line(px_x, pad_top + plot_h, px_x, pad_top + plot_h + 4, fill=self.spine_color)
-                
-                try: dt_label = datetime.datetime.fromtimestamp(x_val).strftime("%m-%d %H:%M")
-                except: dt_label = f"{x_val:.1f}"
-                self.canvas.create_text(px_x, pad_top + plot_h + 10, text=dt_label, fill=self.text_color, font=('Segoe UI', 9), angle=25, anchor='ne')
-
-    def _schedule_lod_update(self) -> None:
-        if self._debounce_job: self.after_cancel(self._debounce_job)
-        self._debounce_job = self.after(50, lambda: self.request_lod_data(initial_load=False))
-
-    def export_to_file(self, target_path: str) -> bool:
+        # Guard against combobox being destroyed while async render completes
         try:
-            from PIL import ImageGrab
-            self.canvas.update_idletasks()
-
-            x0 = self.canvas.winfo_rootx()
-            y0 = self.canvas.winfo_rooty()
-            x1 = x0 + self.canvas.winfo_width()
-            y1 = y0 + self.canvas.winfo_height()
+            if getattr(self, 'dropdown_combo', None) and self.dropdown_combo.winfo_exists():
+                self.dropdown_combo['values'] = options
+                if self.target_view.get() not in options:
+                    self.target_view.set("Combined")
+        except Exception:
+            # Widget no longer available
+            if self.log_fn: self.log_fn('[WARN] Dropdown update skipped; widget not available.')
             
-            if x1 <= x0 or y1 <= y0:
-                print("[!] Export failed: Canvas geometry measurements are invalid.")
-                return False
-            screenshot = ImageGrab.grab(bbox=(x0, y0, x1, y1))
-            screenshot.save(target_path, "PNG")
-            
-            print(f"[✓] Canvas snapshot successfully saved directly to: {target_path}")
-            return True
-        except Exception as err:
-            print(f"[!] Native canvas export pipeline failed: {err}")
-            return False
-
-class NoBackendDisplay(tk.Frame): 
-    def __init__(self, parent, **kwargs):
-        super().__init__(parent, bg=style.COLORS['bg_card'], **kwargs)
-        tk.Label(
-            self, text="Backend not available.", 
-            fg=style.COLORS['text_muted'], bg=style.COLORS['bg_card']
-        ).pack(expand=True)
-
-class PlotErrorDisplay(tk.Frame): 
-    def __init__(self, parent, error_msg, **kwargs):
-        super().__init__(parent, bg=style.COLORS['bg_card'], **kwargs)
-        tk.Label(
-            self, text=f"❌ Error rendering plot:\n{error_msg}", 
-            fg=style.COLORS['error'], bg=style.COLORS['bg_card']
-        ).pack(expand=True)
-        

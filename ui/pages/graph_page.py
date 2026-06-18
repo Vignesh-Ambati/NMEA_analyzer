@@ -10,19 +10,17 @@ from typing import Optional, Any, List, Tuple, Callable
 
 from .base_page import BasePage
 from .. import style, config
-from ..components import InteractivePlotCanvas, PlotErrorDisplay
+from ..components import InteractivePlotCanvas, ThemedButton
+from .. import config as ui_config
 
 class GraphPage(BasePage):
     def __init__(self, parent: tk.Misc, controller: Any) -> None:
         super().__init__(parent, controller)
-        
         self.plotter: Optional[InteractivePlotCanvas] = None
         self.plot_container: Optional[tk.Frame] = None
-        self.title_label: Optional[tk.Label] = None
         self.is_maximized: bool = False
 
     def setup_ui(self) -> None:
-        """Constructs the visual components, layout grids, and interactive sidebars."""
         self.main_frame = tk.Frame(self, bg=style.COLORS['bg_card'])
         self.main_frame.pack(fill='both', expand=True, padx=10, pady=10)
 
@@ -33,8 +31,8 @@ class GraphPage(BasePage):
         self.header_bar.pack(fill='x', pady=(0, 5))
         self.header_bar.pack_propagate(False)
 
-        current_task_idx: int = self.controller.state.current_task if self.controller.state.current_task is not None else 0
-        task_title: str = config.TASKS[current_task_idx] if current_task_idx < len(config.TASKS) else "Analysis View Frame"
+        current_task_idx = self.controller.state.current_task if self.controller.state.current_task is not None else 0
+        task_title = config.TASKS[current_task_idx] if current_task_idx < len(config.TASKS) else "Analysis View Frame"
 
         self.title_label = tk.Label(
             self.header_bar, text=task_title, fg=style.COLORS['text_primary'], 
@@ -45,8 +43,8 @@ class GraphPage(BasePage):
         nav_frame = tk.Frame(self.header_bar, bg=style.COLORS['bg_card_light'])
         nav_frame.pack(side='right', padx=5)
         
-        tk.Button(nav_frame, text="← Back", command=self._go_back, bg=style.COLORS['bg_card'], fg=style.COLORS['text_primary'], relief='flat', padx=12, pady=4, cursor='hand2').pack(side='left', padx=2)
-        tk.Button(nav_frame, text="⌂ Home", command=self._go_home, bg=style.COLORS['bg_card'], fg=style.COLORS['text_primary'], relief='flat', padx=12, pady=4, cursor='hand2').pack(side='left', padx=2)
+        ThemedButton(nav_frame, text="← Back", command=self._go_back, is_primary=False, padx=12, pady=4).pack(side='left', padx=2)
+        ThemedButton(nav_frame, text="⌂ Home", command=self._go_home, is_primary=False, padx=12, pady=4).pack(side='left', padx=2)
 
         self.plot_container = tk.Frame(self.plot_frame, bg=style.COLORS['bg_card'])
         self.plot_container.pack(fill='both', expand=True)
@@ -64,10 +62,7 @@ class GraphPage(BasePage):
                 task_index=task_index, log_fn=self._write_console
             )
             self.plotter.pack(fill='both', expand=True)
-            
-            # THE FIX: Tell Datashader to calculate bounds and render the image immediately
-            self.plotter.reset_scale()
-                
+            self.plotter.request_lod_data(initial_load=True)
         except Exception as err:
             self._write_console(f"❌ Initialization error: {err}")
             
@@ -79,40 +74,76 @@ class GraphPage(BasePage):
         tk.Label(self.sidebar_frame, text="⚙️ Graph Matrix", fg=style.COLORS['accent'], bg=style.COLORS['bg_card_light'], font=('Segoe UI', 10, 'bold')).pack(pady=(10, 5), padx=10, anchor='w')
         tk.Frame(self.sidebar_frame, bg=style.COLORS['border'], height=1).pack(fill='x', padx=10, pady=5)
 
-        # Integrating all Matplotlib functional requests strictly into the sidebar
+        # 🚀 ALL CUSTOM SIDEBAR CONTROLS RESTORED!
         sidebar_controls: List[Tuple[str, Callable[[], None]]] = [
             ("⛶ Maximize Plot", self._toggle_maximize),
             ("✋ Pan Data", lambda: self.plotter.set_interaction_mode('pan') if self.plotter else None),
             ("🔍 Zoom Box", lambda: self.plotter.set_interaction_mode('zoom') if self.plotter else None),
-            ("🏠 Reset Axis", self._autoscale),
+            ("🏠 Reset View", lambda: self.plotter.reset_scale() if self.plotter else None),
             ("⏪ Step Back", lambda: self.plotter.history_back() if self.plotter else None),
             ("⏩ Step Forward", lambda: self.plotter.history_forward() if self.plotter else None),
-            ("🎨 Theme & Colors", self._open_theme_popup),
             ("💾 Export Frame", self._save_image),
+            ("🎨 Theme & Colors", self._open_theme_popup),
         ]
 
         for button_text, command_func in sidebar_controls:
-            btn = tk.Button(
-                self.sidebar_frame, text=button_text, command=command_func,
-                bg=style.COLORS['bg_card'], fg=style.COLORS['text_secondary'],
-                activebackground=style.COLORS['accent'], activeforeground='white',
-                relief='flat', anchor='w', padx=10, pady=5, cursor='hand2'
+            btn = ThemedButton(
+                self.sidebar_frame, text=button_text, command=command_func, is_primary=False,
+                padx=10, pady=5
             )
-            btn.pack(fill='x', padx=10, pady=2)
-            btn.bind("<Enter>", lambda e, target_btn=btn: target_btn.configure(bg=style.COLORS['accent'], fg='white'))
-            btn.bind("<Leave>", lambda e, target_btn=btn: target_btn.configure(bg=style.COLORS['bg_card'], fg=style.COLORS['text_secondary']))
+            btn.pack(fill='x', padx=10, pady=6)
 
     def _toggle_maximize(self) -> None:
-        """Expands the plot to fill the entire GUI window."""
+        # Create a separate Toplevel window containing a fresh plot canvas.
         if not self.is_maximized:
-            self.sidebar_frame.pack_forget()
-            self.header_bar.pack_forget()
+            # Destroy current embedded plot so we can create a standalone one
+            if self.plot_container:
+                for c in self.plot_container.winfo_children():
+                    c.destroy()
+
+            # Create Toplevel and put a new plotter instance inside it
+            self._max_win = tk.Toplevel(self.winfo_toplevel())
+            self._max_win.title("Maximized Plot - Preview")
+            self._max_win.geometry("900x600")
+            # When the window is closed or minimized, re-attach plot back to page
+            def _on_max_close():
+                try:
+                    self._max_win.destroy()
+                except Exception:
+                    pass
+                self._attach_canvas_engine(self.controller.state.current_task or 0)
+                self.is_maximized = False
+
+            self._max_win.protocol('WM_DELETE_WINDOW', _on_max_close)
+            # Detect minimize (iconify) and restore back to embedded view
+            def _on_map(event=None):
+                # If window is iconified, treat it like close
+                if str(self._max_win.state()) == 'iconic':
+                    _on_max_close()
+
+            self._max_win.bind('<Unmap>', _on_map)
+
+            # Create a new InteractivePlotCanvas inside the Toplevel
+            try:
+                max_plot = InteractivePlotCanvas(parent=self._max_win, controller=self.controller, task_index=self.controller.state.current_task or 0, log_fn=self._write_console)
+                max_plot.pack(fill='both', expand=True)
+                max_plot.request_lod_data(initial_load=True)
+            except Exception as e:
+                self._write_console(f"Failed to create maximized plot: {e}")
+
+            # Optionally hide the console to give more room (if expanded)
             if hasattr(self.controller, 'console') and self.controller.console._expanded:
                 self.controller.console.toggle()
+
             self.is_maximized = True
         else:
-            self.sidebar_frame.pack(side='right', fill='y', padx=(10, 0))
-            self.header_bar.pack(fill='x', pady=(0, 5))
+            # If already maximized, close the toplevel if present and re-attach
+            try:
+                if hasattr(self, '_max_win') and self._max_win:
+                    self._max_win.destroy()
+            except Exception:
+                pass
+            self._attach_canvas_engine(self.controller.state.current_task or 0)
             if hasattr(self.controller, 'console') and not self.controller.console._expanded:
                 self.controller.console.toggle()
             self.is_maximized = False
@@ -148,27 +179,25 @@ class GraphPage(BasePage):
 
     def _go_back(self) -> None: self.controller.navigate_to_task_page()
     def _go_home(self) -> None: self.controller.navigate_to_file_page()
-    def _autoscale(self) -> None:
-        if self.plotter: self.plotter.reset_scale()
 
     def _save_image(self) -> None:
         if not self.plotter: return
         target_file = filedialog.asksaveasfilename(defaultextension=".png", filetypes=[("PNG Image", "*.png")])
         if target_file and self.plotter.export_to_file(target_file):
-            messagebox.showinfo("Success", f"Chart exported to:\n{target_file}", parent=self.controller.root)
+            messagebox.show_info("Success", f"Chart exported to:\n{target_file}", parent=self.controller.root)
 
     def _change_bg_color(self) -> None:
         if self.plotter and (c := colorchooser.askcolor(title="Plot Background")[1]):
-            self.plotter.plot_bg_color = c; self.plotter._draw_canvas_overlay(self.plotter._cached_pil_img)
+            self.plotter.plot_bg_color = c; self.plotter.fig.patch.set_facecolor(c); self.plotter._format_axes(); self.plotter.canvas.draw_idle()
     def _change_line_color(self) -> None:
         if self.plotter and (c := colorchooser.askcolor(title="Line Color")[1]):
-            self.plotter.color_cycle[0] = c; self.plotter.request_lod_data(initial_load=False)
+            self.plotter.color_cycle[0] = c; self.plotter.request_lod_data()
     def _change_text_color(self) -> None:
         if self.plotter and (c := colorchooser.askcolor(title="Text Color")[1]):
-            self.plotter.text_color = c; self.plotter._draw_canvas_overlay(self.plotter._cached_pil_img)
+            self.plotter.text_color = c; self.plotter._format_axes(); self.plotter.canvas.draw_idle()
     def _change_grid_color(self) -> None:
         if self.plotter and (c := colorchooser.askcolor(title="Grid Color")[1]):
-            self.plotter.grid_color = c; self.plotter.grid_visible = True; self.plotter._draw_canvas_overlay(self.plotter._cached_pil_img)
+            self.plotter.grid_color = c; self.plotter.grid_visible = True; self.plotter._format_axes(); self.plotter.canvas.draw_idle()
 
     def _write_console(self, text_message: str) -> None:
         if hasattr(self.controller, 'console') and self.controller.console is not None:

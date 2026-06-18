@@ -33,6 +33,18 @@ class FilePage(BasePage):
                  fg=style.COLORS['text_secondary'], bg=style.COLORS['bg_card_light'],
                  font=('Segoe UI', 8)).pack(side='bottom', pady=8)
 
+        # Debug toggle
+        self._debug_var = tk.BooleanVar(value=getattr(config, 'GUI_DEBUG', False))
+        def _on_debug_toggle():
+            config.GUI_DEBUG = bool(self._debug_var.get())
+            # brief feedback
+            if config.GUI_DEBUG:
+                dialogs.show_info('Debug Enabled', 'GUI debug exports are enabled.', parent=self.controller.root)
+
+        tk.Checkbutton(left, text='Enable GUI Debug Exports', variable=self._debug_var,
+                       bg=style.COLORS['bg_card_light'], fg=style.COLORS['text_primary'],
+                       selectcolor=style.COLORS['bg_card_light'], command=_on_debug_toggle).pack(side='bottom', pady=6, padx=12)
+
         # Right panel – reduced outer/inner padding
         right = tk.Frame(main, bg=style.COLORS['bg_card'])
         right.pack(side='right', fill='both', expand=True, padx=20, pady=20)   # reduced from 30

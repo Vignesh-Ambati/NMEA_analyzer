@@ -62,3 +62,10 @@ SUPPORTED_EXTENSIONS = [
     ("Text Files", "*.txt"),
     ("NMEA Files", "*.nmea"),
 ]
+
+# Debug / developer helpers
+# When True, various UI components will emit intermediate files (images, csvs)
+# to help with debugging rendering and data pipeline problems.
+GUI_DEBUG = False
+DEBUG_EXPORT_DIR = "debug_exports"
+PLOT_DPI = 100
