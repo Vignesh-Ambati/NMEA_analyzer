@@ -359,7 +359,13 @@ class InteractivePlotCanvas(tk.Frame):
         self._current_xlim = None
         self._current_ylim = None
         
-        self.plot_bg_color = style.COLORS['bg_card']
+        # ---- NEW: View history ----
+        self._view_stack = []          # list of (xlim, ylim) tuples
+        self._view_index = -1          # current position in stack
+        self._push_on_render = True    # whether to push view after render
+        
+        # ---- NEW: White background ----
+        self.plot_bg_color = '#ffffff'   # was style.COLORS['bg_card']
         self.text_color = style.COLORS['text_primary']
         self.grid_color = style.COLORS['border']
         self.grid_visible = True
@@ -374,33 +380,32 @@ class InteractivePlotCanvas(tk.Frame):
         self.dropdown_combo = ttk.Combobox(self.top_control_frame, textvariable=self.target_view, state="readonly", width=25)
         self.dropdown_combo.pack(side='right')
 
-        # 1. Matplotlib Native Figure Setup
+        # Matplotlib Figure – white background
         self.fig = Figure(figsize=(6, 4), dpi=getattr(ui_config, 'PLOT_DPI', 100))
         self.fig.patch.set_facecolor(self.plot_bg_color)
         self.ax = self.fig.add_subplot(111)
         self._format_axes()
 
-        # 2. Tkinter Integration
+        # Tkinter Canvas
         self.canvas = FigureCanvasTkAgg(self.fig, master=self)
         self.canvas.get_tk_widget().pack(fill='both', expand=True)
 
-        # 3. HIDDEN NATIVE TOOLBAR
-        # We instantiate it to use its logic, but we DO NOT pack() it into the UI.
+        # Hidden toolbar (we still use its pan/zoom toggles)
         self.hidden_toolbar_frame = tk.Frame(self) 
         self.toolbar = NavigationToolbar2Tk(self.canvas, self.hidden_toolbar_frame)
         self.toolbar.update()
 
-        # 4. Bind Mouse Release to trigger Datashader updates after panning/zooming
+        # Bind mouse release to detect pan/zoom end
         self.canvas.mpl_connect('button_release_event', self._on_mouse_release)
         self.ax_image = None
 
-        # Lightweight in-memory render cache to avoid unnecessary recompute
-        # key: (target_view, width, height, x0, x1, y0, y1)
+        # Render cache
         self._render_cache: Dict[Tuple, Tuple[Image.Image, Tuple[float,float,float,float]]] = {}
 
     def _format_axes(self) -> None:
         self.ax.clear()
-        self.ax.set_facecolor(self.plot_bg_color)
+        self.ax.set_facecolor(self.plot_bg_color)          # white axes
+        self.fig.patch.set_facecolor(self.plot_bg_color)   # white figure
         self.ax.tick_params(colors=self.text_color)
         for spine in self.ax.spines.values():
             spine.set_color(self.grid_color)
@@ -418,55 +423,90 @@ class InteractivePlotCanvas(tk.Frame):
             try: return datetime.datetime.fromtimestamp(x).strftime('%Y-%m-%d\n%H:%M:%S')
             except: return ""
         self.ax.xaxis.set_major_formatter(FuncFormatter(format_date))
-        # Improve spacing to avoid cramped x-axis labels
         try:
             self.fig.tight_layout()
         except Exception:
-            # fallback to manual adjustment
             self.fig.subplots_adjust(bottom=0.18, left=0.1, right=0.98, top=0.92)
         for label in self.ax.get_xticklabels():
             label.set_rotation(25)
             label.set_ha('right')
 
-    def _on_mouse_release(self, event):
-        """Catches when the user finishes zooming or panning using the toolbar."""
-        if self.toolbar.mode != '': 
-            self._refresh_datashader_bounds()
-
-    # ──────────────────────────────────────────────────────────
-    # SIDEBAR TOOLBAR HIJACKING METHODS
-    # ──────────────────────────────────────────────────────────
-    def set_interaction_mode(self, mode: str) -> None:
-        """Programmatically triggers the hidden Matplotlib toolbar modes."""
-        if mode == 'pan':
-            if self.toolbar.mode == 'zoom rect':
-                self.toolbar.zoom() # Toggle off zoom
-            if self.toolbar.mode != 'pan/zoom':
-                self.toolbar.pan()  # Toggle on pan
-            if self.log_fn: self.log_fn("✋ Drag-Pan mode activated.")
-                
-        elif mode == 'zoom':
-            if self.toolbar.mode == 'pan/zoom':
-                self.toolbar.pan() # Toggle off pan
-            if self.toolbar.mode != 'zoom rect':
-                self.toolbar.zoom() # Toggle on zoom
-            if self.log_fn: self.log_fn("🔍 Box-Zoom mode activated. Draw a box on the graph.")
-
-    def reset_scale(self) -> None:
-        self.request_lod_data(initial_load=True)
+    # ---- Custom history methods ----
+    def _push_view(self) -> None:
+        """Push current axis limits onto history stack."""
+        xlim = self.ax.get_xlim()
+        ylim = self.ax.get_ylim()
+        # Truncate any forward history if we are not at the end
+        if self._view_index < len(self._view_stack) - 1:
+            self._view_stack = self._view_stack[:self._view_index + 1]
+        self._view_stack.append((xlim, ylim))
+        self._view_index = len(self._view_stack) - 1
+        # Keep stack bounded (e.g., 50 entries)
+        if len(self._view_stack) > 50:
+            self._view_stack.pop(0)
+            self._view_index -= 1
 
     def history_back(self) -> None:
-        """Step backwards through zoom states and update Datashader."""
-        self.toolbar.back()
-        self._refresh_datashader_bounds()
+        """Step backwards through view history."""
+        if self._view_index > 0:
+            self._view_index -= 1
+            xlim, ylim = self._view_stack[self._view_index]
+            self._push_on_render = False   # don't push again after render
+            self.request_lod_data(x_range=xlim, y_range=ylim)
+            if self.log_fn: self.log_fn("⏪ Stepped back in history")
 
     def history_forward(self) -> None:
-        """Step forwards through zoom states and update Datashader."""
-        self.toolbar.forward()
-        self._refresh_datashader_bounds()
+        """Step forwards through view history."""
+        if self._view_index < len(self._view_stack) - 1:
+            self._view_index += 1
+            xlim, ylim = self._view_stack[self._view_index]
+            self._push_on_render = False
+            self.request_lod_data(x_range=xlim, y_range=ylim)
+            if self.log_fn: self.log_fn("⏩ Stepped forward in history")
 
+    def reset_scale(self) -> None:
+        """Reset to full data range and push new view."""
+        self._push_on_render = True
+        self.request_lod_data(initial_load=True)
+        if self.log_fn: self.log_fn("🏠 Reset view to full data range")
+
+    # ---- Interaction mode (Pan / Zoom) ----
+    def set_interaction_mode(self, mode: str) -> None:
+        """Toggle Matplotlib toolbar pan/zoom and change cursor."""
+        if mode == 'pan':
+            if self.toolbar.mode == 'zoom rect':
+                self.toolbar.zoom()  # turn off zoom
+            if self.toolbar.mode != 'pan/zoom':
+                self.toolbar.pan()   # turn on pan
+            self.canvas.get_tk_widget().config(cursor='fleur')
+            if self.log_fn: self.log_fn("✋ Drag-Pan mode activated.")
+        elif mode == 'zoom':
+            if self.toolbar.mode == 'pan/zoom':
+                self.toolbar.pan()   # turn off pan
+            if self.toolbar.mode != 'zoom rect':
+                self.toolbar.zoom()  # turn on zoom
+            self.canvas.get_tk_widget().config(cursor='cross')
+            if self.log_fn: self.log_fn("🔍 Box-Zoom mode activated. Draw a box on the graph.")
+        else:
+            # Idle / reset cursor
+            self.canvas.get_tk_widget().config(cursor='arrow')
+
+    # ---- Mouse release handler ----
+    def _on_mouse_release(self, event):
+        if self.toolbar.mode != '':
+            self._refresh_datashader_bounds()
+            # After a manual pan/zoom, we want to push the new view
+            self._push_on_render = True
+            # The actual render is triggered by _refresh_datashader_bounds -> request_lod_data
+
+    def _refresh_datashader_bounds(self):
+        new_xlim = self.ax.get_xlim()
+        new_ylim = self.ax.get_ylim()
+        if self._current_xlim != new_xlim or self._current_ylim != new_ylim:
+            self.request_lod_data(x_range=new_xlim, y_range=new_ylim)
+
+    # ---- Export ----
     def export_to_file(self, target_path: str) -> bool:
-        """Uses Matplotlib's native high-res save function."""
         try:
             self.fig.savefig(target_path, bbox_inches='tight', dpi=300)
             if self.log_fn: self.log_fn(f"[✓] Canvas snapshot saved to: {target_path}")
@@ -475,16 +515,8 @@ class InteractivePlotCanvas(tk.Frame):
             if self.log_fn: self.log_fn(f"[!] Export failed: {err}")
             return False
 
-    def _refresh_datashader_bounds(self):
-        new_xlim = self.ax.get_xlim()
-        new_ylim = self.ax.get_ylim()
-        if self._current_xlim != new_xlim or self._current_ylim != new_ylim:
-            self.request_lod_data(initial_load=False, x_range=new_xlim, y_range=new_ylim)
-            
-    # ──────────────────────────────────────────────────────────
-
+    # ---- Main rendering request ----
     def request_lod_data(self, initial_load: bool = False, x_range=None, y_range=None) -> None:
-        # State Safety Check
         if hasattr(self.controller, 'state') and getattr(self.controller.state, 'is_parsing', getattr(self.controller.state, 'is_processing', False)):
             if initial_load:
                 dialogs.show_info("Parsing in Progress", "Files are currently being processed.\nPlease wait.", parent=self.controller.root)
@@ -496,17 +528,18 @@ class InteractivePlotCanvas(tk.Frame):
         self.controller.progress.add_job("plot_render", "Datashader Engine")
 
         w, h = self.canvas.get_width_height()
+        # Clamp canvas size to avoid huge renders
+        w = min(w, 1200)
+        h = min(h, 800)
 
-        # Normalize ranges for caching key
         xr = None if x_range is None else (float(x_range[0]), float(x_range[1]))
         yr = None if y_range is None else (float(y_range[0]), float(y_range[1]))
         cache_key = (self.target_view.get(), w, h, xr, yr)
 
-        # Serve from cache if available and initial_load is False (fresh loads prefer recompute)
         if not initial_load and cache_key in self._render_cache:
             pil_img, extent = self._render_cache[cache_key]
             if self.log_fn: self.log_fn('ℹ️ Using cached render for viewport.')
-            self._on_render_complete(pil_img, extent, initial_load)
+            self._on_render_complete(pil_img, extent)
             return
 
         def _progress_cb(pct: float, msg: str):
@@ -521,7 +554,7 @@ class InteractivePlotCanvas(tk.Frame):
                         color_cycle=self.color_cycle, x_range=x_range, y_range=y_range,
                         progress_callback=_progress_cb
                     )
-                    self.after(0, lambda: self._on_render_complete(pil_img, extent, initial_load))
+                    self.after(0, lambda: self._on_render_complete(pil_img, extent))
                 else:
                     self.after(0, lambda: self._on_render_error("Service unavailable."))
             except Exception as e:
@@ -529,7 +562,7 @@ class InteractivePlotCanvas(tk.Frame):
 
         threading.Thread(target=_worker_thread, daemon=True).start()
 
-    def _on_render_complete(self, pil_img: Optional[Image.Image], extent: Tuple[float,float,float,float], initial_load: bool) -> None:
+    def _on_render_complete(self, pil_img: Optional[Image.Image], extent: Tuple[float,float,float,float]) -> None:
         self._is_rendering = False
         self.controller.progress.set_job_progress("plot_render", 1.0, "Done")
         self.after(1000, lambda: self.controller.progress.remove_job("plot_render"))
@@ -539,18 +572,20 @@ class InteractivePlotCanvas(tk.Frame):
         if pil_img is None:
             if self.log_fn: self.log_fn("ℹ️ No data available for viewport.")
             return
-        # Cache the result to speed up repeated views
+
+        # Cache the result
         try:
+            w, h = self.canvas.get_width_height()
+            w = min(w, 1200)
+            h = min(h, 800)
             xr = (float(extent[0]), float(extent[1]))
             yr = (float(extent[2]), float(extent[3]))
-            w, h = self.canvas.get_width_height()
             cache_key = (self.target_view.get(), w, h, xr, yr)
             self._render_cache[cache_key] = (pil_img.copy(), extent)
         except Exception:
             pass
 
         self._format_axes()
-        # Use imshow to paint the datashader output
         self.ax_image = self.ax.imshow(np.array(pil_img), extent=extent, origin='lower', aspect='auto')
         self.ax.set_xlim(extent[0], extent[1])
         self.ax.set_ylim(extent[2], extent[3])
@@ -558,9 +593,15 @@ class InteractivePlotCanvas(tk.Frame):
         self._current_xlim = self.ax.get_xlim()
         self._current_ylim = self.ax.get_ylim()
 
+        # ---- Push view to history if requested ----
+        if self._push_on_render:
+            self._push_view()
+        self._push_on_render = True   # reset for next render
+
         self.canvas.draw_idle()
         if self.log_fn: self.log_fn("✓ Dashboard updated.")
-        # Optional debug export of the rendered image and extent
+
+        # Debug export (optional)
         try:
             if getattr(ui_config, 'GUI_DEBUG', False):
                 out_dir = getattr(ui_config, 'DEBUG_EXPORT_DIR', 'debug_exports')
@@ -585,14 +626,10 @@ class InteractivePlotCanvas(tk.Frame):
         if hasattr(self.controller, 'extraction_service') and hasattr(self.controller.extraction_service, '_dataframeCache'):
             cache_keys = list(self.controller.extraction_service._dataframeCache.keys())
             if cache_keys: options += cache_keys
-
-        # Guard against combobox being destroyed while async render completes
         try:
             if getattr(self, 'dropdown_combo', None) and self.dropdown_combo.winfo_exists():
                 self.dropdown_combo['values'] = options
                 if self.target_view.get() not in options:
                     self.target_view.set("Combined")
         except Exception:
-            # Widget no longer available
             if self.log_fn: self.log_fn('[WARN] Dropdown update skipped; widget not available.')
-            

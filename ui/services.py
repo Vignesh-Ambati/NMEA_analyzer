@@ -99,7 +99,6 @@ class ExtractionService:
 
         if progress_callback: progress_callback(0.30, "Calculating viewport boundaries...")
         
-        # Calculate global bounds if no specific zoom level is requested
         if x_range is None or y_range is None:
             global_Xmin, global_Xmax = float('inf'), float('-inf')
             global_Ymin, global_Ymax = float('inf'), float('-inf')
@@ -114,6 +113,10 @@ class ExtractionService:
             y_span = (global_Ymax - global_Ymin) if global_Ymax > global_Ymin else 1.0
             x_range = (global_Xmin - x_span * 0.02, global_Xmax + x_span * 0.02)
             y_range = (global_Ymin - y_span * 0.05, global_Ymax + y_span * 0.05)
+
+        # ---- Clamp canvas size to avoid performance issues ----
+        canvas_width = min(int(canvas_width), 1200)
+        canvas_height = min(int(canvas_height), 800)
 
         if progress_callback: progress_callback(0.50, "Datashader rasterization pipeline active...")
         canvas = ds.Canvas(
