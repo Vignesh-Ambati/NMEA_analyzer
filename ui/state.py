@@ -16,6 +16,8 @@ class AppState:
     plot_data: Optional[Any] = None
     navigation_stack: List[str] = field(default_factory=list)
     
+    debug_mode: bool = False
+    
     def reset(self):
         """Reset state to initial values."""
         self.file_paths.clear()
@@ -52,3 +54,4 @@ class AppState:
     def clear_navigation(self):
         """Clear navigation history."""
         self.navigation_stack.clear()
+        

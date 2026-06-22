@@ -9,7 +9,6 @@ from .. import config as ui_config
 
 class GraphPage(BasePage):
     def __init__(self, parent: tk.Misc, controller: Any) -> None:
-        # 1. Initialize instance attributes FIRST
         self.plotter: Optional[InteractivePlotCanvas] = None
         self.plot_container: Optional[tk.Frame] = None
         self.sidebar_frame: Optional[tk.Frame] = None
@@ -17,7 +16,6 @@ class GraphPage(BasePage):
         self.content_frame: Optional[tk.Frame] = None
         self._fullpage = False
         self._app_top_bar = None
-
         super().__init__(parent, controller)
 
     def setup_ui(self) -> None:
@@ -59,7 +57,6 @@ class GraphPage(BasePage):
         self._attach_canvas_engine(current_task_idx)
 
     def _build_sidebar(self, parent: tk.Frame) -> None:
-        # Increase width slightly to give menus comfortable room
         self.sidebar_frame = tk.Frame(parent, bg=style.COLORS['bg_card_light'], width=220)
         self.sidebar_frame.grid(row=0, column=1, sticky='ns', padx=(10, 0))
         self.sidebar_frame.grid_propagate(False)
@@ -73,7 +70,6 @@ class GraphPage(BasePage):
                                    font=('Segoe UI', 9))
         self.mode_label.pack(pady=(0, 5), padx=10, anchor='w')
 
-        # Container to hot-swap sidebar submenus
         self.menu_container = tk.Frame(self.sidebar_frame, bg=style.COLORS['bg_card_light'])
         self.menu_container.pack(fill='both', expand=True)
 
@@ -113,7 +109,6 @@ class GraphPage(BasePage):
         self.btn_theme = ThemedButton(self.main_menu, text="🎨 Theme & Colors", command=self._show_theme_menu, padx=10, pady=5)
         self.btn_theme.pack(fill='x', padx=10, pady=6)
 
-        # Trigger logic loop evaluating step forward/back disables
         self._update_nav_buttons()
 
     def _build_theme_menu(self):
@@ -150,15 +145,16 @@ class GraphPage(BasePage):
         
         if not self.is_manual:
             if self.plotter:
-                # Turn off active tools safely if transitioning out of manual mapping
+                # Safely turn off active manual toolbar states before shifting to custom auto behaviors
                 if self.plotter.toolbar.mode == 'pan/zoom':
                     self.plotter.toolbar.pan()
                 elif self.plotter.toolbar.mode == 'zoom rect':
                     self.plotter.toolbar.zoom()
-                self.plotter.reset_scale()
-                self._update_mode_label("Auto")
+                
+                self._update_mode_label("Auto Mode Active")
+                self.plotter.set_auto_mode(True)
             
-            # Lock out manual manipulation features
+            # Disable redundant buttons
             self.btn_pan.config(state='disabled')
             self.btn_zoom.config(state='disabled')
             self.btn_reset.config(state='disabled')
@@ -170,16 +166,19 @@ class GraphPage(BasePage):
             self.btn_reset.config(state='normal')
             if self.plotter:
                 self._update_mode_label("Manual: Idle")
+                self.plotter.set_auto_mode(False)
             self._update_nav_buttons()
 
     def _update_nav_buttons(self) -> None:
         if not self.winfo_exists():
             return
             
-        if self.plotter and self.is_manual:
-            # Poll Matplotlib history stack logic
-            can_back = self.plotter._view_index > 0
-            can_forward = self.plotter._view_index < len(self.plotter._view_stack) - 1
+        plotter = getattr(self, 'plotter', None)
+        is_manual = getattr(self, 'is_manual', False)
+
+        if plotter and is_manual:
+            can_back = plotter._view_index > 0
+            can_forward = plotter._view_index < len(plotter._view_stack) - 1
             
             self.btn_back.config(state='normal' if can_back else 'disabled')
             self.btn_forward.config(state='normal' if can_forward else 'disabled')
@@ -189,14 +188,10 @@ class GraphPage(BasePage):
     def _toggle_fullpage(self) -> None:
         if not self._fullpage:
             self.header_bar.grid_remove()
-            
-            # Hide Console & Progress directly 
             if hasattr(self.controller, 'console') and self.controller.console:
-                self.controller.console.pack_forget()
+                self.controller.console.place_forget()
             if hasattr(self.controller, 'progress') and self.controller.progress:
                 self.controller.progress.pack_forget()
-            
-            # Attempt to safely hide the main window's Top Bar (where title/theme toggle sits)
             try:
                 slaves = self.controller.root.pack_slaves()
                 if slaves and isinstance(slaves[0], tk.Frame) and slaves[0] != self.controller.content_frame.master:
@@ -204,24 +199,20 @@ class GraphPage(BasePage):
                     self._app_top_bar.pack_forget()
             except Exception:
                 pass
-
             self.btn_fullpage.config(text="⛶ Minimize")
             self._fullpage = True
         else:
-            # Restore Top Bar cleanly back above the content frame
             if hasattr(self, '_app_top_bar') and self._app_top_bar:
                 try:
                     self._app_top_bar.pack(fill='x', side='top', before=self.controller.content_frame.master)
                 except Exception:
                     self._app_top_bar.pack(fill='x', side='top')
-                    
             self.header_bar.grid()
-            
-            # Repack Progress & Console so they go cleanly to the bottom
             if hasattr(self.controller, 'progress') and self.controller.progress:
                 self.controller.progress.pack(fill='x', side='bottom')
             if hasattr(self.controller, 'console') and self.controller.console:
-                self.controller.console.pack(fill='x', side='bottom')
+                height = self.controller.console._max_height if self.controller.console._expanded else self.controller.console._min_height
+                self.controller.console.place(relx=0, rely=1.0, relwidth=1.0, anchor='sw', height=height)
 
             self.btn_fullpage.config(text="⛶ Maximize")
             self._fullpage = False
