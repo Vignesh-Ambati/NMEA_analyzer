@@ -2,14 +2,14 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Tuple, Optional, Any
 import pandas as pd
-
 import numpy as np
+import threading, os, time
 
 class BaseExtractor(ABC):        
     @abstractmethod
-    def _extract(self, parquet_path: Path) -> Any:
-        #It might return data frame or any. so we kept any.
-        #But it must use Optional[pd.DataFrame]
+    def _extract(self, parquet_path: Path, state: Any = None) -> Any:
+        # It might return data frame or any. so we kept any.
+        # But it must use Optional[pd.DataFrame]
         pass
     @staticmethod
     def safe_format(x):
@@ -17,7 +17,7 @@ class BaseExtractor(ABC):
                 return np.nan
             sx = str(x)
             return sx if '.' in sx else sx + '.00'
-    def _convertToAbsoluteEpoch(self, date_series: pd.Series, time_series: pd.Series) -> np.ndarray:
+    def _convertToAbsoluteEpoch(self, date_series: pd.Series, time_series: pd.Series, state: Any = None) -> np.ndarray:
         """
         Converts NMEA dates and times into absolute Unix epoch seconds.
         Uses linear interpolation to backtrack missing outage seconds and gracefully
@@ -58,5 +58,20 @@ class BaseExtractor(ABC):
         
         anchor_epoch = anchor_date.value // 10**9
         epochs = anchor_epoch + continuous_seconds
-        
+        # Non-blocking debug export of time-only series when UI debug enabled
+        try:
+            if state is not None and getattr(state, 'debug_mode', False):
+                def _dump_times(eps):
+                    try:
+                        out_dir = os.path.join(os.getcwd(), 'debug_exports')
+                        os.makedirs(out_dir, exist_ok=True)
+                        fname = f"convertToAbsoluteEpoch_{int(time.time())}.csv"
+                        out_path = os.path.join(out_dir, fname)
+                        pd.DataFrame({'Time': eps}).to_csv(out_path, index=False)
+                    except Exception:
+                        pass
+                threading.Thread(target=_dump_times, args=(epochs,), daemon=True).start()
+        except Exception:
+            pass
+
         return epochs

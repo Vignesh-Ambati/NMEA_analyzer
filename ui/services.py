@@ -75,7 +75,7 @@ class ExtractionService:
                 if not parquet_path or not os.path.exists(parquet_path): continue
                 extractor = self.extractors.get(task_id)
                 if not extractor: continue
-                result = extractor._extract(Path(parquet_path))
+                result = extractor._extract(Path(parquet_path), state)
                 if result is not None and isinstance(result, pd.DataFrame) and not result.empty:
                     self._dataframeCache[fileId] = result
         return available_files
@@ -98,6 +98,27 @@ class ExtractionService:
             return None, (0, 1, 0, 1)
 
         if progress_callback: progress_callback(0.30, "Calculating viewport boundaries...")
+
+        # Non-blocking debug dump of cached data frames before rendering
+        try:
+            if state is not None and getattr(state, 'debug_mode', False):
+                def _dump_cached(cache):
+                    try:
+                        out_dir = os.path.join(os.getcwd(), 'debug_exports')
+                        os.makedirs(out_dir, exist_ok=True)
+                        ts = int(time.time())
+                        for fid, df in cache.items():
+                            safe_fid = str(fid).replace('.', '_')
+                            p = os.path.join(out_dir, f"service_cached_{safe_fid}_{ts}.csv")
+                            try:
+                                df[['Time','Value']].to_csv(p, index=False)
+                            except Exception:
+                                df.to_csv(p, index=False)
+                    except Exception:
+                        pass
+                threading.Thread(target=_dump_cached, args=(self._dataframeCache.copy(),), daemon=True).start()
+        except Exception:
+            pass
         
         if x_range is None or y_range is None:
             global_Xmin, global_Xmax = float('inf'), float('-inf')

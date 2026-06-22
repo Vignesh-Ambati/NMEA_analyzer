@@ -1,20 +1,19 @@
-import datetime
-import threading
-import json
 import os
 import time
+import datetime
+import threading
 import numpy as np
 import tkinter as tk
-from tkinter import ttk
 from PIL import Image
-from typing import Any, Dict, Optional, Callable, Tuple, List
+from tkinter import ttk
 from matplotlib.figure import Figure
+from typing import Any, Dict, Optional, Callable, Tuple, List
 from matplotlib.ticker import FuncFormatter, StrMethodFormatter
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
-from . import config as ui_config
 
 from . import style
 from . import dialogs
+from . import config as ui_config
 
 class ThemedButton(tk.Button):
     def __init__(self, parent, text, command=None, is_primary=False, **kwargs):
@@ -316,7 +315,6 @@ class ConsoleOutput(tk.Frame):
                     btn.configure(bg=style.COLORS['bg_card_light'], fg=style.COLORS['text_secondary'])
         self.text_frame.configure(bg=style.COLORS['bg_console'])
         self.text.configure(bg=style.COLORS['bg_console'], fg=style.COLORS['text_secondary'])
-
 
 class InteractivePlotCanvas(tk.Frame):
     def __init__(self, parent: tk.Misc, controller: Any, task_index: int, log_fn: Optional[Callable[[str], None]] = None, **kwargs: Any) -> None:
@@ -688,12 +686,10 @@ class InteractivePlotCanvas(tk.Frame):
                 os.makedirs(out_dir, exist_ok=True)
                 ts = time.strftime('%Y%m%d_%H%M%S')
                 
-                # 1. Export Image & JSON
-                img_path = os.path.join(out_dir, f"render_task{self.task_index}_{self.target_view.get()}_{ts}.png")
-                pil_img.save(img_path)
-                meta = {'task_index': self.task_index, 'target_view': self.target_view.get(), 'extent': extent, 'timestamp': ts}
-                with open(os.path.join(out_dir, f"render_task{self.task_index}_{ts}.json"), 'w', encoding='utf-8') as mf:
-                    json.dump(meta, mf, indent=2)
+                # # 1. Export Image & JSON
+                # img_path = os.path.join(out_dir, f"render_task{self.task_index}_{self.target_view.get()}_{ts}.png")
+                # pil_img.save(img_path)
+                # meta = {'task_index': self.task_index, 'target_view': self.target_view.get(), 'extent': extent, 'timestamp': ts}
                 
                 # 2. Export Raw Data to CSV
                 if hasattr(self.controller, 'extraction_service'):
