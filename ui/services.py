@@ -3,24 +3,48 @@ import time
 import threading
 import numpy as np
 import pandas as pd
+from PIL import Image
 import datashader as ds
+from pathlib import Path
 from datashader import transfer_functions
 from typing import Dict, List, Tuple, Optional, Callable, Any
-from pathlib import Path
-from PIL import Image
 
 try:
-    from core import CacheManager, JobOrchestrator
-    from core.extractors import AltitudeExtractor
+    from .. import (
+        CacheManager, 
+        JobOrchestrator, 
+        AltitudeExtractor
+    )
     CORE_AVAILABLE = True
 except ImportError:
     CORE_AVAILABLE = False
 
+class LogService:
+    def __init__(self, queue=None):
+        self.queue = queue
+
+    def write(self, message: str) -> None:
+        if self.queue is None:
+            return
+        try:
+            self.queue.put(message)
+        except Exception:
+            pass
+
 class ProcessingService:
     def __init__(self):
+        self.log_service = LogService()
         if CORE_AVAILABLE:
-            self.orchestrator = JobOrchestrator()
+            self.orchestrator = JobOrchestrator(log_queue=self.log_service.queue)
+            self.log_service.queue = self.orchestrator.log_queue
+            self.log_queue = self.log_service.queue
+        else:
+            self.orchestrator = None
+            self.log_queue = None
             
+    def _log(self, message: str) -> None:
+        self.log_service.write(message)
+
     def process_file(
         self, file_path: str,
         on_complete: Optional[Callable[[Any, str], None]] = None,
@@ -28,11 +52,13 @@ class ProcessingService:
         on_progress: Optional[Callable[[float, str], None]] = None,
     ) -> bool:
         if not CORE_AVAILABLE:
+            self._log("[!] Core module not available")
             if on_error: on_error("Core module not available", file_path)
             return False
         
         file_path_obj = Path(file_path)
         if not file_path_obj.exists():
+            self._log(f"[!] File not found: {file_path}")
             if on_error: on_error(f"File not found: {file_path}", file_path)
             return False
         

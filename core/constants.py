@@ -3,9 +3,8 @@ core/constants.py
 ─────────────────
 Static lookup tables shared across NMEA processing modules.
 """
-
 import re
-from re import search
+
 
 
 CONSTELLATION_DICT = {

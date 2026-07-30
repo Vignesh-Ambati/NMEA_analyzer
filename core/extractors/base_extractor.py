@@ -1,9 +1,11 @@
-from abc import ABC, abstractmethod
-from pathlib import Path
-from typing import Tuple, Optional, Any
-import pandas as pd
+import os
+import time
+import threading
 import numpy as np
-import threading, os, time
+import pandas as pd
+from pathlib import Path
+from abc import ABC, abstractmethod
+from typing import Any, Optional, Tuple
 
 class BaseExtractor(ABC):        
     @abstractmethod

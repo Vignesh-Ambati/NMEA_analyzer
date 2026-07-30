@@ -4,13 +4,13 @@ core/debug.py
 Standalone data exportation service for pipeline debugging.
 """
 import os
-from pathlib import Path
 import pandas as pd
 import pyarrow as pa
+from pathlib import Path
 
 class DebugExportService:
     @staticmethod
-    def dump(data, stage_name: str, file_identifier: str) -> None:
+    def dump(data, stage_name: str, file_identifier: str, _logQueue=None) -> None:
         """Dumps PyArrow Tables or Pandas DataFrames to Excel for inspection."""
         out_dir = Path("debug_exports")
         out_dir.mkdir(exist_ok=True)
@@ -25,7 +25,11 @@ class DebugExportService:
             elif isinstance(data, pd.DataFrame):
                 df = data.copy()
             else:
-                print(f"[Debug] Unsupported data type at {stage_name}")
+                if _logQueue is not None:
+                    try:
+                        _logQueue.put(f"[Debug] Unsupported data type at {stage_name}")
+                    except Exception:
+                        pass
                 return
 
             # Clean timezone data if present, as Excel rejects timezone-aware datetimes
@@ -35,10 +39,22 @@ class DebugExportService:
             # Excel hard-limit protection
             if len(df) > 1000000:
                 df.to_csv(csv_path, index=False)
-                print(f"[Debug] Output too large for Excel. Saved as CSV: {csv_path}")
+                if _logQueue is not None:
+                    try:
+                        _logQueue.put(f"[Debug] Output too large for Excel. Saved as CSV: {csv_path}")
+                    except Exception:
+                        pass
             else:
                 df.to_excel(excel_path, index=False)
-                print(f"[Debug] Stage Data Exported: {excel_path}")
+                if _logQueue is not None:
+                    try:
+                        _logQueue.put(f"[Debug] Stage Data Exported: {excel_path}")
+                    except Exception:
+                        pass
                 
         except Exception as e:
-            print(f"[!] Debug Export Failed ({stage_name}): {e}")
+            if _logQueue is not None:
+                try:
+                    _logQueue.put(f"[!] Debug Export Failed ({stage_name}): {e}")
+                except Exception:
+                    pass

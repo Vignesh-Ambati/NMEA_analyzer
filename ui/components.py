@@ -7,21 +7,23 @@ import tkinter as tk
 from PIL import Image
 from tkinter import ttk
 from matplotlib.figure import Figure
-from typing import Any, Dict, Optional, Callable, Tuple, List
+from typing import Any, Callable, Dict, List, Optional, Tuple
 from matplotlib.ticker import FuncFormatter, StrMethodFormatter
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 
-from . import style
-from . import dialogs
-from . import config as ui_config
+from . import (
+    _UiDialoguesPage,
+    _UiStylingPage,
+    _UiCofigurationPage
+)
 
 class ThemedButton(tk.Button):
     def __init__(self, parent, text, command=None, is_primary=False, **kwargs):
-        cfg = style.get_button_style(is_primary)
+        cfg = _UiStylingPage.get_button_style(is_primary)
         cfg.update(kwargs)
         cfg['highlightthickness'] = 2
-        cfg['highlightbackground'] = style.COLORS['text_primary']
-        cfg['highlightcolor'] = style.COLORS['accent']
+        cfg['highlightbackground'] = _UiStylingPage.COLORS['text_primary']
+        cfg['highlightcolor'] = _UiStylingPage.COLORS['accent']
         super().__init__(parent, text=text, command=command, **cfg)
         self.default_bg = cfg['bg']
         self.hover_bg = cfg['activebackground']
@@ -32,16 +34,16 @@ class ThemedButton(tk.Button):
     
 class ThemedLabel(tk.Label):
     def __init__(self, parent, text="", style_type='normal', **kwargs):
-        cfg = style.get_label_style(style_type)
+        cfg = _UiStylingPage.get_label_style(style_type)
         cfg.update(kwargs)
         super().__init__(parent, text=text, **cfg)
 
 class ThemedFrame(tk.Frame):
     def __init__(self, parent, frame_type='default', **kwargs):
         styles = {
-            'default': {'bg': style.COLORS['bg_card'], 'highlightthickness': 0},
-            'card': {'bg': style.COLORS['bg_card_light'], 'bd': 1, 'relief': 'solid', 'highlightthickness': 0},
-            'input': {'bg': style.COLORS['bg_input'], 'bd': 1, 'relief': 'solid'},
+            'default': {'bg': _UiStylingPage.COLORS['bg_card'], 'highlightthickness': 0},
+            'card': {'bg': _UiStylingPage.COLORS['bg_card_light'], 'bd': 1, 'relief': 'solid', 'highlightthickness': 0},
+            'input': {'bg': _UiStylingPage.COLORS['bg_input'], 'bd': 1, 'relief': 'solid'},
         }
         cfg = styles.get(frame_type, styles['default'])
         cfg.update(kwargs)
@@ -49,8 +51,8 @@ class ThemedFrame(tk.Frame):
 
 class ThemedEntry(tk.Entry):
     def __init__(self, parent, placeholder="", **kwargs):
-        super().__init__(parent, bg=style.COLORS['bg_input'], fg=style.COLORS['text_primary'],
-                         insertbackground=style.COLORS['accent'], relief='solid', bd=1,
+        super().__init__(parent, bg=_UiStylingPage.COLORS['bg_input'], fg=_UiStylingPage.COLORS['text_primary'],
+                         insertbackground=_UiStylingPage.COLORS['accent'], relief='solid', bd=1,
                          highlightthickness=0, font=('Segoe UI', 10), **kwargs)
         self.placeholder = placeholder
         self._insert_placeholder()
@@ -58,19 +60,19 @@ class ThemedEntry(tk.Entry):
         self.bind('<FocusOut>', self._insert_placeholder)
     def _insert_placeholder(self, event=None):
         if not self.get():
-            self.config(fg=style.COLORS['text_muted'])
+            self.config(fg=_UiStylingPage.COLORS['text_muted'])
             self.insert(0, self.placeholder)
     def _clear_placeholder(self, event):
         if self.get() == self.placeholder:
             self.delete(0, tk.END)
-            self.config(fg=style.COLORS['text_primary'])
+            self.config(fg=_UiStylingPage.COLORS['text_primary'])
     def get_value(self):
         val = self.get()
         return '' if val == self.placeholder else val
 
-class FileInputFrame(tk.Frame):
+class FileInputFrame(ThemedFrame):
     def __init__(self, parent, on_browse=None, placeholder="Select file..."):
-        super().__init__(parent, bg=style.COLORS['bg_card'], bd=1, relief='solid')
+        super().__init__(parent, bg=_UiStylingPage.COLORS['bg_card'], bd=1, relief='solid')
         self.entry = ThemedEntry(self, placeholder=placeholder)
         self.entry.pack(side='left', fill='both', expand=True, padx=4, pady=4)
         self.browse_btn = ThemedButton(self, text="📁 Browse", command=on_browse, is_primary=False)
@@ -78,19 +80,19 @@ class FileInputFrame(tk.Frame):
     def set_value(self, val):
         self.entry.delete(0, tk.END)
         self.entry.insert(0, val)
-        self.entry.config(fg=style.COLORS['text_primary'])
+        self.entry.config(fg=_UiStylingPage.COLORS['text_primary'])
     def get_value(self):
         return self.entry.get_value()
 
-class ScrollableFrame(tk.Frame):
+class ScrollableFrame(ThemedFrame):
     def __init__(self, parent, **kwargs):
         super().__init__(parent, **kwargs)
-        self.canvas = tk.Canvas(self, bg=style.COLORS['bg_card_light'], highlightthickness=0)
+        self.canvas = tk.Canvas(self, bg=_UiStylingPage.COLORS['bg_card_light'], highlightthickness=0)
         scrollbar = tk.Scrollbar(self, orient='vertical', command=self.canvas.yview)
         scrollbar.pack(side='right', fill='y')
         self.canvas.pack(side='left', fill='both', expand=True)
         self.canvas.config(yscrollcommand=scrollbar.set)
-        self.content_frame = tk.Frame(self.canvas, bg=style.COLORS['bg_card_light'])
+        self.content_frame = ThemedFrame(self.canvas, bg=_UiStylingPage.COLORS['bg_card_light'])
         self.canvas_window = self.canvas.create_window((0,0), window=self.content_frame, anchor='nw')
         self.content_frame.bind('<Configure>', self._on_configure)
         self.canvas.bind('<Configure>', self._on_canvas_configure)
@@ -106,19 +108,19 @@ class ScrollableFrame(tk.Frame):
         except Exception:
             pass
 
-class ProgressIndicator(tk.Frame):
+class ProgressIndicator(ThemedFrame):
     def __init__(self, parent):
-        super().__init__(parent, bg=style.COLORS['bg_dark'])
+        super().__init__(parent, bg=_UiStylingPage.COLORS['bg_dark'])
         self.active_jobs: Dict[str, Dict[str, Any]] = {}
         self.display_keys: List[str] = []
         self.current_idx: int = 0
         self.rotation_timer: Optional[str] = None
         
-        self.container = tk.Frame(self, bg=style.COLORS['bg_dark'])
+        self.container = ThemedFrame(self, bg=_UiStylingPage.COLORS['bg_dark'])
         self.container.pack(fill='x', expand=True, pady=5)
         
-        self.label = tk.Label(self.container, text="Ready", fg=style.COLORS['text_secondary'],
-                              bg=style.COLORS['bg_dark'], font=('Segoe UI', 9), width=45, anchor='w')
+        self.label = ThemedLabel(self.container, text="Ready", fg=_UiStylingPage.COLORS['text_secondary'],
+                              bg=_UiStylingPage.COLORS['bg_dark'], font=('Segoe UI', 9), width=45, anchor='w')
         self.label.pack(side='left', padx=10)
         
         self.progress = ttk.Progressbar(self.container, mode='determinate', maximum=100, style='TProgressbar')
@@ -185,13 +187,13 @@ class ProgressIndicator(tk.Frame):
     def set_value(self, val): pass
     
     def update_theme(self):
-        self.configure(bg=style.COLORS['bg_dark'])
-        self.container.configure(bg=style.COLORS['bg_dark'])
-        self.label.configure(bg=style.COLORS['bg_dark'], fg=style.COLORS['text_secondary'])
+        self.configure(bg=_UiStylingPage.COLORS['bg_dark'])
+        self.container.configure(bg=_UiStylingPage.COLORS['bg_dark'])
+        self.label.configure(bg=_UiStylingPage.COLORS['bg_dark'], fg=_UiStylingPage.COLORS['text_secondary'])
 
-class TaskCard(tk.Frame):
+class TaskCard(ThemedFrame):
     def __init__(self, parent, icon, name, on_execute=None, is_implemented=True, **kwargs):
-        super().__init__(parent, bg=style.COLORS['bg_card_light'], bd=1, relief='solid', **kwargs)
+        super().__init__(parent, bg=_UiStylingPage.COLORS['bg_card_light'], bd=1, relief='solid', **kwargs)
         self.is_implemented = is_implemented
         self.on_execute = on_execute
         self.grid_propagate(False)
@@ -200,19 +202,19 @@ class TaskCard(tk.Frame):
         if is_implemented:
             self.config(cursor="hand2")
         
-        self.content = tk.Frame(self, bg=style.COLORS['bg_card_light'])
+        self.content = ThemedFrame(self, bg=_UiStylingPage.COLORS['bg_card_light'])
         self.content.pack(fill='both', expand=True, padx=6, pady=6)
         
-        icon_lbl = tk.Label(self.content, text=icon, font=('Segoe UI', 24), bg=style.COLORS['bg_card_light'], fg=style.COLORS['text_primary'])
+        icon_lbl = ThemedLabel(self.content, text=icon, font=('Segoe UI', 24), bg=_UiStylingPage.COLORS['bg_card_light'], fg=_UiStylingPage.COLORS['text_primary'])
         icon_lbl.pack(pady=2)
         
-        name_lbl = tk.Label(self.content, text=name, font=('Segoe UI', 8), fg=style.COLORS['text_primary'],
-                            bg=style.COLORS['bg_card_light'], wraplength=120, justify='center')
+        name_lbl = ThemedLabel(self.content, text=name, font=('Segoe UI', 8), fg=_UiStylingPage.COLORS['text_primary'],
+                            bg=_UiStylingPage.COLORS['bg_card_light'], wraplength=120, justify='center')
         name_lbl.pack()
         
         if not is_implemented:
-            tk.Label(self.content, text="Soon", font=('Segoe UI', 6, 'italic'),
-                     fg=style.COLORS['text_muted'], bg=style.COLORS['bg_card_light']).pack(pady=2)
+            ThemedLabel(self.content, text="Soon", font=('Segoe UI', 6, 'italic'),
+                     fg=_UiStylingPage.COLORS['text_muted'], bg=_UiStylingPage.COLORS['bg_card_light']).pack(pady=2)
         
         if is_implemented:
             for w in (self, self.content, icon_lbl, name_lbl):
@@ -222,59 +224,59 @@ class TaskCard(tk.Frame):
     
     def _on_enter(self, event):
         if self.is_implemented:
-            self.content.configure(bg=style.COLORS['hover'])
+            self.content.configure(bg=_UiStylingPage.COLORS['hover'])
             for child in self.content.winfo_children():
                 if isinstance(child, tk.Label):
-                    child.configure(bg=style.COLORS['hover'])
+                    child.configure(bg=_UiStylingPage.COLORS['hover'])
     
     def _on_leave(self, event):
         if self.is_implemented:
-            self.content.configure(bg=style.COLORS['bg_card_light'])
+            self.content.configure(bg=_UiStylingPage.COLORS['bg_card_light'])
             for child in self.content.winfo_children():
                 if isinstance(child, tk.Label):
-                    child.configure(bg=style.COLORS['bg_card_light'])
+                    child.configure(bg=_UiStylingPage.COLORS['bg_card_light'])
     
     def _on_click(self, event):
         if self.is_implemented and self.on_execute:
             self.on_execute()
 
-class ConsoleOutput(tk.Frame):
+class ConsoleOutput(ThemedFrame):
     def __init__(self, parent):
-        super().__init__(parent, bg=style.COLORS['bg_console'], bd=1, relief='solid', highlightthickness=0)
+        super().__init__(parent, bg=_UiStylingPage.COLORS['bg_console'], bd=1, relief='solid', highlightthickness=0)
         self._expanded = True
         self._min_height = 70
         self._max_height = 320
 
-        self.header = tk.Frame(self, bg=style.COLORS['bg_card_light'], height=36)
+        self.header = ThemedFrame(self, bg=_UiStylingPage.COLORS['bg_card_light'], height=36)
         self.header.pack(fill='x')
         self.header.pack_propagate(False)
 
-        accent_line = tk.Frame(self.header, bg=style.COLORS['accent'], width=4)
+        accent_line = ThemedFrame(self.header, bg=_UiStylingPage.COLORS['accent'], width=4)
         accent_line.pack(side='left', fill='y')
 
-        tk.Label(self.header, text="⚡ CONSOLE OUTPUT", fg=style.COLORS['accent_light'],
-                 bg=style.COLORS['bg_card_light'], font=('Segoe UI', 9, 'bold')).pack(side='left', padx=12)
+        ThemedLabel(self.header, text="⚡ CONSOLE OUTPUT", fg=_UiStylingPage.COLORS['accent_light'],
+                 bg=_UiStylingPage.COLORS['bg_card_light'], font=('Segoe UI', 9, 'bold')).pack(side='left', padx=12)
 
-        btn_frame = tk.Frame(self.header, bg=style.COLORS['bg_card_light'])
+        btn_frame = ThemedFrame(self.header, bg=_UiStylingPage.COLORS['bg_card_light'])
         btn_frame.pack(side='right', padx=8)
 
-        self.clear_btn = tk.Button(btn_frame, text="🗑 Clear", command=self.clear,
-            bg=style.COLORS['bg_card_light'], fg=style.COLORS['text_secondary'],
-            activebackground=style.COLORS['hover'], relief='flat', cursor='hand2', padx=10, pady=4)
+        self.clear_btn = ThemedButton(btn_frame, text="🗑 Clear", command=self.clear,
+            is_primary=False, fg=_UiStylingPage.COLORS['text_secondary'],
+            activebackground=_UiStylingPage.COLORS['hover'], relief='flat', cursor='hand2', padx=10, pady=4)
         self.clear_btn.pack(side='left', padx=4)
 
-        self.toggle_btn = tk.Button(btn_frame, text="▼", command=self.toggle,
-            bg=style.COLORS['bg_card_light'], fg=style.COLORS['text_secondary'],
-            activebackground=style.COLORS['hover'], relief='flat', cursor='hand2', padx=10, pady=4)
+        self.toggle_btn = ThemedButton(btn_frame, text="▼", command=self.toggle,
+            is_primary=False, fg=_UiStylingPage.COLORS['text_secondary'],
+            activebackground=_UiStylingPage.COLORS['hover'], relief='flat', cursor='hand2', padx=10, pady=4)
         self.toggle_btn.pack(side='left', padx=4)
 
-        self.text_frame = tk.Frame(self, bg=style.COLORS['bg_console'])
+        self.text_frame = ThemedFrame(self, bg=_UiStylingPage.COLORS['bg_console'])
         self.text_frame.pack(fill='both', expand=True, padx=1, pady=1)
 
         scrollbar = tk.Scrollbar(self.text_frame)
         scrollbar.pack(side='right', fill='y')
 
-        self.text = tk.Text(self.text_frame, bg=style.COLORS['bg_console'], fg=style.COLORS['text_secondary'],
+        self.text = tk.Text(self.text_frame, bg=_UiStylingPage.COLORS['bg_console'], fg=_UiStylingPage.COLORS['text_secondary'],
                             font=('Consolas', 9), wrap=tk.WORD, relief='flat', bd=0,
                             yscrollcommand=scrollbar.set, padx=8, pady=6)
         self.text.pack(fill='both', expand=True)
@@ -304,21 +306,31 @@ class ConsoleOutput(tk.Frame):
         self.text.config(state=tk.DISABLED)
 
     def update_theme(self):
-        self.configure(bg=style.COLORS['bg_console'])
-        self.header.configure(bg=style.COLORS['bg_card_light'])
+        self.configure(bg=_UiStylingPage.COLORS['bg_console'])
+        self.header.configure(bg=_UiStylingPage.COLORS['bg_card_light'])
+        
+        # Update header labels and frames
         for child in self.header.winfo_children():
-            if isinstance(child, tk.Label):
-                child.configure(bg=style.COLORS['bg_card_light'])
-            elif isinstance(child, tk.Frame):
-                child.configure(bg=style.COLORS['bg_card_light'])
-                for btn in child.winfo_children():
-                    btn.configure(bg=style.COLORS['bg_card_light'], fg=style.COLORS['text_secondary'])
-        self.text_frame.configure(bg=style.COLORS['bg_console'])
-        self.text.configure(bg=style.COLORS['bg_console'], fg=style.COLORS['text_secondary'])
+            if isinstance(child, (ThemedLabel, ThemedFrame)):
+                child.configure(bg=_UiStylingPage.COLORS['bg_card_light'])
 
-class InteractivePlotCanvas(tk.Frame):
+        # Update buttons with their hover states
+        btn_bg = _UiStylingPage.COLORS['bg_card_light']
+        btn_fg = _UiStylingPage.COLORS['text_secondary']
+        btn_hover = _UiStylingPage.COLORS['hover']
+        
+        for btn in (self.clear_btn, self.toggle_btn):
+            if isinstance(btn, ThemedButton):
+                btn.config(bg=btn_bg, fg=btn_fg, activebackground=btn_hover)
+                btn.default_bg = btn_bg
+                btn.hover_bg = btn_hover
+        
+        self.text_frame.configure(bg=_UiStylingPage.COLORS['bg_console'])
+        self.text.configure(bg=_UiStylingPage.COLORS['bg_console'], fg=_UiStylingPage.COLORS['text_secondary'])
+
+class InteractivePlotCanvas(ThemedFrame):
     def __init__(self, parent: tk.Misc, controller: Any, task_index: int, log_fn: Optional[Callable[[str], None]] = None, **kwargs: Any) -> None:
-        super().__init__(parent, bg=style.COLORS['bg_card'], **kwargs)
+        super().__init__(parent, bg=_UiStylingPage.COLORS['bg_card'], **kwargs)
         self.controller = controller
         self.task_index = task_index
         self.log_fn = log_fn
@@ -349,16 +361,16 @@ class InteractivePlotCanvas(tk.Frame):
         self._push_on_render = True
         
         # Linked strictly to Active Theme colors for visibility
-        self.plot_bg_color = style.COLORS['bg_card']
-        self.text_color = style.COLORS['text_primary']
-        self.grid_color = style.COLORS['border']
+        self.plot_bg_color = _UiStylingPage.COLORS['bg_card']
+        self.text_color = _UiStylingPage.COLORS['text_primary']
+        self.grid_color = _UiStylingPage.COLORS['border']
         self.grid_visible = False # Grid disabled by default
         self.color_cycle = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd']
 
         self._initialize_canvas()
 
     def _initialize_canvas(self) -> None:
-        self.top_control_frame = tk.Frame(self, bg=style.COLORS['bg_card'])
+        self.top_control_frame = ThemedFrame(self, bg=_UiStylingPage.COLORS['bg_card'])
         self.top_control_frame.pack(fill='x', padx=5, pady=5)
         
         self.dropdown_combo = None
@@ -366,7 +378,7 @@ class InteractivePlotCanvas(tk.Frame):
             self.dropdown_combo = ttk.Combobox(self.top_control_frame, textvariable=self.target_view, state="readonly", width=25)
             self.dropdown_combo.pack(side='right')
 
-        self.fig = Figure(figsize=(6, 4), dpi=getattr(ui_config, 'PLOT_DPI', 100))
+        self.fig = Figure(figsize=(6, 4), dpi=getattr(_UiCofigurationPage, 'PLOT_DPI', 100))
         self.fig.patch.set_facecolor(self.plot_bg_color)
         self.ax = self.fig.add_subplot(111)
         self._format_axes()
@@ -374,7 +386,7 @@ class InteractivePlotCanvas(tk.Frame):
         self.canvas = FigureCanvasTkAgg(self.fig, master=self)
         self.canvas.get_tk_widget().pack(fill='both', expand=True)
 
-        self.hidden_toolbar_frame = tk.Frame(self) 
+        self.hidden_toolbar_frame = ThemedFrame(self) 
         self.toolbar = NavigationToolbar2Tk(self.canvas, self.hidden_toolbar_frame)
         self.toolbar.update()
 
@@ -595,7 +607,7 @@ class InteractivePlotCanvas(tk.Frame):
     def request_lod_data(self, initial_load: bool = False, x_range=None, y_range=None) -> None:
         if hasattr(self.controller, 'state') and getattr(self.controller.state, 'is_parsing', getattr(self.controller.state, 'is_processing', False)):
             if initial_load:
-                dialogs.show_info("Parsing in Progress", "Files are currently being processed.\nPlease wait.", parent=self.controller.root)
+                _UiDialoguesPage.show_info("Parsing in Progress", "Files are currently being processed.\nPlease wait.", parent=self.controller.root)
             return
 
         if self._is_rendering: return
@@ -660,7 +672,7 @@ class InteractivePlotCanvas(tk.Frame):
             pass
 
         self._format_axes()
-        self.ax_image = self.ax.imshow(np.array(pil_img), extent=extent, origin='lower', aspect='auto')
+        self.ax_image = self.ax.imshow(np.array(pil_img), extent=extent, origin='upper', aspect='auto')
         self.ax.set_xlim(extent[0], extent[1])
         self.ax.set_ylim(extent[2], extent[3])
         
@@ -677,12 +689,12 @@ class InteractivePlotCanvas(tk.Frame):
         # ---- DEBUG EXPORT: PNG, JSON, AND CSV ----
         try:
             # Safely check if debug is enabled globally
-            debug_enabled = getattr(ui_config, 'GUI_DEBUG', False)
+            debug_enabled = getattr(_UiCofigurationPage, '_Graph_Debug', False)
             if hasattr(self.controller, 'state') and hasattr(self.controller.state, 'debug_mode'):
                 debug_enabled = debug_enabled or self.controller.state.debug_mode
 
             if debug_enabled:
-                out_dir = getattr(ui_config, 'DEBUG_EXPORT_DIR', 'debug_exports')
+                out_dir = getattr(_UiCofigurationPage, 'DEBUG_EXPORT_DIR', 'debug_exports')
                 os.makedirs(out_dir, exist_ok=True)
                 ts = time.strftime('%Y%m%d_%H%M%S')
                 

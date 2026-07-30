@@ -5,30 +5,28 @@ Temporary on-disk cache used to store split NMEA message streams
 between the processing stage and the query/plot stage.
 """
 
-import atexit
 import os
-from pathlib import Path
-import shutil
-import tempfile
 import time
-from typing import Optional
 import zlib
+from pathlib import Path
 import pyarrow as _pyArrow
+from typing import Optional
 import pyarrow.parquet as _parquet
-from . import constants as _constantPage
+
+from . import _CoreConstantsPage
         
 class CacheManager:
     _baseDirectory = os.getcwd()
-    _tempDirectory = os.path.join(_baseDirectory, _constantPage.CACHE_BASE_NAME)
+    _tempDirectory = os.path.join(_baseDirectory, _CoreConstantsPage.CACHE_BASE_NAME)
     
     @classmethod
     def getCacheDirectory(cls) -> str:
         os.makedirs(cls._tempDirectory, exist_ok=True)
         return cls._tempDirectory
     
-    def __init__(self, log_path: Optional[Path] = None) -> None:
+    def __init__(self, log_path: Optional[Path] = None, _logQueue=None) -> None:
         self._cacheDir = CacheManager.getCacheDirectory()
-        CacheManager._purgeExpiredEntries(self._cacheDir, _constantPage.RETENTION_WINDOW_SECONDS)
+        CacheManager._purgeExpiredEntries(self._cacheDir, _CoreConstantsPage.RETENTION_WINDOW_SECONDS, _logQueue=_logQueue)
         self.log_path = log_path
         self.parquet_path = CacheManager.get_parquetPath(log_path, self._cacheDir) if log_path else None
         self.temp_dir = self._cacheDir
@@ -53,19 +51,23 @@ class CacheManager:
         return Path(_targetDir) / f"cache_{_fingerprint}.parquet"
     
     @classmethod
-    def load_existingCache(cls, _logPath:Path, _targetDir: str) -> Optional[_pyArrow.Table]:
+    def load_existingCache(cls, _logPath:Path, _targetDir: str, _logQueue=None) -> Optional[_pyArrow.Table]:
         _parquetPath = cls.get_parquetPath(_logPath, _targetDir)
         if _parquetPath.exists() and _parquetPath.stat().st_size > 0:
             try:
                 os.utime(str(_parquetPath), None)
                 return _parquet.read_table(str(_parquetPath))
             except Exception as e:
-                print(f"[!] Warning: Found existing cache at {_parquetPath} but failed to read: {e}")
+                if _logQueue is not None:
+                    try:
+                        _logQueue.put(f"[!] Warning: Found existing cache at {_parquetPath} but failed to read: {e}")
+                    except Exception:
+                        pass
                 return None
         return None
     
     @staticmethod
-    def _purgeExpiredEntries(_targetDir: str, _cutoffSeconds: int) -> None:
+    def _purgeExpiredEntries(_targetDir: str, _cutoffSeconds: int, _logQueue=None) -> None:
         try:
             _now = time.time()
             for _entry in os.scandir(_targetDir):
@@ -73,4 +75,8 @@ class CacheManager:
                     try: os.remove(_entry.path)
                     except OSError: pass
         except Exception as e:
-            print(f"[!] Retention engine sweep met exception: {e}")
+            if _logQueue is not None:
+                try:
+                    _logQueue.put(f"[!] Retention engine sweep met exception: {e}")
+                except Exception:
+                    pass

@@ -6,7 +6,7 @@ Low-level NMEA parsing helpers:
 
 from typing import Any, Dict, List, Optional, Tuple
 
-from . import constants as _constantPage
+from . import _CoreConstantsPage
 
 
 class BaseParsers:
@@ -67,16 +67,16 @@ class BaseParsers:
 
            
             return {
-                _constantPage.KEY_TYPE: "GGA",
-                _constantPage.KEY_TIME: _time,
-                _constantPage.KEY_DATE: _date,
-                _constantPage.KEY_LAT: _toDecimalConverter(_fields[2], _fields[3]),
-                _constantPage.KEY_LON: _toDecimalConverter(_fields[4], _fields[5]),
-                _constantPage.KEY_QUAL: int(_fields[6]) if _fields[6] else 0,
-                _constantPage.KEY_SVS: int(_fields[7]) if _fields[7] else 0,
-                _constantPage.KEY_HDOP: float(_fields[8]) if _fields[8] else 0.0,
-                _constantPage.KEY_ALT: float(_fields[9]) if _fields[9]else 0.0,
-                _constantPage.KEY_GHEIGHT: float(_fields[11]) if _fields[11] else 0.0
+                _CoreConstantsPage.KEY_TYPE: "GGA",
+                _CoreConstantsPage.KEY_TIME: _time,
+                _CoreConstantsPage.KEY_DATE: _date,
+                _CoreConstantsPage.KEY_LAT: _toDecimalConverter(_fields[2], _fields[3]),
+                _CoreConstantsPage.KEY_LON: _toDecimalConverter(_fields[4], _fields[5]),
+                _CoreConstantsPage.KEY_QUAL: int(_fields[6]) if _fields[6] else 0,
+                _CoreConstantsPage.KEY_SVS: int(_fields[7]) if _fields[7] else 0,
+                _CoreConstantsPage.KEY_HDOP: float(_fields[8]) if _fields[8] else 0.0,
+                _CoreConstantsPage.KEY_ALT: float(_fields[9]) if _fields[9]else 0.0,
+                _CoreConstantsPage.KEY_GHEIGHT: float(_fields[11]) if _fields[11] else 0.0
             }
         except (IndexError, ValueError):
             return None
@@ -92,14 +92,14 @@ class BaseParsers:
 
 
             return {
-                _constantPage.KEY_TYPE: "RMC",
-                _constantPage.KEY_TIME: _time,
-                _constantPage.KEY_STATUS: _fields[2], 
-                _constantPage.KEY_LAT: _toDecimalConverter(_fields[3], _fields[4]),
-                _constantPage.KEY_LON: _toDecimalConverter(_fields[5], _fields[6]),
-                _constantPage.KEY_SPD: _toKmphConverter(_fields[7]),
-                _constantPage.KEY_COG: float(_fields[8]) if _fields[8]else 0.0,
-                _constantPage.KEY_DATE: _date
+                _CoreConstantsPage.KEY_TYPE: "RMC",
+                _CoreConstantsPage.KEY_TIME: _time,
+                _CoreConstantsPage.KEY_STATUS: _fields[2], 
+                _CoreConstantsPage.KEY_LAT: _toDecimalConverter(_fields[3], _fields[4]),
+                _CoreConstantsPage.KEY_LON: _toDecimalConverter(_fields[5], _fields[6]),
+                _CoreConstantsPage.KEY_SPD: _toKmphConverter(_fields[7]),
+                _CoreConstantsPage.KEY_COG: float(_fields[8]) if _fields[8]else 0.0,
+                _CoreConstantsPage.KEY_DATE: _date
             }
         except (IndexError, ValueError):
             return None
@@ -111,11 +111,11 @@ class BaseParsers:
             _toKmphConverter = self._knotsToKmph
             
             return {
-                _constantPage.KEY_TYPE: "VTG",
-                _constantPage.KEY_DATE: _date,
-                _constantPage.KEY_TIME: _time,
-                _constantPage.KEY_COG: float(_fields[1]) if _fields[1] else 0.0,
-                _constantPage.KEY_SPD: float(_fields[7]) if _fields[7] else _toKmphConverter(_fields[5])
+                _CoreConstantsPage.KEY_TYPE: "VTG",
+                _CoreConstantsPage.KEY_DATE: _date,
+                _CoreConstantsPage.KEY_TIME: _time,
+                _CoreConstantsPage.KEY_COG: float(_fields[1]) if _fields[1] else 0.0,
+                _CoreConstantsPage.KEY_SPD: float(_fields[7]) if _fields[7] else _toKmphConverter(_fields[5])
             }
         except (ValueError, IndexError):
             return None
@@ -130,17 +130,17 @@ class BaseParsers:
 
             
             return {
-                _constantPage.KEY_TYPE: "GNS",
-                _constantPage.KEY_TIME: _time,
-                _constantPage.KEY_DATE: _date,
-                _constantPage.KEY_LAT: _toDecimalConverter(_fields[2], _fields[3]),
-                _constantPage.KEY_LON: _toDecimalConverter(_fields[4], _fields[5]),
+                _CoreConstantsPage.KEY_TYPE: "GNS",
+                _CoreConstantsPage.KEY_TIME: _time,
+                _CoreConstantsPage.KEY_DATE: _date,
+                _CoreConstantsPage.KEY_LAT: _toDecimalConverter(_fields[2], _fields[3]),
+                _CoreConstantsPage.KEY_LON: _toDecimalConverter(_fields[4], _fields[5]),
                 # TODO:KEY_MODE is needed to be confirmed
-                _constantPage.KEY_MODE: (not (_mode := _fields[6]) or _mode.startswith('N')),
-                _constantPage.KEY_SVS: int(_fields[7]) if _fields[7] else 0,
-                _constantPage.KEY_HDOP: float(_fields[8]) if _fields[8] else 0.0,
-                _constantPage.KEY_ALT: float(_fields[9]) if _fields[9] else 0.0,
-                _constantPage.KEY_GHEIGHT: float(_fields[10]) if _fields[10] else 0.0
+                _CoreConstantsPage.KEY_MODE: (not (_mode := _fields[6]) or _mode.startswith('N')),
+                _CoreConstantsPage.KEY_SVS: int(_fields[7]) if _fields[7] else 0,
+                _CoreConstantsPage.KEY_HDOP: float(_fields[8]) if _fields[8] else 0.0,
+                _CoreConstantsPage.KEY_ALT: float(_fields[9]) if _fields[9] else 0.0,
+                _CoreConstantsPage.KEY_GHEIGHT: float(_fields[10]) if _fields[10] else 0.0
             }
         except (ValueError, IndexError):
             return None
@@ -155,12 +155,12 @@ class BaseParsers:
 
             
             return {
-                _constantPage.KEY_TYPE: "GLL",
-                _constantPage.KEY_TIME: _time,
-                _constantPage.KEY_DATE: _date,
-                _constantPage.KEY_LAT: _toDecimalConverter(_fields[1], _fields[2]),
-                _constantPage.KEY_LON: _toDecimalConverter(_fields[3], _fields[4]),
-                _constantPage.KEY_STATUS: _fields[6]
+                _CoreConstantsPage.KEY_TYPE: "GLL",
+                _CoreConstantsPage.KEY_TIME: _time,
+                _CoreConstantsPage.KEY_DATE: _date,
+                _CoreConstantsPage.KEY_LAT: _toDecimalConverter(_fields[1], _fields[2]),
+                _CoreConstantsPage.KEY_LON: _toDecimalConverter(_fields[3], _fields[4]),
+                _CoreConstantsPage.KEY_STATUS: _fields[6]
             }
         except (ValueError, IndexError):
             return None  
@@ -174,10 +174,10 @@ class BaseParsers:
 
 
             return {
-                _constantPage.KEY_TYPE: "ZDA",
-                _constantPage.KEY_TIME: _time,
-                _constantPage.KEY_DATE: _date,
-                _constantPage.KEY_OFFSET: f"{_fields[5]}:{_fields[6]}" if _fields[5] else "00:00"
+                _CoreConstantsPage.KEY_TYPE: "ZDA",
+                _CoreConstantsPage.KEY_TIME: _time,
+                _CoreConstantsPage.KEY_DATE: _date,
+                _CoreConstantsPage.KEY_OFFSET: f"{_fields[5]}:{_fields[6]}" if _fields[5] else "00:00"
             }
         except (ValueError, IndexError):
             return None      
@@ -186,7 +186,7 @@ class BaseParsers:
         _fields += [""] * (19 - len(_fields))
         try:            
             _idChar = _fields[18][:1]
-            _constellation = _constantPage.CONSTELLATION_ID.get(int(_idChar) if _idChar else 0, "Unknown")
+            _constellation = _CoreConstantsPage.CONSTELLATION_ID.get(int(_idChar) if _idChar else 0, "Unknown")
             _activeSvs = tuple(sv for sv in _fields[3:15] if sv)
             
             # GSA Signature: Differentiate multiple GSAs in one epoch by their System ID
@@ -195,16 +195,16 @@ class BaseParsers:
 
             
             return {
-                _constantPage.KEY_TYPE: "GSA",
-                _constantPage.KEY_TIME: _time,
-                _constantPage.KEY_DATE: _date,
-                _constantPage.KEY_CONSTELLATION: _constellation,
+                _CoreConstantsPage.KEY_TYPE: "GSA",
+                _CoreConstantsPage.KEY_TIME: _time,
+                _CoreConstantsPage.KEY_DATE: _date,
+                _CoreConstantsPage.KEY_CONSTELLATION: _constellation,
                 # TODO:fix type is needed to be confirmed
-                _constantPage.KEY_FIX_TYPE: int(_fields[2]) if _fields[2] else 1,
-                _constantPage.KEY_SV_IDS: _activeSvs,
-                _constantPage.KEY_PDOP: float(_fields[15]) if _fields[15] else 0.0,
-                _constantPage.KEY_HDOP: float(_fields[16]) if _fields[16] else 0.0,
-                _constantPage.KEY_VDOP: float(_fields[17]) if _fields[17] else 0.0
+                _CoreConstantsPage.KEY_FIX_TYPE: int(_fields[2]) if _fields[2] else 1,
+                _CoreConstantsPage.KEY_SV_IDS: _activeSvs,
+                _CoreConstantsPage.KEY_PDOP: float(_fields[15]) if _fields[15] else 0.0,
+                _CoreConstantsPage.KEY_HDOP: float(_fields[16]) if _fields[16] else 0.0,
+                _CoreConstantsPage.KEY_VDOP: float(_fields[17]) if _fields[17] else 0.0
             }
         except (ValueError, IndexError):
             return None
@@ -213,7 +213,7 @@ class BaseParsers:
         _fields += [""] * (22 - len(_fields))
         try:
             _header = _fields[0][1:3]
-            _constellation =  _constantPage.CONSTELLATION_DICT.get(_header, "Unknown")
+            _constellation =  _CoreConstantsPage.CONSTELLATION_DICT.get(_header, "Unknown")
             _msgNum = int(_fields[2]) if _fields[2] else 1
             _totalMessages = int(_fields[1]) if _fields[1] else 1
             
@@ -234,14 +234,14 @@ class BaseParsers:
                 
             _svData = tuple(tuple(_fields[i:i+4]) for i in range(4, 17, 4) if _fields[i] and '*' not in _fields[i])    
             return {
-                _constantPage.KEY_TYPE: "GSV",
-                _constantPage.KEY_TIME: _time,
-                _constantPage.KEY_DATE: _date,
-                _constantPage.KEY_CONSTELLATION: _constellation,
-                _constantPage.KEY_MSG_NUM: _msgNum,
-                _constantPage.KEY_TOTAL_MSGS: int(_fields[1]) if _fields[1] else 1,
-                _constantPage.KEY_TOTAL_SVS: int(_fields[3]) if _fields[3] else 0,
-                _constantPage.KEY_SATELLITES: tuple(_svData) # Just the 1-4 SVs on THIS line
+                _CoreConstantsPage.KEY_TYPE: "GSV",
+                _CoreConstantsPage.KEY_TIME: _time,
+                _CoreConstantsPage.KEY_DATE: _date,
+                _CoreConstantsPage.KEY_CONSTELLATION: _constellation,
+                _CoreConstantsPage.KEY_MSG_NUM: _msgNum,
+                _CoreConstantsPage.KEY_TOTAL_MSGS: int(_fields[1]) if _fields[1] else 1,
+                _CoreConstantsPage.KEY_TOTAL_SVS: int(_fields[3]) if _fields[3] else 0,
+                _CoreConstantsPage.KEY_SATELLITES: tuple(_svData) # Just the 1-4 SVs on THIS line
             }
 
         except (ValueError, IndexError):

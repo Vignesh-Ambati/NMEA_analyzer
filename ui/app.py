@@ -1,9 +1,22 @@
+import queue
 import tkinter as tk
-from . import style, config, dialogs
-from .state import AppState
-from .services import ExtractionService, ProcessingService
-from .components import ProgressIndicator, ConsoleOutput
-from .pages import FilePage, TaskPage, GraphPage
+
+from . import (
+    AppState,
+    FilePage,
+    GraphPage,
+    TaskPage,
+    _UiCofigurationPage,
+    _UiDialoguesPage,
+    _UiStylingPage,
+    ConsoleOutput,
+    ProgressIndicator,
+    ThemedButton,
+    ThemedFrame,
+    ThemedLabel,
+    ExtractionService,
+    ProcessingService,
+)
 
 class LogAnalyzerApp:
     def __init__(self):
@@ -11,7 +24,7 @@ class LogAnalyzerApp:
         self.root.title("NMEA Log Analyzer")
         self.root.geometry("1000x600")
         self.root.minsize(800, 400)
-        self.root.configure(bg=style.COLORS['bg_dark'])
+        self.root.configure(bg=_UiStylingPage.COLORS['bg_dark'])
 
         self.state = AppState()
         self.processing_service = ProcessingService()
@@ -24,39 +37,39 @@ class LogAnalyzerApp:
         self.root.mainloop()
 
     def _setup_top_bar(self):
-        top = tk.Frame(self.root, bg=style.COLORS['bg_dark'], height=40)
+        top = ThemedFrame(self.root, height=40, bg=_UiStylingPage.COLORS['bg_dark'])
         top.pack(fill='x', side='top')
         top.pack_propagate(False)
         
-        self.title_label = tk.Label(top, text="NMEA Log Analyzer", fg=style.COLORS['accent'], bg=style.COLORS['bg_dark'],
+        self.title_label = ThemedLabel(top, text="NMEA Log Analyzer", fg=_UiStylingPage.COLORS['accent'], bg=_UiStylingPage.COLORS['bg_dark'],
                             font=('Segoe UI', 12, 'bold'))
         self.title_label.pack(side='left', padx=15)
-        self.theme_btn = tk.Button(top, text="🌙 Dark", command=self._toggle_theme,
-            bg=style.COLORS['bg_card_light'], fg=style.COLORS['text_primary'],
-            activebackground=style.COLORS['accent'], relief='flat', cursor='hand2', padx=10)
-        self.theme_btn.pack(side='right', padx=15)
+        self.theme_btn = ThemedButton(top, text="🌙 Dark", command=self._toggle_theme,
+            is_primary=False, padx=30, pady=4)
+        self.theme_btn.pack(side='right', padx=10)
 
     def _setup_main_layout(self):
-        main_container = tk.Frame(self.root, bg=style.COLORS['bg_dark'])
+        main_container = ThemedFrame(self.root, bg=_UiStylingPage.COLORS['bg_dark'])
         main_container.pack(fill='both', expand=True)
-        self.content_frame = tk.Frame(main_container, bg=style.COLORS['bg_card'])
+        self.content_frame = ThemedFrame(main_container, frame_type='default')
         self.content_frame.pack(fill='both', expand=True)
         self.progress = ProgressIndicator(main_container)
         self.progress.pack(fill='x', side='bottom')
         self.console = ConsoleOutput(main_container)
-        self.console.pack(fill='x', side='bottom')
+        self.console.pack(fill='x', side='bottom', padx=10)
         self.console.toggle()
+        self.root.after(100, self._process_log_queue)
 
     def _toggle_theme(self):
-        current = style.get_current_theme()
+        current = _UiStylingPage.get_current_theme()
         new = 'light' if current == 'dark' else 'dark'
-        style.set_theme(new)
-        self.root.configure(bg=style.COLORS['bg_dark'])
+        _UiStylingPage.set_theme(new)
+        self.root.configure(bg=_UiStylingPage.COLORS['bg_dark'])
         if hasattr(self, 'title_label'):
-            self.title_label.configure(bg=style.COLORS['bg_dark'])
+            self.title_label.configure(bg=_UiStylingPage.COLORS['bg_dark'])
         for child in self.root.winfo_children():
             if isinstance(child, tk.Frame):
-                child.configure(bg=style.COLORS['bg_dark'])
+                child.configure(bg=_UiStylingPage.COLORS['bg_dark'])
         self.theme_btn.config(text="☀️ Light" if new == 'light' else "🌙 Dark")
         self.progress.update_theme()
         self.console.update_theme()
@@ -68,6 +81,17 @@ class LogAnalyzerApp:
         if self.current_page_instance:
             self.current_page_instance.pack_forget()
             self.current_page_instance.destroy()
+
+    def _process_log_queue(self) -> None:
+        log_queue = getattr(self.processing_service, 'log_service', None)
+        if log_queue is not None and log_queue.queue is not None:
+            while True:
+                try:
+                    message = log_queue.queue.get_nowait()
+                except queue.Empty:
+                    break
+                self.console.write(message)
+        self.root.after(100, self._process_log_queue)
 
     def _load_page(self, page_class):
         self._clear_content()
@@ -85,7 +109,7 @@ class LogAnalyzerApp:
 
     def navigate_to_task_page(self):
         if not self.state.file_paths:
-            dialogs.show_warning("No File", "Please load a file first.", parent=self.root)
+            _UiDialoguesPage.show_warning("No File", "Please load a file first.", parent=self.root)
             return None
         self._load_page(TaskPage)
         self.progress.set_text("Select a task")
@@ -95,8 +119,8 @@ class LogAnalyzerApp:
     def navigate_to_graph_page(self, task_index):
         self.state.set_task(task_index)
         self._load_page(GraphPage)
-        self.progress.set_text(f"Executing: {config.TASKS[task_index]}")
-        self.console.write(f"▶ Starting task: {config.TASKS[task_index]}")
+        self.progress.set_text(f"Executing: {_UiCofigurationPage.TASKS[task_index]}")
+        self.console.write(f"▶ Starting task: {_UiCofigurationPage.TASKS[task_index]}")
         if self.console._expanded:
             self.console.toggle()
 
@@ -131,7 +155,7 @@ class LogAnalyzerApp:
         self.console.write(f"✗ Failed {filename}: {err}")
         # Only show a pop-up if they are trying to load their very first file
         if not self.state.caches:
-            dialogs.show_error("Processing Error", err, parent=self.root)
+            _UiDialoguesPage.show_error("Processing Error", err, parent=self.root)
 
     def process_file(self, file_path):
         job_id = str(file_path)

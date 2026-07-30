@@ -5,7 +5,7 @@ Common dialog wrappers for alerts and file selection.
 """
 from tkinter import messagebox, filedialog
 from typing import Tuple, Union
-from . import config
+from . import _UiCofigurationPage
 
 def show_warning(title: str, message: str, parent=None) -> bool:
     """Show a standard warning dialog."""
@@ -29,7 +29,7 @@ def ask_file(title: str = "Select NMEA Log File", parent=None) -> str:
     Returns the file path string, or an empty string if cancelled.
     """
     # Fallback to generic text files if SUPPORTED_EXTENSIONS isn't defined in config
-    extensions = getattr(config, 'SUPPORTED_EXTENSIONS', [("Log Files", "*.log *.txt"), ("All Files", "*.*")])
+    extensions = getattr(_UiCofigurationPage, 'SUPPORTED_EXTENSIONS', [("Log Files", "*.log *.txt"), ("All Files", "*.*")])
     
     return filedialog.askopenfilename(
         title=title,
@@ -42,7 +42,7 @@ def ask_files(title: str = "Select Multiple NMEA Log Files", parent=None) -> Tup
     Show a file dialog for selecting MULTIPLE files at once.
     Returns a tuple of file path strings, or an empty tuple if cancelled.
     """
-    extensions = getattr(config, 'SUPPORTED_EXTENSIONS', [("Log Files", "*.log *.txt"), ("All Files", "*.*")])
+    extensions = getattr(_UiCofigurationPage, 'SUPPORTED_EXTENSIONS', [("Log Files", "*.log *.txt"), ("All Files", "*.*")])
     
     return filedialog.askopenfilenames(
         title=title,

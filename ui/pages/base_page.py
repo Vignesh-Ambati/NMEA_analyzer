@@ -4,11 +4,9 @@ ui/pages/base_page.py
 Base page class for all pages.
 """
 
-import tkinter as tk
-from .. import style
+from .. import ThemedFrame
 
-
-class BasePage(tk.Frame):
+class BasePage(ThemedFrame):
     """
     Base class for all pages in the application.
     
@@ -29,7 +27,7 @@ class BasePage(tk.Frame):
         """
         super().__init__(
             parent,
-            bg=style.COLORS['bg_card'],
+            frame_type='default',
             **kwargs
         )
         

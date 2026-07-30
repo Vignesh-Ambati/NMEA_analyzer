@@ -5,13 +5,13 @@ Core NMEA processing engine.
 """
 
 from pathlib import Path
-from typing import Generator
 
-from .cache import CacheManager
-from .stage2 import ParquetStorageEngine
-from .parser import BaseParsers
-from . import constants as _constantPage
-
+from . import (
+    CacheManager, 
+    ParquetStorageEngine, 
+    BaseParsers, 
+    _CoreConstantsPage
+)
 
 class NmeaProcessor(BaseParsers):
     def __init__(self, abs_filename: str) -> None:
@@ -29,24 +29,28 @@ class NmeaProcessor(BaseParsers):
             "GSV": self._parseGSV,
         }
         
-    def process_file(self, _sharedProgress = None):
+    def process_file(self, _sharedProgress = None, _logQueue=None):
         if not self.abs_filename.exists(): 
             raise FileNotFoundError(f"Provided path is invalid: {self.abs_filename}")
         
         _cacheDirectory = CacheManager.getCacheDirectory()
-        _existing_data = CacheManager.load_existingCache(self.abs_filename, _cacheDirectory)
+        _existing_data = CacheManager.load_existingCache(self.abs_filename, _cacheDirectory, _logQueue=_logQueue)
         if _existing_data is not None:
             if _sharedProgress is not None: _sharedProgress.value = 1.0
-            print(f"[✓] O(1) Cache Match! Preloaded {len(_existing_data)} records instantly.")
+            if _logQueue is not None:
+                try:
+                    _logQueue.put(f"[✓] O(1) Cache Match! Preloaded {len(_existing_data)} records instantly.")
+                except Exception:
+                    pass
             return None
         _finalParquetPath = CacheManager.get_parquetPath(self.abs_filename, _cacheDirectory)
-        _storageEngine = ParquetStorageEngine(_finalParquetPath)
+        _storageEngine = ParquetStorageEngine(_finalParquetPath, _logQueue=_logQueue)
         
         try:
             _chunkBuffer: list = []
-            _batchSize = _constantPage.BATCH_SIZE
+            _batchSize = _CoreConstantsPage.BATCH_SIZE
             _parseMap = self._parseMap
-            _search = _constantPage.LINE_PATTERN.search
+            _search = _CoreConstantsPage.LINE_PATTERN.search
             _totalBytes = self.abs_filename.stat().st_size
             _bytesProcessed = 0
             with self.abs_filename.open(

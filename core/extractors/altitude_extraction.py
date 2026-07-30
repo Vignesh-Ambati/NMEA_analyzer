@@ -3,20 +3,23 @@ core/extractors/task03_altitude.py
 ──────────────────────────────────
 Calculates corrected MSL Altitude measurements from processed NMEA structures.
 """
+import os
+import time
+import threading
 import numpy as np
 import pandas as pd
 from pathlib import Path
-from typing import Optional, Any
-import threading, os, time
+from typing import Any, Optional
 import pyarrow.parquet as parquet
-from .base_extractor import BaseExtractor
-from core.constants import KEY_TYPE, KEY_TIME, KEY_DATE, KEY_ALT, KEY_GHEIGHT
+
+from . import BaseExtractor
+from .. import _CoreConstantsPage
 
 class AltitudeExtractor(BaseExtractor):
     @staticmethod
     def _smartStreamLine(dataframe: pd.DataFrame, state: Any = None) -> pd.DataFrame:
-        times = dataframe[KEY_TIME].astype(str).values
-        types = dataframe[KEY_TYPE].values
+        times = dataframe[_CoreConstantsPage.KEY_TIME].astype(str).values
+        types = dataframe[_CoreConstantsPage.KEY_TYPE].values
         values = dataframe['Value'].values
         
         keep_mask = np.ones(len(dataframe), dtype=bool)
@@ -64,20 +67,20 @@ class AltitudeExtractor(BaseExtractor):
             pass
         return result       
     
-    def _extract(self, parquet_path: Path, state: Any = None) -> Optional[pd.DataFrame]:
+    def _extract(self, parquet_path: Path, state: Any = None, _logQueue=None) -> Optional[pd.DataFrame]:
         try:
             # 1. High-Speed Bulk Load
             table = parquet.read_table(
                 parquet_path,
-                columns=[KEY_DATE, KEY_TIME, KEY_TYPE, KEY_ALT, KEY_GHEIGHT],
-                filters=[(KEY_TYPE, 'in', ['GGA', 'GNS'])]
+                columns=[_CoreConstantsPage.KEY_DATE, _CoreConstantsPage.KEY_TIME, _CoreConstantsPage.KEY_TYPE, _CoreConstantsPage.KEY_ALT, _CoreConstantsPage.KEY_GHEIGHT],
+                filters=[(_CoreConstantsPage.KEY_TYPE, 'in', ['GGA', 'GNS'])]
             )
             if table.num_rows == 0: return None
             dataframe = table.to_pandas()
             
             # 2. Vectorized Math
-            alt_numeric = pd.to_numeric(dataframe[KEY_ALT], errors='coerce')
-            gheight_numeric = pd.to_numeric(dataframe[KEY_GHEIGHT], errors='coerce')
+            alt_numeric = pd.to_numeric(dataframe[_CoreConstantsPage.KEY_ALT], errors='coerce')
+            gheight_numeric = pd.to_numeric(dataframe[_CoreConstantsPage.KEY_GHEIGHT], errors='coerce')
             # NMEA: geoid separation (gheight) = ellipsoid_height - orthometric_height (MSL)
             # ellipsoid_height = MSL + geoid_separation
             dataframe['Value'] = alt_numeric + gheight_numeric
@@ -93,12 +96,12 @@ class AltitudeExtractor(BaseExtractor):
                             fname = f"altitude_vectorized_{int(time.time())}.csv"
                             out_path = os.path.join(out_dir, fname)
                             # Ensure NMEA time preserved as string and include Value
-                            df_gga = df[df[KEY_TYPE] == "GGA"]
+                            df_gga = df[df[_CoreConstantsPage.KEY_TYPE] == "GGA"]
 
                             df_out = pd.DataFrame({
-                                'NMEA_Time': df_gga.get(KEY_TIME),
-                                'Altitude_raw': df_gga.get(KEY_ALT),
-                                'Geoid_sep': df_gga.get(KEY_GHEIGHT),
+                                'NMEA_Time': df_gga.get(_CoreConstantsPage.KEY_TIME),
+                                'Altitude_raw': df_gga.get(_CoreConstantsPage.KEY_ALT),
+                                'Geoid_sep': df_gga.get(_CoreConstantsPage.KEY_GHEIGHT),
                                 'Altitude': df_gga.get('Value')
                             })
 
@@ -111,13 +114,13 @@ class AltitudeExtractor(BaseExtractor):
             
             # 3. Streamline & Time Conversion
             # Keep a snapshot of pre-streamlined raw rows for per-second selection
-            raw_rows = dataframe[[KEY_DATE, KEY_TIME, KEY_TYPE, KEY_ALT]].copy()
+            raw_rows = dataframe[[_CoreConstantsPage.KEY_DATE, _CoreConstantsPage.KEY_TIME, _CoreConstantsPage.KEY_TYPE, _CoreConstantsPage.KEY_ALT]].copy()
 
             dataframe = self._smartStreamLine(dataframe, state=state)
-            dataframe['Time'] = self._convertToAbsoluteEpoch(dataframe[KEY_DATE], dataframe[KEY_TIME], state=state)
+            dataframe['Time'] = self._convertToAbsoluteEpoch(dataframe[_CoreConstantsPage.KEY_DATE], dataframe[_CoreConstantsPage.KEY_TIME], state=state)
             
             # 4. Replica Fix: Outages to 0.0 instead of NaN for straight vertical drops
-            outage_mask = dataframe[KEY_TIME].astype(str).isin(["", "None", "000000.00", "0.0", "nan", "<NA>"])
+            outage_mask = dataframe[_CoreConstantsPage.KEY_TIME].astype(str).isin(["", "None", "000000.00", "0.0", "nan", "<NA>"])
             dataframe.loc[outage_mask, 'Value'] = 0.0
             # Debug dump after replica fix (non-blocking)
             try:
@@ -134,7 +137,7 @@ class AltitudeExtractor(BaseExtractor):
                             # try to attach nearest NMEA_Time from raw rows by matching index where possible
                             # raw contains original NMEA times; perform nearest join on index distance
                             try:
-                                df_out['NMEA_Time'] = raw[KEY_TIME].values[:len(df_out)]
+                                df_out['NMEA_Time'] = raw[_CoreConstantsPage.KEY_TIME].values[:len(df_out)]
                             except Exception:
                                 df_out['NMEA_Time'] = None
                             df_out.to_csv(out_path, index=False, header=False)
@@ -144,22 +147,22 @@ class AltitudeExtractor(BaseExtractor):
                                 persec_fname = f"altitude_nmea_persecond_{int(time.time())}.csv"
                                 persec_path = os.path.join(out_dir, persec_fname)
                                 r = raw.copy()
-                                r['time_num'] = pd.to_numeric(r[KEY_TIME], errors='coerce')
+                                r['time_num'] = pd.to_numeric(r[_CoreConstantsPage.KEY_TIME], errors='coerce')
                                 r = r.dropna(subset=['time_num'])
                                 r['sec_key'] = (r['time_num']//1).astype(int)
                                 # for each sec_key prefer GGA
                                 def pick_group(g):
-                                    ggga = g[g[KEY_TYPE]=='GGA']
+                                    ggga = g[g[_CoreConstantsPage.KEY_TYPE]=='GGA']
                                     if not ggga.empty:
                                         return ggga.iloc[0]
                                     return g.iloc[0]
                                 rows = r.groupby('sec_key').apply(pick_group)
                                 rows = rows.reset_index(drop=True)
                                 rows_out = pd.DataFrame({
-                                    'NMEA_Date': rows[KEY_DATE],
-                                    'NMEA_Time': rows[KEY_TIME],
-                                    'Type': rows[KEY_TYPE],
-                                    'Altitude_raw': pd.to_numeric(rows[KEY_ALT], errors='coerce')
+                                    'NMEA_Date': rows[_CoreConstantsPage.KEY_DATE],
+                                    'NMEA_Time': rows[_CoreConstantsPage.KEY_TIME],
+                                    'Type': rows[_CoreConstantsPage.KEY_TYPE],
+                                    'Altitude_raw': pd.to_numeric(rows[_CoreConstantsPage.KEY_ALT], errors='coerce')
                                 })
                                 rows_out.to_csv(persec_path, index=False, header=False)
                             except Exception:
@@ -174,5 +177,9 @@ class AltitudeExtractor(BaseExtractor):
             return dataframe.sort_values(by=['Time']).reset_index(drop=True)[['Time', 'Value']]
             
         except Exception as e:
-            print(f"[!] Altitude Extractor Error: {e}")
+            if _logQueue is not None:
+                try:
+                    _logQueue.put(f"[!] Altitude Extractor Error: {e}")
+                except Exception:
+                    pass
             return None

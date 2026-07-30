@@ -1,14 +1,16 @@
-"""
-main.py
-───────
-Application entry point for ACCORD Log Analyzer.
-Run with:
-    python main.py
-"""
-import pycache_config
-from ui.app import LogAnalyzerApp
+
+import sys
+from pathlib import Path
 
 if __name__ == "__main__":
+    if __package__ is None:
+        parent_dir = Path(__file__).resolve().parent.parent
+        sys.path.insert(0, str(parent_dir))
+        __package__ = Path(__file__).resolve().parent.name
+
+    from . import pycache_config
+    from . import LogAnalyzerApp
+
     LogAnalyzerApp()
     
 # TODO: ADD A CONFIG BUTTON TO REMOVE THE LOGCACHE AS FAIL SAFE. ALSO PRINT IN CONSOLE IF CACHE IS PRESENT FOR ANY FILE
