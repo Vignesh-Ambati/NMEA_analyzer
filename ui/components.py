@@ -5,14 +5,13 @@ import threading
 import numpy as np
 import tkinter as tk
 from PIL import Image
-from tkinter import ttk
+from tkinter import ttk, messagebox, filedialog, colorchooser
 from matplotlib.figure import Figure
 from typing import Any, Callable, Dict, List, Optional, Tuple
 from matplotlib.ticker import FuncFormatter, StrMethodFormatter
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 
 from . import (
-    _UiDialoguesPage,
     _UiStylingPage,
     _UiCofigurationPage
 )
@@ -22,15 +21,17 @@ class ThemedButton(tk.Button):
         cfg = _UiStylingPage.get_button_style(is_primary)
         cfg.update(kwargs)
         cfg['highlightthickness'] = 2
-        cfg['highlightbackground'] = _UiStylingPage.COLORS['text_primary']
-        cfg['highlightcolor'] = _UiStylingPage.COLORS['accent']
+        cfg['highlightbackground'] = _UiStylingPage.COLORS['border']
+        cfg['highlightcolor'] = _UiStylingPage.COLORS['accent_hover']
         super().__init__(parent, text=text, command=command, **cfg)
         self.default_bg = cfg['bg']
         self.hover_bg = cfg['activebackground']
         self.bind('<Enter>', self._on_enter)
         self.bind('<Leave>', self._on_leave)
-    def _on_enter(self, e): self.configure(bg=self.hover_bg)
-    def _on_leave(self, e): self.configure(bg=self.default_bg)
+    def _on_enter(self, e):
+        self.configure(bg=self.hover_bg, highlightcolor=_UiStylingPage.COLORS['accent_hover'])
+    def _on_leave(self, e):
+        self.configure(bg=self.default_bg, highlightcolor=_UiStylingPage.COLORS['accent_hover'])
     
 class ThemedLabel(tk.Label):
     def __init__(self, parent, text="", style_type='normal', **kwargs):
@@ -53,7 +54,7 @@ class ThemedEntry(tk.Entry):
     def __init__(self, parent, placeholder="", **kwargs):
         super().__init__(parent, bg=_UiStylingPage.COLORS['bg_input'], fg=_UiStylingPage.COLORS['text_primary'],
                          insertbackground=_UiStylingPage.COLORS['accent'], relief='solid', bd=1,
-                         highlightthickness=0, font=('Segoe UI', 10), **kwargs)
+                         highlightthickness=0, font=_UiStylingPage.get_font(10), **kwargs)
         self.placeholder = placeholder
         self._insert_placeholder()
         self.bind('<FocusIn>', self._clear_placeholder)
@@ -117,10 +118,10 @@ class ProgressIndicator(ThemedFrame):
         self.rotation_timer: Optional[str] = None
         
         self.container = ThemedFrame(self, bg=_UiStylingPage.COLORS['bg_dark'])
-        self.container.pack(fill='x', expand=True, pady=5)
+        self.container.pack(fill='x', expand=True)
         
         self.label = ThemedLabel(self.container, text="Ready", fg=_UiStylingPage.COLORS['text_secondary'],
-                              bg=_UiStylingPage.COLORS['bg_dark'], font=('Segoe UI', 9), width=45, anchor='w')
+                              bg=_UiStylingPage.COLORS['bg_dark'], font=_UiStylingPage.get_font(9), width=45, anchor='w')
         self.label.pack(side='left', padx=10)
         
         self.progress = ttk.Progressbar(self.container, mode='determinate', maximum=100, style='TProgressbar')
@@ -205,15 +206,15 @@ class TaskCard(ThemedFrame):
         self.content = ThemedFrame(self, bg=_UiStylingPage.COLORS['bg_card_light'])
         self.content.pack(fill='both', expand=True, padx=6, pady=6)
         
-        icon_lbl = ThemedLabel(self.content, text=icon, font=('Segoe UI', 24), bg=_UiStylingPage.COLORS['bg_card_light'], fg=_UiStylingPage.COLORS['text_primary'])
+        icon_lbl = ThemedLabel(self.content, text=icon, font=_UiStylingPage.get_font(24), bg=_UiStylingPage.COLORS['bg_card_light'], fg=_UiStylingPage.COLORS['text_primary'])
         icon_lbl.pack(pady=2)
         
-        name_lbl = ThemedLabel(self.content, text=name, font=('Segoe UI', 8), fg=_UiStylingPage.COLORS['text_primary'],
+        name_lbl = ThemedLabel(self.content, text=name, font=_UiStylingPage.get_font(8), fg=_UiStylingPage.COLORS['text_primary'],
                             bg=_UiStylingPage.COLORS['bg_card_light'], wraplength=120, justify='center')
         name_lbl.pack()
         
         if not is_implemented:
-            ThemedLabel(self.content, text="Soon", font=('Segoe UI', 6, 'italic'),
+            ThemedLabel(self.content, text="Soon", font=_UiStylingPage.get_font(6, italic=True),
                      fg=_UiStylingPage.COLORS['text_muted'], bg=_UiStylingPage.COLORS['bg_card_light']).pack(pady=2)
         
         if is_implemented:
@@ -240,14 +241,16 @@ class TaskCard(ThemedFrame):
         if self.is_implemented and self.on_execute:
             self.on_execute()
 
-class ConsoleOutput(ThemedFrame):
-    def __init__(self, parent):
-        super().__init__(parent, bg=_UiStylingPage.COLORS['bg_console'], bd=1, relief='solid', highlightthickness=0)
-        self._expanded = True
-        self._min_height = 70
+class ConsoleOutput(ThemedFrame): # type: ignore
+    def __init__(self, parent, app_controller=None):
+        super().__init__(parent, bg=_UiStylingPage.COLORS['bg_console'], bd=0, relief='flat', highlightthickness=0)
+        self.app_controller = app_controller 
+        self._expanded = False # Start expanded by default
+        self._header_height = 36 # Store header height
+        self._min_height = self._header_height # When collapsed, height is just the header
         self._max_height = 320
 
-        self.header = ThemedFrame(self, bg=_UiStylingPage.COLORS['bg_card_light'], height=36)
+        self.header = ThemedFrame(self, bg=_UiStylingPage.COLORS['bg_card_light'], height=self._header_height)
         self.header.pack(fill='x')
         self.header.pack_propagate(False)
 
@@ -255,10 +258,10 @@ class ConsoleOutput(ThemedFrame):
         accent_line.pack(side='left', fill='y')
 
         ThemedLabel(self.header, text="⚡ CONSOLE OUTPUT", fg=_UiStylingPage.COLORS['accent_light'],
-                 bg=_UiStylingPage.COLORS['bg_card_light'], font=('Segoe UI', 9, 'bold')).pack(side='left', padx=12)
+                 bg=_UiStylingPage.COLORS['bg_card_light'], font=_UiStylingPage.get_font(9, 'bold')).pack(side='left', padx=12)
 
         btn_frame = ThemedFrame(self.header, bg=_UiStylingPage.COLORS['bg_card_light'])
-        btn_frame.pack(side='right', padx=8)
+        btn_frame.pack(side='right', padx=(8,0))
 
         self.clear_btn = ThemedButton(btn_frame, text="🗑 Clear", command=self.clear,
             is_primary=False, fg=_UiStylingPage.COLORS['text_secondary'],
@@ -268,10 +271,11 @@ class ConsoleOutput(ThemedFrame):
         self.toggle_btn = ThemedButton(btn_frame, text="▼", command=self.toggle,
             is_primary=False, fg=_UiStylingPage.COLORS['text_secondary'],
             activebackground=_UiStylingPage.COLORS['hover'], relief='flat', cursor='hand2', padx=10, pady=4)
-        self.toggle_btn.pack(side='left', padx=4)
+        self.toggle_btn.pack(side='left')
 
         self.text_frame = ThemedFrame(self, bg=_UiStylingPage.COLORS['bg_console'])
-        self.text_frame.pack(fill='both', expand=True, padx=1, pady=1)
+        if self._expanded: 
+            self.text_frame.pack(fill='both', expand=True, padx=1, pady=1)
 
         scrollbar = tk.Scrollbar(self.text_frame)
         scrollbar.pack(side='right', fill='y')
@@ -281,18 +285,24 @@ class ConsoleOutput(ThemedFrame):
                             yscrollcommand=scrollbar.set, padx=8, pady=6)
         self.text.pack(fill='both', expand=True)
         scrollbar.config(command=self.text.yview)
-        self.text.config(state=tk.DISABLED)
+        self.text.config(state=tk.DISABLED) 
+        
+        # Set initial toggle button text based on _expanded state 
+        self.toggle_btn.config(text="▲" if not self._expanded else "▼")
 
     def toggle(self):
-        if self._expanded:
+        if self._expanded: # Currently expanded, so collapse it
             self.text_frame.pack_forget()
-            self.configure(height=self._min_height)
             self.toggle_btn.config(text="▲")
         else:
+            # Currently collapsed, so expand it
             self.text_frame.pack(fill='both', expand=True, padx=1, pady=1)
-            self.configure(height=self._max_height)
             self.toggle_btn.config(text="▼")
         self._expanded = not self._expanded
+        
+        # Notify the app controller to update its placement
+        if self.app_controller:
+            self.app_controller._update_console_and_progress_placement()
 
     def write(self, msg):
         self.text.config(state=tk.NORMAL)
@@ -329,11 +339,12 @@ class ConsoleOutput(ThemedFrame):
         self.text.configure(bg=_UiStylingPage.COLORS['bg_console'], fg=_UiStylingPage.COLORS['text_secondary'])
 
 class InteractivePlotCanvas(ThemedFrame):
-    def __init__(self, parent: tk.Misc, controller: Any, task_index: int, log_fn: Optional[Callable[[str], None]] = None, **kwargs: Any) -> None:
+    def __init__(self, parent: tk.Misc, controller: Any, task_index: int, log_fn: Optional[Callable[[str], None]] = None, dialog_fn: Optional[Callable[[str, str], None]] = None, **kwargs: Any) -> None:
         super().__init__(parent, bg=_UiStylingPage.COLORS['bg_card'], **kwargs)
         self.controller = controller
         self.task_index = task_index
         self.log_fn = log_fn
+        self.dialog_fn = dialog_fn
         
         # State tracking for interactions
         self.auto_mode_active = False
@@ -404,20 +415,19 @@ class InteractivePlotCanvas(ThemedFrame):
         self.ax.set_facecolor(self.plot_bg_color)
         self.fig.patch.set_facecolor(self.plot_bg_color)
         
-        # Reduced tick size to 8
-        self.ax.tick_params(colors=self.text_color, labelsize=8)
+        # Further reduced tick size for a more compact look
+        self.ax.tick_params(colors=self.text_color, labelsize=7)
         for spine in self.ax.spines.values():
             spine.set_color(self.grid_color)
             
-        # Title removed entirely to reclaim UI space
-        
-        # Reduced axis label size to 9
-        self.ax.set_ylabel("Altitude (meters)" if self.task_index == 3 else "Value", color=self.text_color, fontsize=9)
-        self.ax.set_xlabel("Date & Time", color=self.text_color, fontsize=9)
+        # Reduced y-axis label size and removed x-axis label to save space
+        self.ax.set_ylabel("Altitude (m)" if self.task_index == 3 else "Value", color=self.text_color, fontsize=8)
+        self.ax.set_xlabel("")
 
         if self.grid_visible:
             self.ax.grid(True, linestyle='--', color=self.grid_color, alpha=0.5)
 
+        # Keep y-axis formatter for readability
         self.ax.yaxis.set_major_formatter(StrMethodFormatter('{x:,.0f}'))
 
         def format_date(x, pos):
@@ -425,10 +435,11 @@ class InteractivePlotCanvas(ThemedFrame):
             except: return ""
         self.ax.xaxis.set_major_formatter(FuncFormatter(format_date))
         
+        # Adjust subplot parameters to use the full canvas space
         try:
             self.fig.tight_layout()
         except Exception:
-            self.fig.subplots_adjust(bottom=0.20, left=0.12, right=0.98, top=0.95)
+            self.fig.subplots_adjust(bottom=0.18, left=0.09, right=0.98, top=0.98)
             
         for label in self.ax.get_xticklabels():
             label.set_rotation(25)
@@ -606,8 +617,8 @@ class InteractivePlotCanvas(ThemedFrame):
 
     def request_lod_data(self, initial_load: bool = False, x_range=None, y_range=None) -> None:
         if hasattr(self.controller, 'state') and getattr(self.controller.state, 'is_parsing', getattr(self.controller.state, 'is_processing', False)):
-            if initial_load:
-                _UiDialoguesPage.show_info("Parsing in Progress", "Files are currently being processed.\nPlease wait.", parent=self.controller.root)
+            if initial_load and self.dialog_fn:
+                self.dialog_fn("Parsing in Progress", "Files are currently being processed.\nPlease wait.")
             return
 
         if self._is_rendering: return
@@ -689,7 +700,7 @@ class InteractivePlotCanvas(ThemedFrame):
         # ---- DEBUG EXPORT: PNG, JSON, AND CSV ----
         try:
             # Safely check if debug is enabled globally
-            debug_enabled = getattr(_UiCofigurationPage, '_Graph_Debug', False)
+            debug_enabled = getattr(_UiCofigurationPage, 'DEBUG_GRAPH', False)
             if hasattr(self.controller, 'state') and hasattr(self.controller.state, 'debug_mode'):
                 debug_enabled = debug_enabled or self.controller.state.debug_mode
 
@@ -765,3 +776,57 @@ class InteractivePlotCanvas(ThemedFrame):
                     self.target_view.set(options[0])
         except Exception:
             if self.log_fn: self.log_fn('[WARN] Dropdown update skipped; widget not available.')
+    
+class MessageBox:
+    """A static class for showing standard tkinter message boxes."""
+    @staticmethod
+    def show_info(title: str, message: str, **kwargs: Any) -> None:
+        """Show an informational dialog."""
+        messagebox.showinfo(title, message, **kwargs)
+
+    @staticmethod
+    def show_warning(title: str, message: str, **kwargs: Any) -> None:
+        """Show a warning dialog."""
+        messagebox.showwarning(title, message, **kwargs)
+
+    @staticmethod
+    def show_error(title: str, message: str, **kwargs: Any) -> None:
+        """Show an error dialog."""
+        messagebox.showerror(title, message, **kwargs)
+
+    @staticmethod
+    def ask_yes_no(title: str, message: str, **kwargs: Any) -> bool:
+        """Show a yes/no confirmation dialog."""
+        return messagebox.askyesno(title, message, **kwargs)
+
+class FileDialog:
+    """A static class for showing file and directory dialogs."""
+
+    @staticmethod
+    def ask_open_file(title: str = "Select File", filetypes: Optional[List[Tuple[str, str]]] = None, **kwargs: Any) -> str:
+        """Show a dialog to open a single file."""
+        if filetypes is None:
+            filetypes = [("All Files", "*.*")]
+        return filedialog.askopenfilename(title=title, filetypes=filetypes, **kwargs)
+
+    @staticmethod
+    def ask_open_files(title: str = "Select Files", filetypes: Optional[List[Tuple[str, str]]] = None, **kwargs: Any) -> Tuple[str, ...]:
+        """Show a dialog to open multiple files."""
+        if filetypes is None:
+            filetypes = [("All Files", "*.*")]
+        return filedialog.askopenfilenames(title=title, filetypes=filetypes, **kwargs)
+
+    @staticmethod
+    def ask_save_as_file(title: str = "Save As", defaultextension: str = "", filetypes: Optional[List[Tuple[str, str]]] = None, **kwargs: Any) -> str:
+        """Show a dialog to save a file."""
+        if filetypes is None:
+            filetypes = [("All Files", "*.*")]
+        return filedialog.asksaveasfilename(title=title, defaultextension=defaultextension, filetypes=filetypes, **kwargs)
+
+class ColorChooser:
+    """A static class for using the color chooser dialog."""
+
+    @staticmethod
+    def ask_color(initialcolor: Optional[str] = None, title: Optional[str] = "Select Color", **kwargs: Any) -> Tuple[Optional[Tuple[int, int, int]], Optional[str]]:
+        """Show a dialog to choose a color."""
+        return colorchooser.askcolor(initialcolor, title=title, **kwargs)

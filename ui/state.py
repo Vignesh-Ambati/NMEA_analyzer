@@ -17,6 +17,8 @@ class AppState:
     navigation_stack: List[str] = field(default_factory=list)
     
     debug_mode: bool = False
+    progress_bar_visible: bool = False
+    console_visible: bool = False
     
     def reset(self):
         """Reset state to initial values."""

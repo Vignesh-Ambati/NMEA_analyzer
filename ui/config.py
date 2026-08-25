@@ -34,7 +34,7 @@ FONT_SIZES = {
 
 # Font families
 FONTS = {
-    'default': 'Segoe UI',
+    'default': 'Arial',
     'mono': 'Consolas',
 }
 
@@ -66,6 +66,8 @@ SUPPORTED_EXTENSIONS = [
 # Debug / developer helpers
 # When True, various UI components will emit intermediate files (images, csvs)
 # to help with debugging rendering and data pipeline problems.
-_Graph_Debug = False
+DEBUG_GRAPH = False
+DEBUG_PROGRESS_BAR_VISIBLE = False
+DEBUG_CONSOLE_VISIBLE = False
 DEBUG_EXPORT_DIR = "debug_exports"
 PLOT_DPI = 100

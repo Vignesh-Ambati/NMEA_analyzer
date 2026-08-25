@@ -12,8 +12,8 @@ from . import config as _UiCofigurationPage
 from . import style as _UiStylingPage
 from .state import AppState
 
+from .components import ThemedButton, ThemedLabel, ThemedFrame, ThemedEntry, FileInputFrame, ScrollableFrame, ProgressIndicator, TaskCard, ConsoleOutput, InteractivePlotCanvas, MessageBox, FileDialog, ColorChooser
 from . import dialogs as _UiDialoguesPage
-from .components import ThemedButton, ThemedLabel, ThemedFrame, ThemedEntry, FileInputFrame, ScrollableFrame, ProgressIndicator, TaskCard, ConsoleOutput, InteractivePlotCanvas
 from .services import LogService, ProcessingService, ExtractionService
 
 from .pages import BasePage, FilePage, TaskPage, GraphPage

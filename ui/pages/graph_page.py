@@ -9,9 +9,10 @@ from .. import (
     ThemedLabel,
     ThemedButton,
     InteractivePlotCanvas,
+    MessageBox,
+    FileDialog,
+    ColorChooser,
 )
-
-from tkinter import colorchooser, filedialog, messagebox
 
 class GraphPage(BasePage):
     def __init__(self, parent: tk.Misc, controller: Any) -> None:
@@ -36,13 +37,13 @@ class GraphPage(BasePage):
         current_task_idx = self.controller.state.current_task if self.controller.state.current_task is not None else 0
         task_title = _UiCofigurationPage.TASKS[current_task_idx] if current_task_idx < len(_UiCofigurationPage.TASKS) else "Analysis View Frame"
 
-        ThemedLabel(self.header_bar, text=task_title, fg=_UiStylingPage.COLORS['text_primary'],
-                 bg=_UiStylingPage.COLORS['bg_card_light'], font=('Segoe UI', 12, 'bold')).pack(side='left', padx=10)
+        ThemedLabel(self.header_bar, text=task_title, fg=_UiStylingPage.COLORS['text_primary'], bg=_UiStylingPage.COLORS['bg_card_light'],
+                    font=_UiStylingPage.get_font(10, 'bold')).pack(side='left', padx=10)
 
         nav_frame = ThemedFrame(self.header_bar, bg=_UiStylingPage.COLORS['bg_card_light'])
         nav_frame.pack(side='right')
-        ThemedButton(nav_frame, text="← Back", command=self._go_back, is_primary=False, padx=12, pady=4).pack(side='left', padx=2)
-        ThemedButton(nav_frame, text="⌂ Home", command=self._go_home, is_primary=False, padx=12, pady=4).pack(side='left', padx=2)
+        ThemedButton(nav_frame, text="← Back", command=self._go_back, is_primary=False, padx=10, pady=3, font=_UiStylingPage.get_font(9, 'bold')).pack(side='left', padx=2)
+        ThemedButton(nav_frame, text="⌂ Home", command=self._go_home, is_primary=False, padx=10, pady=3, font=_UiStylingPage.get_font(9, 'bold')).pack(side='left', padx=2)
 
         # ---- Content frame (row 1) ----
         self.content_frame = ThemedFrame(self.main_frame, bg=_UiStylingPage.COLORS['bg_card'])
@@ -50,30 +51,29 @@ class GraphPage(BasePage):
         self.main_frame.grid_rowconfigure(1, weight=1)
         self.main_frame.grid_columnconfigure(0, weight=1)
 
+        # Sidebar (now on the left)
+        self._build_sidebar(self.content_frame)
+
         # Plot container
         self.plot_container = ThemedFrame(self.content_frame, bg=_UiStylingPage.COLORS['bg_card'])
-        self.plot_container.grid(row=0, column=0, sticky='nsew')
-        self.content_frame.grid_columnconfigure(0, weight=1)
+        self.plot_container.grid(row=0, column=1, sticky='nsew', padx=(10, 0))
+        self.content_frame.grid_columnconfigure(1, weight=1)
         self.content_frame.grid_rowconfigure(0, weight=1)
-
-        # Sidebar
-        self._build_sidebar(self.content_frame)
 
         # Attach plotter
         self._attach_canvas_engine(current_task_idx)
 
     def _build_sidebar(self, parent: ThemedFrame) -> None:
         self.sidebar_frame = ThemedFrame(parent, bg=_UiStylingPage.COLORS['bg_card_light'], width=220)
-        self.sidebar_frame.grid(row=0, column=1, sticky='ns', padx=(10, 0))
+        self.sidebar_frame.grid(row=0, column=0, sticky='ns')
         self.sidebar_frame.grid_propagate(False)
 
-        ThemedLabel(self.sidebar_frame, text="⚙️ Graph Matrix", fg=_UiStylingPage.COLORS['accent'],
-                 bg=_UiStylingPage.COLORS['bg_card_light'], font=('Segoe UI', 10, 'bold')).pack(pady=(10, 5), padx=10, anchor='w')
+        ThemedLabel(self.sidebar_frame, text="⚙️ Graph Matrix", fg=_UiStylingPage.COLORS['accent'], bg=_UiStylingPage.COLORS['bg_card_light'],
+                    font=_UiStylingPage.get_font(9, 'bold')).pack(pady=(10, 5), padx=10, anchor='w')
         ThemedFrame(self.sidebar_frame, bg=_UiStylingPage.COLORS['border'], height=1).pack(fill='x', padx=10, pady=5)
 
         self.mode_label = ThemedLabel(self.sidebar_frame, text="Mode: Manual (Idle)",
-                                   fg=_UiStylingPage.COLORS['text_secondary'], bg=_UiStylingPage.COLORS['bg_card_light'],
-                                   font=('Segoe UI', 9))
+                                   fg=_UiStylingPage.COLORS['text_secondary'], bg=_UiStylingPage.COLORS['bg_card_light'], font=_UiStylingPage.get_font(8))
         self.mode_label.pack(pady=(0, 5), padx=10, anchor='w')
 
         self.menu_container = ThemedFrame(self.sidebar_frame, bg=_UiStylingPage.COLORS['bg_card_light'])
@@ -88,28 +88,28 @@ class GraphPage(BasePage):
         self.main_menu = ThemedFrame(self.menu_container, bg=_UiStylingPage.COLORS['bg_card_light'])
 
         self.is_manual = True
-        self.btn_mode_toggle = ThemedButton(self.main_menu, text="Mode: Manual", command=self._toggle_manual_auto, padx=10, pady=5)
+        self.btn_mode_toggle = ThemedButton(self.main_menu, text="Mode: Manual", command=self._toggle_manual_auto, padx=10, pady=5, font=_UiStylingPage.get_font(9, 'bold'))
         self.btn_mode_toggle.pack(fill='x', padx=10, pady=6)
 
-        self.btn_fullpage = ThemedButton(self.main_menu, text="⛶ Maximize", command=self._toggle_fullpage, padx=10, pady=5)
+        self.btn_fullpage = ThemedButton(self.main_menu, text="⛶ Maximize", command=self._toggle_fullpage, padx=10, pady=5, font=_UiStylingPage.get_font(9, 'bold'))
         self.btn_fullpage.pack(fill='x', padx=10, pady=6)
 
-        self.btn_pan = ThemedButton(self.main_menu, text="✋ Pan Data", command=self._on_pan, padx=10, pady=5)
+        self.btn_pan = ThemedButton(self.main_menu, text="✋ Pan Data", command=self._on_pan, padx=10, pady=5, font=_UiStylingPage.get_font(9, 'bold'))
         self.btn_pan.pack(fill='x', padx=10, pady=6)
 
-        self.btn_zoom = ThemedButton(self.main_menu, text="🔍 Zoom Box", command=self._on_zoom, padx=10, pady=5)
+        self.btn_zoom = ThemedButton(self.main_menu, text="🔍 Zoom Box", command=self._on_zoom, padx=10, pady=5, font=_UiStylingPage.get_font(9, 'bold'))
         self.btn_zoom.pack(fill='x', padx=10, pady=6)
 
-        self.btn_reset = ThemedButton(self.main_menu, text="🏠 Reset View", command=self._on_reset, padx=10, pady=5)
+        self.btn_reset = ThemedButton(self.main_menu, text="🏠 Reset View", command=self._on_reset, padx=10, pady=5, font=_UiStylingPage.get_font(9, 'bold'))
         self.btn_reset.pack(fill='x', padx=10, pady=6)
 
-        self.btn_back = ThemedButton(self.main_menu, text="⏪ Step Back", command=self._on_back, padx=10, pady=5)
+        self.btn_back = ThemedButton(self.main_menu, text="⏪ Step Back", command=self._on_back, padx=10, pady=5, font=_UiStylingPage.get_font(9, 'bold'))
         self.btn_back.pack(fill='x', padx=10, pady=6)
 
-        self.btn_forward = ThemedButton(self.main_menu, text="⏩ Step Forward", command=self._on_forward, padx=10, pady=5)
+        self.btn_forward = ThemedButton(self.main_menu, text="⏩ Step Forward", command=self._on_forward, padx=10, pady=5, font=_UiStylingPage.get_font(9, 'bold'))
         self.btn_forward.pack(fill='x', padx=10, pady=6)
 
-        self.btn_export = ThemedButton(self.main_menu, text="💾 Export Frame", command=self._save_image, padx=10, pady=5)
+        self.btn_export = ThemedButton(self.main_menu, text="💾 Export Frame", command=self._save_image, padx=10, pady=5, font=_UiStylingPage.get_font(9, 'bold'))
         self.btn_export.pack(fill='x', padx=10, pady=6)
 
         self.btn_theme = ThemedButton(self.main_menu, text="🎨 Theme & Colors", command=self._show_theme_menu, padx=10, pady=5)
@@ -120,8 +120,8 @@ class GraphPage(BasePage):
     def _build_theme_menu(self):
         self.theme_menu = ThemedFrame(self.menu_container, bg=_UiStylingPage.COLORS['bg_card_light'])
 
-        ThemedLabel(self.theme_menu, text="🎨 Appearance Settings", fg=_UiStylingPage.COLORS['accent'],
-                 bg=_UiStylingPage.COLORS['bg_card_light'], font=('Segoe UI', 9, 'bold')).pack(pady=(5, 10))
+        ThemedLabel(self.theme_menu, text="🎨 Appearance Settings", fg=_UiStylingPage.COLORS['accent'], bg=_UiStylingPage.COLORS['bg_card_light'],
+                    font=_UiStylingPage.get_font(8, 'bold')).pack(pady=(5, 10))
 
         color_controls = [
             ("🎨 Plot Background", self._change_bg_color),
@@ -130,11 +130,11 @@ class GraphPage(BasePage):
             ("🔲 Grid Color", self._change_grid_color)
         ]
 
-        for text, cmd in color_controls:
-            btn = ThemedButton(self.theme_menu, text=text, command=cmd, is_primary=False, padx=10, pady=5)
+        for text, cmd in color_controls: # type: ignore
+            btn = ThemedButton(self.theme_menu, text=text, command=cmd, is_primary=False, padx=10, pady=5, font=_UiStylingPage.get_font(9, 'bold'))
             btn.pack(fill='x', padx=10, pady=6)
 
-        btn_back = ThemedButton(self.theme_menu, text="🔙 Back", command=self._show_main_menu, padx=10, pady=5)
+        btn_back = ThemedButton(self.theme_menu, text="🔙 Back", command=self._show_main_menu, padx=10, pady=5, font=_UiStylingPage.get_font(9, 'bold'))
         btn_back.pack(fill='x', padx=10, pady=(20, 6))
 
     def _show_main_menu(self) -> None:
@@ -267,7 +267,8 @@ class GraphPage(BasePage):
                 parent=self.plot_container,
                 controller=self.controller,
                 task_index=task_index,
-                log_fn=self._write_console
+                log_fn=self._write_console,
+                dialog_fn=lambda title, msg: MessageBox.show_info(title, msg, parent=self.controller.root)
             )
             self.plotter.pack(fill='both', expand=True)
             self.plotter.request_lod_data(initial_load=True)
@@ -278,13 +279,13 @@ class GraphPage(BasePage):
     def _save_image(self) -> None:
         if not self.plotter:
             return
-        target_file = filedialog.asksaveasfilename(defaultextension=".png",
+        target_file = FileDialog.ask_save_as_file(defaultextension=".png",
                                                    filetypes=[("PNG Image", "*.png")])
         if target_file and self.plotter.export_to_file(target_file):
-            messagebox.show_info("Success", f"Chart exported to:\n{target_file}", parent=self.controller.root)
+            MessageBox.show_info("Success", f"Chart exported to:\n{target_file}", parent=self.controller.root)
 
     def _change_bg_color(self) -> None:
-        if self.plotter and (c := colorchooser.askcolor(title="Plot Background")[1]):
+        if self.plotter and (c := ColorChooser.ask_color(title="Plot Background")[1]):
             self.plotter.plot_bg_color = c
             self.plotter.fig.patch.set_facecolor(c)
             self.plotter.ax.set_facecolor(c)
@@ -292,18 +293,18 @@ class GraphPage(BasePage):
             self.plotter.canvas.draw_idle()
 
     def _change_line_color(self) -> None:
-        if self.plotter and (c := colorchooser.askcolor(title="Line Color")[1]):
+        if self.plotter and (c := ColorChooser.ask_color(title="Line Color")[1]):
             self.plotter.color_cycle[0] = c
             self.plotter.request_lod_data()
 
     def _change_text_color(self) -> None:
-        if self.plotter and (c := colorchooser.askcolor(title="Text Color")[1]):
+        if self.plotter and (c := ColorChooser.ask_color(title="Text Color")[1]):
             self.plotter.text_color = c
             self.plotter._format_axes()
             self.plotter.canvas.draw_idle()
 
     def _change_grid_color(self) -> None:
-        if self.plotter and (c := colorchooser.askcolor(title="Grid Color")[1]):
+        if self.plotter and (c := ColorChooser.ask_color(title="Grid Color")[1]):
             self.plotter.grid_color = c
             self.plotter.grid_visible = True
             self.plotter._format_axes()
