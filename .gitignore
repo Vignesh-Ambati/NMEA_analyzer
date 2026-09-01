@@ -3,3 +3,8 @@ __pycache__/
 .logcache/
 *.md
 .images/
+*.zip
+LOGS/
+*.md
+cache/
+.vscode/
