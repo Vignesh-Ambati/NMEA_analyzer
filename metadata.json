@@ -1,0 +1,7 @@
+{
+  "name": "NMEA Log Analyzer",
+  "description": "Professional GNSS/NMEA log parser and visualization suite with multi-task analysis, interactive charts, trajectory mapping, and telemetry console.",
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
