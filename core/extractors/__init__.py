@@ -1,2 +1,0 @@
-from .base_extractor import BaseExtractor
-from .altitude_extraction import AltitudeExtractor
