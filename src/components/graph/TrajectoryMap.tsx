@@ -132,13 +132,13 @@ export const TrajectoryMap: React.FC<TrajectoryMapProps> = ({ files, selectedFil
   }
 
   return (
-    <div className="relative flex-1 flex flex-col bg-[#FAFBFD] dark:bg-slate-900 rounded-2xl overflow-hidden select-none transition-colors">
+    <div className="relative flex-1 flex flex-col bg-[#FAF8F5] dark:bg-slate-900 rounded-2xl overflow-hidden select-none transition-colors border border-[#E6E1D6] dark:border-slate-800">
       {/* Top Controls Toolbar */}
-      <div className="h-10 px-4 bg-slate-100/60 dark:bg-slate-800/60 border-b border-slate-200/80 dark:border-slate-800 flex items-center justify-between text-xs shrink-0">
+      <div className="h-10 px-4 bg-[#EFEAE1]/70 dark:bg-slate-800/60 border-b border-[#E6E1D6] dark:border-slate-800 flex items-center justify-between text-xs shrink-0">
         <div className="flex items-center space-x-2 font-mono">
-          <Navigation className="w-3.5 h-3.5 text-sky-500" />
-          <span className="font-bold text-slate-800 dark:text-slate-200">2D Ground Track Trajectory</span>
-          <span className="text-slate-400 text-[11px] hidden sm:inline">
+          <Navigation className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" />
+          <span className="font-bold text-[#24211D] dark:text-slate-200">2D Ground Track Trajectory</span>
+          <span className="text-[#736E65] text-[11px] hidden sm:inline">
             ({bounds.minLat.toFixed(4)}°N, {bounds.minLon.toFixed(4)}°E)
           </span>
         </div>
@@ -146,7 +146,7 @@ export const TrajectoryMap: React.FC<TrajectoryMapProps> = ({ files, selectedFil
         <div className="flex items-center space-x-2">
           {/* Legend badge */}
           <div className="flex items-center space-x-3 text-[11px] font-mono mr-2">
-            <span className="flex items-center space-x-1 text-emerald-600 dark:text-emerald-400">
+            <span className="flex items-center space-x-1 text-emerald-700 dark:text-emerald-400">
               <span className="w-2 h-2 rounded-full bg-emerald-500" />
               <span>Valid Fix</span>
             </span>
@@ -159,7 +159,7 @@ export const TrajectoryMap: React.FC<TrajectoryMapProps> = ({ files, selectedFil
           <button
             onClick={exportKml}
             type="button"
-            className="px-2.5 py-1 rounded-lg bg-slate-200 dark:bg-slate-700 hover:bg-[#E05318] hover:text-white text-slate-700 dark:text-slate-200 text-xs font-semibold flex items-center space-x-1 transition-all cursor-pointer shadow-xs"
+            className="px-2.5 py-1 rounded-lg bg-[#EFEAE1] dark:bg-slate-700 hover:bg-[#E05318] hover:text-white text-[#24211D] dark:text-slate-200 border border-[#E6E1D6] dark:border-slate-600 text-xs font-semibold flex items-center space-x-1 transition-all cursor-pointer shadow-xs"
             title="Download Google Earth KML"
           >
             <Download className="w-3 h-3" />

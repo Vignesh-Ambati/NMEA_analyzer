@@ -21,6 +21,7 @@ interface AppContextType {
   // Navigation & Page
   currentPage: PageType;
   currentTaskId: number;
+  setCurrentTaskId: (id: number) => void;
   navigateToFilePage: () => void;
   navigateToTaskPage: () => void;
   navigateToGraphPage: (taskId: number) => void;
@@ -432,6 +433,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       value={{
         currentPage,
         currentTaskId,
+        setCurrentTaskId,
         navigateToFilePage,
         navigateToTaskPage,
         navigateToGraphPage,

@@ -27,7 +27,7 @@ export const AppContent: React.FC = () => {
   }, [openDevModal]);
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-[#F1F4F8] dark:bg-slate-950 text-slate-800 dark:text-slate-100 font-sans antialiased">
+    <div className="flex h-screen w-screen overflow-hidden bg-[#F5F2EB] dark:bg-slate-950 text-[#24211D] dark:text-slate-100 font-sans antialiased">
       {/* Responsive Left Navigation Sidebar (with mobile drawer support) */}
       {!isFullpage && (
         <Sidebar mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} />
@@ -39,7 +39,7 @@ export const AppContent: React.FC = () => {
         {!isFullpage && <Header setMobileOpen={setMobileOpen} />}
 
         {/* Viewport for Active Section */}
-        <main className="flex-1 flex overflow-hidden relative bg-[#F1F4F8] dark:bg-slate-950">
+        <main className="flex-1 flex overflow-hidden relative bg-[#F5F2EB] dark:bg-slate-950">
           {currentPage === 'file' && <FilePage />}
           {currentPage === 'task' && <TaskPage />}
           {currentPage === 'graph' && <GraphPage />}

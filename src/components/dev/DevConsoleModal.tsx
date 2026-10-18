@@ -116,9 +116,9 @@ export const DevConsoleModal: React.FC = () => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-900/70 backdrop-blur-xs select-none animate-in fade-in duration-150">
-      <div className="bg-[#FAFBFD] dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl shadow-2xl w-full max-w-4xl h-[620px] max-h-[92vh] flex flex-col overflow-hidden text-slate-900 dark:text-slate-100 transition-colors">
+      <div className="bg-[#FAF8F5] dark:bg-slate-900 border border-[#E6E1D6] dark:border-slate-800 rounded-2xl shadow-2xl w-full max-w-4xl h-[620px] max-h-[92vh] flex flex-col overflow-hidden text-[#24211D] dark:text-slate-100 transition-colors">
         {/* Modal Window Header */}
-        <div className="h-14 bg-slate-100/60 dark:bg-slate-950 border-b border-slate-200/80 dark:border-slate-800 px-4 sm:px-6 flex items-center justify-between shrink-0">
+        <div className="h-14 bg-[#EFEAE1]/70 dark:bg-slate-950 border-b border-[#E6E1D6] dark:border-slate-800 px-4 sm:px-6 flex items-center justify-between shrink-0">
           <div className="flex items-center space-x-3">
             <div className={`p-2 rounded-xl ${isDevAuthenticated ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400' : 'bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400'}`}>
               {isDevAuthenticated ? <Unlock className="w-4 h-4" /> : <Lock className="w-4 h-4" />}

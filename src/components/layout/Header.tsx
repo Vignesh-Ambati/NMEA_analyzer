@@ -62,13 +62,14 @@ export const Header: React.FC<HeaderProps> = ({ setMobileOpen }) => {
   const canGoForward = hasFile && (currentPage === 'file' || currentPage === 'task');
 
   return (
-    <header className="h-12 sm:h-14 px-3 sm:px-5 bg-[#FAFBFD] dark:bg-slate-900 border-b border-slate-200/80 dark:border-slate-800 flex items-center justify-between shrink-0 select-none z-20 transition-colors">
-      {/* Left: Mobile Drawer Trigger + Clean Breadcrumb Navigation */}
+    <header className="h-12 sm:h-14 px-3 sm:px-5 bg-[#FAF8F5] dark:bg-slate-900 border-b border-[#E6E1D6] dark:border-slate-800 flex items-center justify-between shrink-0 select-none z-20 transition-colors">
+      {/* Left: Mobile Drawer Trigger + Desktop Sidebar Toggle (when collapsed) + Clean Breadcrumb */}
       <div className="flex items-center space-x-2 sm:space-x-3 min-w-0">
         {/* Mobile menu hamburger (only on mobile screens < 768px) */}
         <button
           onClick={() => setMobileOpen(true)}
-          className="p-1.5 -ml-1 rounded-lg text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 hover:bg-slate-200/50 dark:hover:bg-slate-800 md:hidden cursor-pointer transition-colors shrink-0"
+          type="button"
+          className="p-1.5 -ml-1 rounded-lg text-slate-500 hover:text-[#24211D] dark:text-slate-400 dark:hover:text-slate-100 hover:bg-[#EFEAE1] dark:hover:bg-slate-800 md:hidden cursor-pointer transition-colors shrink-0"
           title="Open Menu"
           aria-label="Open navigation menu"
         >
@@ -80,10 +81,11 @@ export const Header: React.FC<HeaderProps> = ({ setMobileOpen }) => {
           {/* Step 1: File Upload */}
           <button
             onClick={navigateToFilePage}
+            type="button"
             className={`px-2 py-1 rounded-lg transition-colors cursor-pointer flex items-center space-x-1.5 shrink-0 ${
               currentPage === 'file'
-                ? 'bg-orange-100/60 dark:bg-orange-950/40 text-[#E05318] font-bold'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
+                ? 'bg-[#FDF3EE] dark:bg-orange-950/40 text-[#E05318] font-bold border border-orange-200/60 dark:border-orange-900/40'
+                : 'text-[#736E65] dark:text-slate-400 hover:text-[#24211D] dark:hover:text-slate-100 hover:bg-[#EFEAE1] dark:hover:bg-slate-800'
             }`}
           >
             <UploadCloud className="w-3.5 h-3.5 shrink-0" />
@@ -93,15 +95,16 @@ export const Header: React.FC<HeaderProps> = ({ setMobileOpen }) => {
           {/* Steps 2 & 3: ONLY DISPLAYED ONCE FILE UPLOAD IS COMPLETED */}
           {hasFile && (
             <>
-              <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600 shrink-0" />
+              <ChevronRight className="w-3.5 h-3.5 text-[#B8B1A4] dark:text-slate-600 shrink-0" />
 
               {/* Step 2: Task Matrix */}
               <button
                 onClick={navigateToTaskPage}
+                type="button"
                 className={`px-2 py-1 rounded-lg transition-colors flex items-center space-x-1.5 shrink-0 cursor-pointer ${
                   currentPage === 'task'
-                    ? 'bg-orange-100/60 dark:bg-orange-950/40 text-[#E05318] font-bold'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
+                    ? 'bg-[#FDF3EE] dark:bg-orange-950/40 text-[#E05318] font-bold border border-orange-200/60 dark:border-orange-900/40'
+                    : 'text-[#736E65] dark:text-slate-400 hover:text-[#24211D] dark:hover:text-slate-100 hover:bg-[#EFEAE1] dark:hover:bg-slate-800'
                 }`}
                 title="Select Analysis Task"
               >
@@ -109,15 +112,16 @@ export const Header: React.FC<HeaderProps> = ({ setMobileOpen }) => {
                 <span className="truncate">Task Matrix</span>
               </button>
 
-              <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600 shrink-0" />
+              <ChevronRight className="w-3.5 h-3.5 text-[#B8B1A4] dark:text-slate-600 shrink-0" />
 
               {/* Step 3: Analysis Plot */}
               <button
                 onClick={() => navigateToGraphPage(currentTaskId)}
+                type="button"
                 className={`px-2 py-1 rounded-lg transition-colors flex items-center space-x-1.5 truncate max-w-32 sm:max-w-48 cursor-pointer ${
                   currentPage === 'graph'
-                    ? 'bg-orange-100/60 dark:bg-orange-950/40 text-[#E05318] font-bold'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
+                    ? 'bg-[#FDF3EE] dark:bg-orange-950/40 text-[#E05318] font-bold border border-orange-200/60 dark:border-orange-900/40'
+                    : 'text-[#736E65] dark:text-slate-400 hover:text-[#24211D] dark:hover:text-slate-100 hover:bg-[#EFEAE1] dark:hover:bg-slate-800'
                 }`}
                 title={currentTask.title}
               >
@@ -130,8 +134,8 @@ export const Header: React.FC<HeaderProps> = ({ setMobileOpen }) => {
           {/* Standalone Breadcrumbs when on Reference or Utilities */}
           {currentPage === 'reference' && (
             <>
-              <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600 shrink-0" />
-              <span className="px-2 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 font-bold flex items-center space-x-1 shrink-0">
+              <ChevronRight className="w-3.5 h-3.5 text-[#B8B1A4] dark:text-slate-600 shrink-0" />
+              <span className="px-2 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 font-bold flex items-center space-x-1 shrink-0 border border-emerald-200/60 dark:border-emerald-900/40">
                 <BookOpen className="w-3.5 h-3.5" />
                 <span className="truncate">Protocol Guide</span>
               </span>
@@ -140,8 +144,8 @@ export const Header: React.FC<HeaderProps> = ({ setMobileOpen }) => {
 
           {currentPage === 'tools' && (
             <>
-              <ChevronRight className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600 shrink-0" />
-              <span className="px-2 py-1 rounded-lg bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 font-bold flex items-center space-x-1 shrink-0">
+              <ChevronRight className="w-3.5 h-3.5 text-[#B8B1A4] dark:text-slate-600 shrink-0" />
+              <span className="px-2 py-1 rounded-lg bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 font-bold flex items-center space-x-1 shrink-0 border border-amber-200/60 dark:border-amber-900/40">
                 <Wrench className="w-3.5 h-3.5" />
                 <span className="truncate">Standard Utilities</span>
               </span>
@@ -150,12 +154,13 @@ export const Header: React.FC<HeaderProps> = ({ setMobileOpen }) => {
         </nav>
       </div>
 
-      {/* Right: Placed Appropriate Navigation Controls */}
+      {/* Right: Navigation Controls (Home, Back, Next, Theme Toggle) */}
       <div className="flex items-center space-x-1.5 sm:space-x-2 shrink-0">
         {/* Home Button */}
         <button
           onClick={navigateToFilePage}
-          className="p-1.5 sm:p-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-200/50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer"
+          type="button"
+          className="p-1.5 sm:p-2 rounded-xl text-[#736E65] dark:text-slate-300 hover:bg-[#EFEAE1] dark:hover:bg-slate-800 hover:text-[#24211D] dark:hover:text-white transition-colors cursor-pointer"
           title="Return to Home (File Upload)"
           aria-label="Home"
         >
@@ -166,10 +171,11 @@ export const Header: React.FC<HeaderProps> = ({ setMobileOpen }) => {
         <button
           onClick={handleBack}
           disabled={!canGoBack}
+          type="button"
           className={`px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center space-x-1 border transition-colors ${
             canGoBack
-              ? 'bg-[#FAFBFD] dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer shadow-xs'
-              : 'opacity-30 text-slate-400 border-transparent cursor-not-allowed'
+              ? 'bg-[#FAF8F5] dark:bg-slate-800 text-[#24211D] dark:text-slate-200 border-[#E6E1D6] dark:border-slate-700 hover:bg-[#EFEAE1] dark:hover:bg-slate-700 cursor-pointer shadow-xs'
+              : 'opacity-30 text-[#B8B1A4] border-transparent cursor-not-allowed'
           }`}
           title={canGoBack ? 'Back to previous step' : 'Already on first step'}
         >
@@ -181,10 +187,11 @@ export const Header: React.FC<HeaderProps> = ({ setMobileOpen }) => {
         <button
           onClick={handleForward}
           disabled={!canGoForward}
+          type="button"
           className={`px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center space-x-1 border transition-colors ${
             canGoForward
               ? 'bg-[#E05318] hover:bg-[#C94713] text-white border-[#E05318] cursor-pointer shadow-xs'
-              : 'opacity-30 text-slate-400 border-transparent cursor-not-allowed hidden xs:flex'
+              : 'opacity-30 text-[#B8B1A4] border-transparent cursor-not-allowed hidden xs:flex'
           }`}
           title={canGoForward ? 'Proceed to next step' : 'Requires file upload to advance'}
         >
@@ -197,13 +204,13 @@ export const Header: React.FC<HeaderProps> = ({ setMobileOpen }) => {
           onClick={toggleTheme}
           type="button"
           aria-label="Toggle theme mode"
-          className="p-1.5 sm:p-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-[#FAFBFD] dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors cursor-pointer shadow-xs flex items-center space-x-1"
+          className="p-1.5 sm:p-2 rounded-xl border border-[#E6E1D6] dark:border-slate-700 bg-[#FAF8F5] dark:bg-slate-800 text-[#736E65] dark:text-slate-200 hover:bg-[#EFEAE1] dark:hover:bg-slate-700 transition-colors cursor-pointer shadow-xs flex items-center space-x-1"
           title={`Switch to ${theme === 'dark' ? 'Light' : 'Dark'} Mode`}
         >
           {theme === 'dark' ? (
             <Sun className="w-4 h-4 text-amber-400" />
           ) : (
-            <Moon className="w-4 h-4 text-slate-600" />
+            <Moon className="w-4 h-4 text-[#736E65]" />
           )}
         </button>
       </div>

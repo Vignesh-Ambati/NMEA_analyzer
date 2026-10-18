@@ -4,11 +4,11 @@
 
 @layer base {
   :root {
-    --bg-app: #F1F4F8;
-    --bg-card: #FAFBFD;
-    --border-subtle: #E2E8F0;
-    --text-primary: #1E293B;
-    --text-muted: #64748B;
+    --bg-app: #F5F2EB; /* Warm eye-care soothing canvas */
+    --bg-card: #FAF8F5; /* Warm paper / soft eggshell surface */
+    --border-subtle: #E6E1D6; /* Warm sand boundary */
+    --text-primary: #24211D; /* Warm dark charcoal (comfortable contrast) */
+    --text-muted: #736E65; /* Warm taupe-slate */
   }
 
   .dark {
@@ -53,12 +53,12 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.4);
+  background: rgba(180, 172, 160, 0.45);
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(100, 116, 139, 0.7);
+  background: rgba(140, 130, 115, 0.7);
 }
 
 .dark ::-webkit-scrollbar-thumb {

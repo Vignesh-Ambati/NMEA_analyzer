@@ -24,16 +24,16 @@ export const ProgressIndicator: React.FC = () => {
     : `${processingStatus} · ${processingProgress}%`;
 
   return (
-    <div className="h-10 bg-[#FAFBFD] dark:bg-slate-900 border-t border-slate-200/80 dark:border-slate-800 px-4 sm:px-6 flex items-center justify-between z-20 shrink-0 text-xs transition-colors select-none shadow-xs">
+    <div className="h-10 bg-[#FAF8F5] dark:bg-slate-900 border-t border-[#E6E1D6] dark:border-slate-800 px-4 sm:px-6 flex items-center justify-between z-20 shrink-0 text-xs transition-colors select-none shadow-xs">
       <div className="flex items-center space-x-2.5 w-64 truncate">
         <Loader2 className="w-4 h-4 text-[#E05318] animate-spin shrink-0" />
-        <span className="font-medium text-slate-700 dark:text-slate-300 truncate">
+        <span className="font-medium text-[#24211D] dark:text-slate-300 truncate">
           {displayText}
         </span>
       </div>
 
       <div className="flex-1 max-w-md mx-4 sm:mx-6">
-        <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+        <div className="h-1.5 w-full bg-[#EFEAE1] dark:bg-slate-800 rounded-full overflow-hidden">
           <div
             className="h-full bg-[#E05318] rounded-full transition-all duration-300"
             style={{ width: `${displayPct}%` }}
@@ -41,7 +41,7 @@ export const ProgressIndicator: React.FC = () => {
         </div>
       </div>
 
-      <div className="w-16 text-right font-mono text-[11px] text-slate-400 font-semibold">
+      <div className="w-16 text-right font-mono text-[11px] text-[#736E65] dark:text-slate-400 font-semibold">
         {displayPct}%
       </div>
     </div>

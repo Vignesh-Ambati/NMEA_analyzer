@@ -43,14 +43,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) =
 
   const handleNav = (action: () => void) => {
     action();
-    setMobileOpen(false); // Close mobile drawer on navigation
+    setMobileOpen(false); // Close mobile drawer upon selection
   };
 
   const fileLoaded = files.length > 0;
 
   return (
     <>
-      {/* Mobile Backdrop Overlay */}
+      {/* Mobile Backdrop Overlay (Active when drawer is open on mobile screens) */}
       {mobileOpen && (
         <div
           onClick={() => setMobileOpen(false)}
@@ -58,84 +58,88 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) =
         />
       )}
 
-      {/* Responsive Sidebar Container: Collapsible Icon-Rail or Full Width */}
+      {/* Responsive Sidebar Container: Collapsible Icon-Rail or Full Width Drawer */}
       <aside
-        className={`fixed md:static inset-y-0 left-0 z-50 bg-[#FAFBFD] dark:bg-slate-900 border-r border-slate-200/80 dark:border-slate-800 flex flex-col justify-between shrink-0 select-none transition-all duration-200 ease-in-out shadow-lg md:shadow-none ${
+        className={`fixed md:static inset-y-0 left-0 z-50 bg-[#FAF8F5] dark:bg-slate-900 border-r border-[#E6E1D6] dark:border-slate-800 flex flex-col justify-between shrink-0 select-none transition-all duration-200 ease-in-out shadow-xl md:shadow-none ${
           mobileOpen ? 'translate-x-0 w-64' : '-translate-x-full md:translate-x-0'
-        } ${sidebarCollapsed ? 'md:w-[72px]' : 'md:w-64'}`}
+        } ${sidebarCollapsed ? 'md:w-16' : 'md:w-64'}`}
       >
         <div className="flex flex-col h-full overflow-hidden">
-          {/* Brand Header with Pure Name (No Image) & 7-Click Dev Trigger */}
-          <div className="h-14 sm:h-16 px-4 flex items-center justify-between border-b border-slate-200/60 dark:border-slate-800 shrink-0">
+          {/* Brand Header with Pure Name & 7-Click Dev Trigger */}
+          <div className="h-14 sm:h-16 px-3 sm:px-4 flex items-center justify-between border-b border-[#E6E1D6] dark:border-slate-800 shrink-0">
             {sidebarCollapsed ? (
-              // Collapsed state: neat monogram mark with secret 7-click trigger
-              <div
-                onClick={registerDevSecretClick}
-                className="w-full flex items-center justify-center cursor-pointer group select-none py-1"
-                title="Click 7 times for Developer Diagnostics"
-              >
-                <div className="w-9 h-9 rounded-xl bg-orange-100/70 dark:bg-orange-950/60 text-[#E05318] flex items-center justify-center font-bold text-sm tracking-tight border border-orange-200/60 dark:border-orange-900/50 group-hover:scale-105 transition-transform">
-                  NA
-                </div>
+              // Collapsed state: Centered Expand toggle button with warm accent (Zero overflow, impossible to break)
+              <div className="w-full flex items-center justify-center py-1">
+                <button
+                  onClick={toggleSidebar}
+                  type="button"
+                  className="w-10 h-10 rounded-xl bg-[#EFEAE1]/80 hover:bg-[#ECE5D8] dark:bg-slate-800 dark:hover:bg-slate-700/80 text-[#E05318] flex items-center justify-center transition-all cursor-pointer shadow-xs group"
+                  title="Expand Sidebar"
+                  aria-label="Expand Sidebar"
+                >
+                  <PanelLeftOpen className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                </button>
               </div>
             ) : (
-              // Expanded state: Pure Name (No Image)
-              <div
-                onClick={registerDevSecretClick}
-                className="flex items-center space-x-2.5 cursor-pointer group select-none min-w-0"
-                title="Click 7 times to unlock Developer Diagnostics"
-              >
-                <div className="min-w-0">
-                  <div className="text-sm font-bold text-slate-900 dark:text-slate-100 tracking-tight leading-tight truncate flex items-center space-x-1.5">
-                    <span className="text-[#E05318]">NMEA</span>
-                    <span>Analyzer</span>
-                    {devUnlocked && (
-                      <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" title="Developer Mode Active" />
-                    )}
+              // Expanded state: Brand Name (Clickable 7-times for Developer Diagnostics) & Collapse Toggle
+              <>
+                <div
+                  onClick={registerDevSecretClick}
+                  className="flex items-center space-x-2.5 cursor-pointer group select-none min-w-0"
+                  title="Click 7 times to unlock Developer Diagnostics"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-[#FDF3EE] dark:bg-orange-950/60 text-[#E05318] flex items-center justify-center font-bold text-xs tracking-tight border border-orange-200/70 dark:border-orange-900/50 shrink-0 group-hover:scale-105 transition-transform shadow-xs">
+                    NA
                   </div>
-                  <div className="text-[10px] text-slate-400 font-medium truncate mt-0.5">
-                    GNSS Telemetry Suite
+                  <div className="min-w-0">
+                    <div className="text-sm font-bold text-[#24211D] dark:text-slate-100 tracking-tight leading-tight truncate flex items-center space-x-1.5">
+                      <span className="text-[#E05318]">NMEA</span>
+                      <span>Analyzer</span>
+                      {devUnlocked && (
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" title="Developer Mode Active" />
+                      )}
+                    </div>
+                    <div className="text-[10px] text-[#736E65] dark:text-slate-400 font-medium truncate mt-0.5">
+                      GNSS Telemetry Suite
+                    </div>
                   </div>
                 </div>
-              </div>
+
+                <div className="flex items-center space-x-1">
+                  {/* Desktop single collapse toggle */}
+                  <button
+                    onClick={toggleSidebar}
+                    type="button"
+                    className="hidden md:flex p-1.5 rounded-lg text-slate-400 hover:text-[#24211D] dark:hover:text-slate-200 hover:bg-[#EFEAE1] dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                    title="Collapse Sidebar"
+                    aria-label="Collapse Sidebar"
+                  >
+                    <PanelLeftClose className="w-4 h-4" />
+                  </button>
+
+                  {/* Mobile Drawer Close Button */}
+                  <button
+                    onClick={() => setMobileOpen(false)}
+                    type="button"
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-[#24211D] dark:hover:text-white md:hidden cursor-pointer"
+                    aria-label="Close Menu"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+              </>
             )}
-
-            {/* Single Consistent Minimize / Collapse Toggle Button */}
-            <div className="flex items-center">
-              {/* Desktop single toggle */}
-              <button
-                onClick={toggleSidebar}
-                className="hidden md:flex p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-                title={sidebarCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar to save space'}
-                aria-label="Toggle Sidebar"
-              >
-                {sidebarCollapsed ? (
-                  <PanelLeftOpen className="w-4 h-4" />
-                ) : (
-                  <PanelLeftClose className="w-4 h-4" />
-                )}
-              </button>
-
-              {/* Mobile Drawer Close Button */}
-              <button
-                onClick={() => setMobileOpen(false)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-white md:hidden cursor-pointer"
-                aria-label="Close Menu"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
           </div>
 
           {/* Navigation Items Area */}
-          <div className="flex-1 p-2 sm:p-3 space-y-5 overflow-y-auto overflow-x-hidden">
+          <div className="flex-1 p-2 sm:p-2.5 space-y-4 overflow-y-auto overflow-x-hidden">
             {/* SECTION 1: WORKSPACE (Requires File Upload) */}
             <div>
               {!sidebarCollapsed && (
-                <div className="px-2.5 pb-2 text-[10px] font-bold tracking-wider text-slate-400 dark:text-slate-500 uppercase font-mono flex items-center justify-between">
+                <div className="px-2.5 pb-2 text-[10px] font-bold tracking-wider text-[#736E65] dark:text-slate-500 uppercase font-mono flex items-center justify-between">
                   <span>Workspace</span>
                   {fileLoaded && (
-                    <span className="text-[9px] text-emerald-600 dark:text-emerald-400 font-sans">
+                    <span className="text-[9px] text-emerald-600 dark:text-emerald-400 font-sans font-semibold">
                       file ready
                     </span>
                   )}
@@ -146,12 +150,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) =
                 {/* 1. File Upload (Always Present) */}
                 <button
                   onClick={() => handleNav(navigateToFilePage)}
+                  type="button"
                   className={`w-full py-2.5 rounded-xl flex items-center transition-all cursor-pointer ${
                     sidebarCollapsed ? 'justify-center px-0' : 'justify-between px-3'
                   } ${
                     currentPage === 'file'
-                      ? 'bg-orange-50 dark:bg-orange-950/40 text-[#E05318] font-bold shadow-xs'
-                      : 'text-slate-600 dark:text-slate-300 hover:bg-slate-200/40 dark:hover:bg-slate-800'
+                      ? 'bg-[#FDF3EE] dark:bg-orange-950/40 text-[#E05318] font-bold border border-orange-200/70 dark:border-orange-900/40 shadow-xs'
+                      : 'text-[#736E65] dark:text-slate-300 hover:bg-[#EFEAE1] dark:hover:bg-slate-800 hover:text-[#24211D] dark:hover:text-white'
                   }`}
                   title="Step 1: File Ingestion"
                 >
@@ -162,7 +167,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) =
                     )}
                   </div>
                   {!sidebarCollapsed && fileLoaded && (
-                    <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 font-semibold shrink-0">
+                    <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-emerald-100/70 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 font-semibold shrink-0">
                       {files.length}
                     </span>
                   )}
@@ -172,23 +177,24 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) =
                 {fileLoaded && (
                   <button
                     onClick={() => handleNav(navigateToTaskPage)}
+                    type="button"
                     className={`w-full py-2.5 rounded-xl flex items-center transition-all cursor-pointer animate-in fade-in slide-in-from-left-2 duration-150 ${
                       sidebarCollapsed ? 'justify-center px-0' : 'justify-between px-3'
                     } ${
                       currentPage === 'task'
-                        ? 'bg-orange-50 dark:bg-orange-950/40 text-[#E05318] font-bold shadow-xs'
-                        : 'text-slate-600 dark:text-slate-300 hover:bg-slate-200/40 dark:hover:bg-slate-800'
+                        ? 'bg-[#FDF3EE] dark:bg-orange-950/40 text-[#E05318] font-bold border border-orange-200/70 dark:border-orange-900/40 shadow-xs'
+                        : 'text-[#736E65] dark:text-slate-300 hover:bg-[#EFEAE1] dark:hover:bg-slate-800 hover:text-[#24211D] dark:hover:text-white'
                     }`}
                     title="Step 2: Task Matrix"
                   >
                     <div className="flex items-center space-x-2.5 min-w-0">
-                      <LayoutGrid className="w-4 h-4 text-sky-500 shrink-0" />
+                      <LayoutGrid className="w-4 h-4 text-sky-600 dark:text-sky-400 shrink-0" />
                       {!sidebarCollapsed && (
                         <span className="text-xs truncate">2. Task Matrix</span>
                       )}
                     </div>
                     {!sidebarCollapsed && (
-                      <span className="text-[9px] text-slate-400 font-mono shrink-0">
+                      <span className="text-[9px] text-[#736E65] dark:text-slate-400 font-mono shrink-0">
                         10
                       </span>
                     )}
@@ -199,17 +205,18 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) =
                 {fileLoaded && (
                   <button
                     onClick={() => handleNav(() => navigateToGraphPage(currentTaskId))}
+                    type="button"
                     className={`w-full py-2.5 rounded-xl flex items-center transition-all cursor-pointer animate-in fade-in slide-in-from-left-2 duration-150 ${
                       sidebarCollapsed ? 'justify-center px-0' : 'justify-between px-3'
                     } ${
                       currentPage === 'graph'
-                        ? 'bg-orange-50 dark:bg-orange-950/40 text-[#E05318] font-bold shadow-xs'
-                        : 'text-slate-600 dark:text-slate-300 hover:bg-slate-200/40 dark:hover:bg-slate-800'
+                        ? 'bg-[#FDF3EE] dark:bg-orange-950/40 text-[#E05318] font-bold border border-orange-200/70 dark:border-orange-900/40 shadow-xs'
+                        : 'text-[#736E65] dark:text-slate-300 hover:bg-[#EFEAE1] dark:hover:bg-slate-800 hover:text-[#24211D] dark:hover:text-white'
                     }`}
                     title="Step 3: Charts & Analytics"
                   >
                     <div className="flex items-center space-x-2.5 min-w-0">
-                      <LineChart className="w-4 h-4 text-purple-500 shrink-0" />
+                      <LineChart className="w-4 h-4 text-purple-600 dark:text-purple-400 shrink-0" />
                       {!sidebarCollapsed && (
                         <span className="text-xs truncate">3. Charts & Plot</span>
                       )}
@@ -222,7 +229,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) =
             {/* SECTION 2: STANDALONE UTILITIES (No File Needed) */}
             <div>
               {!sidebarCollapsed && (
-                <div className="px-2.5 pb-2 text-[10px] font-bold tracking-wider text-slate-400 dark:text-slate-500 uppercase font-mono">
+                <div className="px-2.5 pb-2 text-[10px] font-bold tracking-wider text-[#736E65] dark:text-slate-500 uppercase font-mono">
                   Utilities & Docs
                 </div>
               )}
@@ -231,46 +238,48 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) =
                 {/* Sentence Protocol Reference Guide */}
                 <button
                   onClick={() => handleNav(navigateToReferencePage)}
+                  type="button"
                   className={`w-full py-2.5 rounded-xl flex items-center transition-all cursor-pointer ${
                     sidebarCollapsed ? 'justify-center px-0' : 'justify-between px-3'
                   } ${
                     currentPage === 'reference'
-                      ? 'bg-orange-50 dark:bg-orange-950/40 text-[#E05318] font-bold shadow-xs'
-                      : 'text-slate-600 dark:text-slate-300 hover:bg-slate-200/40 dark:hover:bg-slate-800'
+                      ? 'bg-[#FDF3EE] dark:bg-orange-950/40 text-[#E05318] font-bold border border-orange-200/70 dark:border-orange-900/40 shadow-xs'
+                      : 'text-[#736E65] dark:text-slate-300 hover:bg-[#EFEAE1] dark:hover:bg-slate-800 hover:text-[#24211D] dark:hover:text-white'
                   }`}
                   title="Sentence Protocol Guide"
                 >
                   <div className="flex items-center space-x-2.5 min-w-0">
-                    <BookOpen className="w-4 h-4 text-emerald-500 shrink-0" />
+                    <BookOpen className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
                     {!sidebarCollapsed && (
                       <span className="text-xs truncate">Protocol Guide</span>
                     )}
                   </div>
                   {!sidebarCollapsed && (
-                    <span className="text-[9px] text-slate-400 shrink-0">Docs</span>
+                    <span className="text-[9px] text-[#736E65] dark:text-slate-400 shrink-0">Docs</span>
                   )}
                 </button>
 
                 {/* Standalone Tools Suite (Time Diff, UTC/IST, Line Copy, Checksum) */}
                 <button
                   onClick={() => handleNav(navigateToToolsPage)}
+                  type="button"
                   className={`w-full py-2.5 rounded-xl flex items-center transition-all cursor-pointer ${
                     sidebarCollapsed ? 'justify-center px-0' : 'justify-between px-3'
                   } ${
                     currentPage === 'tools'
-                      ? 'bg-orange-50 dark:bg-orange-950/40 text-[#E05318] font-bold shadow-xs'
-                      : 'text-slate-600 dark:text-slate-300 hover:bg-slate-200/40 dark:hover:bg-slate-800'
+                      ? 'bg-[#FDF3EE] dark:bg-orange-950/40 text-[#E05318] font-bold border border-orange-200/70 dark:border-orange-900/40 shadow-xs'
+                      : 'text-[#736E65] dark:text-slate-300 hover:bg-[#EFEAE1] dark:hover:bg-slate-800 hover:text-[#24211D] dark:hover:text-white'
                   }`}
                   title="Standard Utilities (Time Diff, UTC/IST, Line Copy, Checksum)"
                 >
                   <div className="flex items-center space-x-2.5 min-w-0">
-                    <Wrench className="w-4 h-4 text-amber-500 shrink-0" />
+                    <Wrench className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
                     {!sidebarCollapsed && (
                       <span className="text-xs truncate">Standard Utilities</span>
                     )}
                   </div>
                   {!sidebarCollapsed && (
-                    <span className="text-[9px] text-slate-400 shrink-0">Tools</span>
+                    <span className="text-[9px] text-[#736E65] dark:text-slate-400 shrink-0">Tools</span>
                   )}
                 </button>
               </div>
@@ -278,7 +287,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) =
           </div>
 
           {/* Bottom Footer Section: Developer Diagnostics (Only if 7-clicked) + Theme */}
-          <div className="p-2.5 sm:p-3 border-t border-slate-200/60 dark:border-slate-800 space-y-1.5 shrink-0">
+          <div className="p-2 sm:p-2.5 border-t border-[#E6E1D6] dark:border-slate-800 space-y-1.5 shrink-0">
             {/* Developer Diagnostics: VISIBLE ONLY WHEN UNLOCKED VIA 7 CLICKS */}
             {devUnlocked && (
               <button
@@ -287,19 +296,19 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) =
                   setMobileOpen(false);
                 }}
                 type="button"
-                className={`w-full py-2 rounded-xl border border-emerald-200 dark:border-emerald-800/80 bg-emerald-50/70 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 text-xs font-medium flex items-center transition-colors cursor-pointer animate-in fade-in duration-200 ${
+                className={`w-full py-2 rounded-xl border border-emerald-300 dark:border-emerald-800/80 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-300 text-xs font-medium flex items-center transition-colors cursor-pointer animate-in fade-in duration-200 ${
                   sidebarCollapsed ? 'justify-center px-0' : 'justify-between px-3'
                 }`}
                 title="Developer Diagnostics"
               >
                 <div className="flex items-center space-x-2 min-w-0">
-                  <Terminal className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                  <Terminal className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
                   {!sidebarCollapsed && (
                     <span className="truncate">Developer Diagnostics</span>
                   )}
                 </div>
                 {!sidebarCollapsed && (
-                  <span className="text-[9px] font-mono text-emerald-600 dark:text-emerald-400 shrink-0">
+                  <span className="text-[9px] font-mono text-emerald-700 dark:text-emerald-400 shrink-0">
                     Active
                   </span>
                 )}
@@ -310,7 +319,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) =
             <button
               onClick={toggleTheme}
               type="button"
-              className={`w-full py-2 rounded-xl text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-200/40 dark:hover:bg-slate-800 flex items-center transition-colors cursor-pointer ${
+              className={`w-full py-2 rounded-xl text-xs font-medium text-[#736E65] dark:text-slate-300 hover:bg-[#EFEAE1] dark:hover:bg-slate-800 hover:text-[#24211D] dark:hover:text-white flex items-center transition-colors cursor-pointer ${
                 sidebarCollapsed ? 'justify-center px-0' : 'justify-between px-3'
               }`}
               title={`Switch to ${theme === 'dark' ? 'Light' : 'Dark'} Mode`}
@@ -319,14 +328,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) =
                 {theme === 'dark' ? (
                   <Moon className="w-3.5 h-3.5 text-amber-400 shrink-0" />
                 ) : (
-                  <Sun className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                  <Sun className="w-3.5 h-3.5 text-amber-600 shrink-0" />
                 )}
                 {!sidebarCollapsed && (
                   <span>{theme === 'dark' ? 'Dark Mode' : 'Light Mode'}</span>
                 )}
               </div>
               {!sidebarCollapsed && (
-                <span className="text-[10px] font-mono text-slate-400">Switch</span>
+                <span className="text-[10px] font-mono text-[#736E65] dark:text-slate-400">Switch</span>
               )}
             </button>
           </div>
