@@ -259,7 +259,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) =
                   )}
                 </button>
 
-                {/* Standalone Tools Suite (Time Diff, UTC/IST, Line Copy, Checksum) */}
+                {/* Standalone Tools Suite (Time Diff, UTC/IST, Line Copy) */}
                 <button
                   onClick={() => handleNav(navigateToToolsPage)}
                   type="button"
@@ -270,7 +270,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) =
                       ? 'bg-[#FDF3EE] dark:bg-orange-950/40 text-[#E05318] font-bold border border-orange-200/70 dark:border-orange-900/40 shadow-xs'
                       : 'text-[#736E65] dark:text-slate-300 hover:bg-[#EFEAE1] dark:hover:bg-slate-800 hover:text-[#24211D] dark:hover:text-white'
                   }`}
-                  title="Standard Utilities (Time Diff, UTC/IST, Line Copy, Checksum)"
+                  title="Standard Utilities (Time Diff, UTC/IST, Line Copy)"
                 >
                   <div className="flex items-center space-x-2.5 min-w-0">
                     <Wrench className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
