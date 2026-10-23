@@ -47,8 +47,7 @@ export const BulkLineCopyUtility: React.FC = () => {
     }
   };
 
-  // Simulates the backend extraction progress visually
-  const startExtraction = () => {
+  const startExtraction = async () => {
     if (!inputPath || !outputPath || !expression) {
       setErrorMessage("Please provide input file, output destination, and a target expression.");
       setStatus('error');
@@ -58,28 +57,54 @@ export const BulkLineCopyUtility: React.FC = () => {
     setErrorMessage(null);
     setStatus('processing');
     setProgress(0);
-    setLinesExtracted(0);
-    addLog(`Initializing extraction engine for target: ${expression}`, 'info');
+    
+    // 1. Construct the payload explicitly
+    const requestPayload = {
+      input_path: inputPath,
+      output_path: outputPath,
+      expression: expression,
+      search_mode: searchMode,
+      match_case: matchCase,
+      match_whole_word: matchWholeWord
+    };
 
-    // Fake progress simulation
-    let currentProg = 0;
-    let currentLines = 0;
-    const interval = setInterval(() => {
-      currentProg += Math.floor(Math.random() * 15) + 5;
-      currentLines += Math.floor(Math.random() * 5000);
-      
-      if (currentProg >= 100) {
-        currentProg = 100;
-        clearInterval(interval);
-        setStatus('complete');
-        addLog(`Extraction complete. ${currentLines.toLocaleString()} lines written.`, 'success');
+    // 2. Log it to the Browser Console (F12)
+    console.log("[DEBUG] Outgoing Payload:", JSON.stringify(requestPayload, null, 2));
+
+    try {
+      const response = await fetch('https://127.0.0.1:8443/api/utilities/bulk-line-copy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestPayload),
+      });
+
+      if (!response.ok) {
+        // 3. Capture the exact error text from FastAPI
+        const errorText = await response.text();
+        console.error(`[DEBUG] Server Error (${response.status}):`, errorText);
+        
+        let parsedError = errorText;
+        try {
+            const errorJson = JSON.parse(errorText);
+            // If it's a 422, FastAPI sends { detail: [...] }
+            if (errorJson.detail) {
+                parsedError = JSON.stringify(errorJson.detail);
+            }
+        } catch (e) {}
+
+        throw new Error(`Server rejected request: ${parsedError}`);
       }
-      
-      setProgress(Math.min(currentProg, 100));
-      setLinesExtracted(currentLines);
-    }, 400);
-  };
 
+      const data = await response.json();
+      setProgress(100);
+      setStatus('complete');
+      setLinesExtracted(data.lines_extracted);
+      
+    } catch (error: any) {
+      setStatus('error');
+      setErrorMessage(error.message);
+    }
+  };
   return (
     <div className="bg-[#FAF8F5] dark:bg-slate-900 border border-[#E6E1D6] dark:border-slate-800 rounded-2xl p-5 sm:p-7 space-y-6 shadow-xs transition-colors">
       

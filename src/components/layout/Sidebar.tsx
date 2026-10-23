@@ -66,7 +66,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) =
       >
         <div className="flex flex-col h-full overflow-hidden">
           {/* Brand Header with Pure Name & 7-Click Dev Trigger */}
-          <div className="h-14 sm:h-16 px-3 sm:px-4 flex items-center justify-between border-b border-[#E6E1D6] dark:border-slate-800 shrink-0">
+          {/* "h-14 px-3 sm:px-4 flex items-center justify-between border-b border-[#E6E1D6] dark:border-slate-800 ..." */}
+          <div className="h-20 px-4 sm:px-4 flex items-center justify-between border-b border-[#E6E1D6] dark:border-slate-800 shrink-0">
             {sidebarCollapsed ? (
               // Collapsed state: Centered Expand toggle button with warm accent (Zero overflow, impossible to break)
               <div className="w-full flex items-center justify-center py-1">

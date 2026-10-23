@@ -62,7 +62,7 @@ export const Header: React.FC<HeaderProps> = ({ setMobileOpen }) => {
   const canGoForward = hasFile && (currentPage === 'file' || currentPage === 'task');
 
   return (
-    <header className="h-12 sm:h-14 px-3 sm:px-5 bg-[#FAF8F5] dark:bg-slate-900 border-b border-[#E6E1D6] dark:border-slate-800 flex items-center justify-between shrink-0 select-none z-20 transition-colors">
+    <header className="h-20 px-3 sm:px-5 bg-[#FAF8F5] dark:bg-slate-900 border-b border-[#E6E1D6] dark:border-slate-800 flex items-center justify-between shrink-0 select-none z-20 transition-colors">
       {/* Left: Mobile Drawer Trigger + Desktop Sidebar Toggle (when collapsed) + Clean Breadcrumb */}
       <div className="flex items-center space-x-2 sm:space-x-3 min-w-0">
         {/* Mobile menu hamburger (only on mobile screens < 768px) */}
