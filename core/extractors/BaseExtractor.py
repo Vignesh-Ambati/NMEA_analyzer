@@ -1,3 +1,5 @@
+# ABC and helper methods for NMEA-specific data (Renamed from legacy)
+
 import os
 import time
 import threading
@@ -5,27 +7,22 @@ import numpy as np
 import pandas as pd
 from pathlib import Path
 from abc import ABC, abstractmethod
-from typing import Any, Optional, Tuple
+from typing import Any, Optional
 
-class BaseExtractor(ABC):        
+class BaseExtractor(ABC):      
     @abstractmethod
     def _extract(self, parquet_path: Path, state: Any = None) -> Any:
-        # It might return data frame or any. so we kept any.
-        # But it must use Optional[pd.DataFrame]
         pass
+
     @staticmethod
     def safe_format(x):
             if pd.isna(x) or str(x).lower() == 'nan':
                 return np.nan
             sx = str(x)
             return sx if '.' in sx else sx + '.00'
+
     def _convertToAbsoluteEpoch(self, date_series: pd.Series, time_series: pd.Series, state: Any = None) -> np.ndarray:
-        """
-        Converts NMEA dates and times into absolute Unix epoch seconds.
-        Uses linear interpolation to backtrack missing outage seconds and gracefully
-        handles midnight wraparounds without relying on error-prone date strings.
-        """
-        timeNumber = pd.to_numeric(time_series, errors='coerce').values
+        timeNumber = np.asarray(pd.to_numeric(time_series, errors='coerce'), dtype=np.float64)
         timeNumber = np.where((timeNumber == 0.0) | np.isnan(timeNumber), np.nan, timeNumber)
         
         _hour   = timeNumber // 10000
@@ -33,17 +30,16 @@ class BaseExtractor(ABC):
         _second = timeNumber % 100
         time_seconds = (_hour * 3600) + (_minute * 60) + _second
         
-        interpolated_seconds = pd.Series(time_seconds).interpolate(method='linear').values
-        
+        interpolated_seconds = np.asarray(pd.Series(time_seconds).interpolate(method='linear'), dtype=np.float64)
         time_diffs = np.diff(interpolated_seconds, prepend=interpolated_seconds[0])
         crossovers = np.cumsum(time_diffs < -43200)
         continuous_seconds = interpolated_seconds + (crossovers * 86400)
         
         parsed_dates = pd.to_datetime(date_series, format="%d%m%y", errors='coerce')
         filled_dates = parsed_dates.ffill().bfill()
-
+        
         if not filled_dates.empty:
-            date_jumps = filled_dates.diff().dt.total_seconds().fillna(0).values
+            date_jumps = np.asarray(filled_dates.diff().dt.total_seconds().fillna(0), dtype=np.float64)
             total_date_days = np.sum(date_jumps) / 86400.0
             total_calculated_days = (continuous_seconds[-1] - continuous_seconds[0]) / 86400.0
             
@@ -52,7 +48,8 @@ class BaseExtractor(ABC):
                     "LOG TIMELINE CORRUPTION DETECTED: This log file contains an extended multi-day "
                     "hardware outage gap where actual dates don't line up with the continuous timeline."
                 )
-        dateStr = date_series.astype(str).replace(["", "None", "000000", "nan", "<NA>"], np.nan).str.zfill(6)
+
+        dateStr = date_series.astype(str).replace(["", "None", "000000", "nan", "<NA>"], None).str.zfill(6)
         valid_dates = dateStr.dropna()
         
         first_valid_date = valid_dates.iloc[0] if not valid_dates.empty else "010100"
@@ -60,7 +57,7 @@ class BaseExtractor(ABC):
         
         anchor_epoch = anchor_date.value // 10**9
         epochs = anchor_epoch + continuous_seconds
-        # Non-blocking debug export of time-only series when UI debug enabled
+
         try:
             if state is not None and getattr(state, 'debug_mode', False):
                 def _dump_times(eps):
@@ -75,5 +72,5 @@ class BaseExtractor(ABC):
                 threading.Thread(target=_dump_times, args=(epochs,), daemon=True).start()
         except Exception:
             pass
-
+            
         return epochs

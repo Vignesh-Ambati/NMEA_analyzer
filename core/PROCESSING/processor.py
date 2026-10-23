@@ -1,3 +1,5 @@
+# Core NMEA processing engine mapping types to parsers
+
 """
 core/processor.py
 ─────────────────
@@ -6,12 +8,10 @@ Core NMEA processing engine.
 
 from pathlib import Path
 
-from . import (
-    CacheManager, 
-    ParquetStorageEngine, 
-    BaseParsers, 
-    _CoreConstantsPage
-)
+from CORE.STORAGE.cache import CacheManager
+from CORE.STORAGE.stage2 import ParquetStorageEngine
+from CORE.PROCESSING.parser import BaseParsers
+import CORE.UTILITIES.constants as _CoreConstantsPage
 
 class NmeaProcessor(BaseParsers):
     def __init__(self, abs_filename: str) -> None:

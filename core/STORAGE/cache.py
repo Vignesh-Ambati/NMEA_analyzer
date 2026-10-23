@@ -1,3 +1,5 @@
+# Temporary on-disk caching logic and fingerprinting
+
 """
 core/cache.py
 ─────────────
@@ -13,7 +15,7 @@ import pyarrow as _pyArrow
 from typing import Optional
 import pyarrow.parquet as _parquet
 
-from . import _CoreConstantsPage
+import CORE.UTILITIES.constants as _CoreConstantsPage
         
 class CacheManager:
     _baseDirectory = os.getcwd()

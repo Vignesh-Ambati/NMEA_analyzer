@@ -1,3 +1,5 @@
+# Asynchronous multi-core process manager
+
 """
 core/orchestrator.py
 ────────────────────
@@ -10,10 +12,10 @@ import glob
 import pandas as pd
 from pathlib import Path
 from multiprocessing import Manager
-from typing import Callable, Dict, Optional
+from typing import Any, Callable, Dict, Optional
 from concurrent.futures import Future, ProcessPoolExecutor
 
-from . import NmeaProcessor
+from ..PROCESSING.processor import NmeaProcessor
 
 def _logging_WriteQueue(_logQueue, message: str) -> None:
     if _logQueue is None:
@@ -43,7 +45,7 @@ class JobOrchestrator:
         self._pool = ProcessPoolExecutor(max_workers=self._maxWorkers)
         self._activeJobs: Dict[str, Future] = {}
     
-    def submitFile(self, _logPath: Path, _onCompleteCallback: Optional[Callable] = None) -> None:
+    def submitFile(self, _logPath: Path, _onCompleteCallback: Optional[Callable] = None) -> Any:
         _pathStr = str(_logPath)
         if _pathStr in self._activeJobs and not self._activeJobs[_pathStr].done():
             _logging_WriteQueue(self.log_queue, f"[*] Job already running for {_logPath.name}")

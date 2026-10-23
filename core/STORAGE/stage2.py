@@ -1,3 +1,5 @@
+# High-performance PyArrow columnar Parquet storage
+
 """
 core/stage2.py
 ──────────────
@@ -8,7 +10,7 @@ import pyarrow as _pyArrow
 import pyarrow.parquet as _parquet
 from typing import Any, Dict, List, Optional
 
-from . import  _CoreConstantsPage
+import CORE.UTILITIES.constants as _CoreConstantsPage
 
 class ParquetStorageEngine:
     def __init__(self, _outputPath: Path, _logQueue=None) -> None:

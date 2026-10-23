@@ -1,11 +1,13 @@
+# Lookup tables, regex patterns, and static configurations
+
 """
 core/constants.py
 ─────────────────
 Static lookup tables shared across NMEA processing modules.
 """
 import re
-
-
+import os
+from pathlib import Path
 
 CONSTELLATION_DICT = {
     "GP": "GPS",
@@ -82,3 +84,7 @@ CACHE_BASE_NAME = ".logcache"
 RETENTION_WINDOW_SECONDS = 3 * 24 * 60 * 60
 """Time until we retain the log before clean up"""
 
+
+_BASE_DIR = Path(__file__).resolve().parent.parent.parent
+CERT_FILE_PATH = os.path.join(_BASE_DIR, "cert.pem")
+KEY_FILE_PATH = os.path.join(_BASE_DIR, "key.pem")

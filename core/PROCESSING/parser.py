@@ -1,3 +1,5 @@
+# Low-level NMEA string parsing and decoding logic
+
 """
 core/parser.py
 ──────────────
@@ -6,8 +8,7 @@ Low-level NMEA parsing helpers:
 
 from typing import Any, Dict, List, Optional, Tuple
 
-from . import _CoreConstantsPage
-
+from ..UTILITIES import constants as _CoreConstantsPage
 
 class BaseParsers:
     """ Parent Class providing methods for NMEA parsing"""
