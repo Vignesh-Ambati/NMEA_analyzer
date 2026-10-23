@@ -99,4 +99,4 @@ export interface SeriesData {
 
 export type ThemeMode = 'dark' | 'light';
 
-export type PageType = 'file' | 'task' | 'graph' | 'reference' | 'tools';
+export type PageType = 'file' | 'task' | 'graph' | 'reference' | 'tools' | 'developer';

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Clock, ArrowRightLeft, FileText, Wrench, ChevronRight } from 'lucide-react';
+import { Clock, ArrowRightLeft, FileText, Wrench } from 'lucide-react';
 import { UtilityConfig, UtilityId } from '../utilities/types';
 import { TimeDifferenceCalculator } from '../utilities/TimeDifferenceCalculator';
 import { UtcIstConverter } from '../utilities/UtcIstConverter';
@@ -10,33 +10,33 @@ const UTILITIES_CONFIG: UtilityConfig[] = [
     id: 'timediff',
     title: 'Time Difference Calculator',
     shortTitle: 'Time Difference',
-    categoryLabel: 'HHMMSS.ss[,DD,MM,YYYY]',
+    categoryLabel: '| Time-1 - Time-2 | ≈ |Time Difference|',
     tagLine: 'Calculate duration and elapsed seconds between two GNSS timestamps.',
     detailedInfo: 'Calculates elapsed duration and seconds between two GNSS timestamps. Supports format: 141105.00,17,10,2026 (Time, Day, Month, Year) or time-only 141105.00.',
     inputFormat: '',
-    outputSpec: 'Duration (H:M:S) & Total Seconds',
+    outputSpec: 'Duration & Total Seconds',
     icon: Clock,
   },
   {
     id: 'utc_ist',
-    title: 'UTC ↔ IST Timezone Converter',
+    title: 'UTC ⇋ IST Timezone Converter',
     shortTitle: 'UTC ↔ IST',
-    categoryLabel: 'GMT+0 ↔ GMT+5:30',
-    tagLine: 'Bi-directional conversion between GNSS UTC (GMT+0) and IST (GMT+5:30).',
-    detailedInfo: 'Bi-directional converter between GNSS standard UTC (GMT+0) and Indian Standard Time (IST, GMT+5:30). Supports 141105.00,17,10,2026 or time-only 141105.00 with day shift.',
+    categoryLabel: 'UTC ⇋ IST Conversion',
+    tagLine: 'Bi-directional conversion between GNSS UTC and IST.',
+    detailedInfo: 'Bi-directional converter between GNSS standard UTC and Indian Standard Time. Supports 141105.00,17,10,2026 or time-only 141105.00 with day shift.',
     inputFormat: '',
     outputSpec: 'IST Time, Date & Day Shift Status',
     icon: ArrowRightLeft,
   },
   {
     id: 'linecopy',
-    title: 'Bulk NMEA Line Slicer & Filter',
-    shortTitle: 'Bulk Line Copy',
-    categoryLabel: 'Batch Slicer',
-    tagLine: 'Filter, slice line ranges, strip checksums, and export raw NMEA lines.',
-    detailedInfo: 'Batch filter sentences by talker or sentence type (e.g. GGA, RMC), slice line number ranges, strip trailing checksum bytes, and copy or download extracted lines.',
-    inputFormat: 'Raw Multiline NMEA Text',
-    outputSpec: 'Filtered Lines (.txt / Clipboard)',
+    title: 'Data Extractor Pro',
+    shortTitle: 'Data Extractor Pro',
+    categoryLabel: 'Regex & Line Extraction',
+    tagLine: 'Extract, filter, slice line ranges, and export GNSS sentences with high-performance regex.',
+    detailedInfo: 'High-performance regex and line slicer. Batch filter sentences by talker or regex expression, slice line ranges, strip trailing checksums, and export extracted data.',
+    inputFormat: 'Raw Multiline NMEA Text or File',
+    outputSpec: 'Filtered Lines (.log / .txt)',
     icon: FileText,
   },
 ];
@@ -58,7 +58,7 @@ export const ToolsPage: React.FC = () => {
             GNSS Standard Utilities
           </h2>
           <p className="text-xs text-[#736E65] dark:text-slate-400 mt-0.5 truncate">
-            Quick-access GNSS engineering utilities for time deltas, timezone shifts, and line slicing.
+            Quick-access GNSS utilities for time deltas, timezone shifts, and raw sentence slicing.
           </p>
         </div>
       </div>
@@ -110,11 +110,11 @@ export const ToolsPage: React.FC = () => {
               : 'bg-[#FAF8F5] dark:bg-slate-900 text-[#736E65] dark:text-slate-300 hover:text-[#24211D] dark:hover:text-white border border-[#E6E1D6] dark:border-slate-800 hover:bg-[#EFEAE1]'
           }`}
         >
-          Bulk Line Copy
+          Data Extractor Pro
         </button>
       </div>
 
-      {/* VIEW 1: All Utilities Grid (Clicking any utility shifts immediately to that utility) */}
+      {/* VIEW 1: All Utilities Grid */}
       {activeTab === 'all' && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {UTILITIES_CONFIG.map((util) => {
@@ -128,23 +128,24 @@ export const ToolsPage: React.FC = () => {
                 <div>
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-[11px] text-[#736E65] dark:text-slate-400 font-mono">
+                      {util.categoryLabel}
                     </span>
                     <span className="text-[10px] text-[#E05318] font-mono bg-orange-100/70 dark:bg-orange-950/50 px-2 py-0.5 rounded-md">
                       Open Tool
                     </span>
                   </div>
 
-                  <div className="flex items-start space-x-3">
+                  <div className="flex items-start space-x-3.5">
                     <div className="w-10 h-10 rounded-xl bg-[#FDF3EE] dark:bg-orange-950/40 border border-orange-200/60 dark:border-orange-900/40 text-[#E05318] flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
                       <IconComponent className="w-5 h-5" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <h3 className="text-base font-bold text-[#24211D] dark:text-slate-100           group-hover:text-[#E05318] transition-colors leading-snug whitespace-normal break-words">
+                      <h3 className="text-base font-bold text-[#24211D] dark:text-slate-100 group-hover:text-[#E05318] transition-colors leading-snug whitespace-normal break-words">
                         {util.title}
                       </h3>
-                        <p className="text-xs text-[#736E65] dark:text-slate-400 mt-1 whitespace-normal break-words">
-                          {util.tagLine}
-                        </p>
+                      <p className="text-xs text-[#736E65] dark:text-slate-400 mt-1 whitespace-normal break-words">
+                        {util.tagLine}
+                      </p>
                     </div>
                   </div>
                 </div>

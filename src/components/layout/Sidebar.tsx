@@ -11,7 +11,8 @@ import {
   X,
   PanelLeftClose,
   PanelLeftOpen,
-  Terminal
+  Terminal,
+  Code2
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -27,16 +28,18 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) =
     navigateToGraphPage,
     navigateToReferencePage,
     navigateToToolsPage,
+    navigateToDeveloperPage,
     currentTaskId,
     files,
     theme,
     toggleTheme,
-    openDevModal,
     isFullpage,
     sidebarCollapsed,
     toggleSidebar,
     devUnlocked,
     registerDevSecretClick,
+    backendStatus,
+    refreshBackendStatus,
   } = useApp();
 
   if (isFullpage) return null;
@@ -66,42 +69,67 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) =
       >
         <div className="flex flex-col h-full overflow-hidden">
           {/* Brand Header with Pure Name & 7-Click Dev Trigger */}
-          {/* "h-14 px-3 sm:px-4 flex items-center justify-between border-b border-[#E6E1D6] dark:border-slate-800 ..." */}
-          <div className="h-20 px-4 sm:px-4 flex items-center justify-between border-b border-[#E6E1D6] dark:border-slate-800 shrink-0">
+          <div className="h-16 px-4 flex items-center justify-between border-b border-[#E6E1D6] dark:border-slate-800 shrink-0">
             {sidebarCollapsed ? (
               // Collapsed state: Centered Expand toggle button with warm accent (Zero overflow, impossible to break)
               <div className="w-full flex items-center justify-center py-1">
                 <button
                   onClick={toggleSidebar}
                   type="button"
-                  className="w-10 h-10 rounded-xl bg-[#EFEAE1]/80 hover:bg-[#ECE5D8] dark:bg-slate-800 dark:hover:bg-slate-700/80 text-[#E05318] flex items-center justify-center transition-all cursor-pointer shadow-xs group"
+                  className="relative w-10 h-10 rounded-xl bg-[#EFEAE1]/80 hover:bg-[#ECE5D8] dark:bg-slate-800 dark:hover:bg-slate-700/80 text-[#E05318] flex items-center justify-center transition-all cursor-pointer shadow-xs group"
                   title="Expand Sidebar"
                   aria-label="Expand Sidebar"
                 >
                   <PanelLeftOpen className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                  <span
+                    className={`absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full ring-2 ring-[#FAF8F5] dark:ring-slate-900 ${
+                      backendStatus?.reachable
+                        ? 'bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.8)] animate-pulse'
+                        : 'bg-rose-500 shadow-[0_0_6px_rgba(244,63,94,0.8)]'
+                    }`}
+                    title={backendStatus?.reachable ? 'Backend Synced' : 'Backend Offline'}
+                  />
                 </button>
               </div>
             ) : (
-              // Expanded state: Brand Name (Clickable 7-times for Developer Diagnostics) & Collapse Toggle
+              // Expanded state: Brand Name (Clickable 7-times for Developer Suite) & Collapse Toggle
               <>
                 <div
                   onClick={registerDevSecretClick}
                   className="flex items-center space-x-2.5 cursor-pointer group select-none min-w-0"
-                  title="Click 7 times to unlock Developer Diagnostics"
+                  title={devUnlocked ? "Developer Suite Unlocked" : "Click 7 times to unlock Developer Suite"}
                 >
                   <div className="w-8 h-8 rounded-lg bg-[#FDF3EE] dark:bg-orange-950/60 text-[#E05318] flex items-center justify-center font-bold text-xs tracking-tight border border-orange-200/70 dark:border-orange-900/50 shrink-0 group-hover:scale-105 transition-transform shadow-xs">
                     NA
                   </div>
                   <div className="min-w-0">
-                    <div className="text-sm font-bold text-[#24211D] dark:text-slate-100 tracking-tight leading-tight truncate flex items-center space-x-1.5">
-                      <span className="text-[#E05318]">NMEA</span>
+                    <div className="text-sm font-bold text-[#24211D] dark:text-slate-100 tracking-tight leading-tight truncate">
+                      <span className="text-[#E05318]">NMEA</span>{' '}
                       <span>Analyzer</span>
-                      {devUnlocked && (
-                        <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" title="Developer Mode Active" />
-                      )}
                     </div>
                     <div className="text-[10px] text-[#736E65] dark:text-slate-400 font-medium truncate mt-0.5">
-                      GNSS Telemetry Suite
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          refreshBackendStatus();
+                        }}
+                        className="flex items-center space-x-1.5 hover:text-[#24211D] dark:hover:text-slate-200 cursor-pointer transition-colors"
+                        title={
+                          backendStatus?.reachable
+                            ? 'Backend Synced (Connected) · Click to re-check'
+                            : 'Backend Offline · Click to retry'
+                        }
+                      >
+                        <span
+                          className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                            backendStatus?.reachable ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'
+                          }`}
+                        />
+                        <span className="truncate">
+                          {backendStatus?.reachable ? 'Backend Synced' : 'Backend Offline'}
+                        </span>
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -283,38 +311,38 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) =
                     <span className="text-[9px] text-[#736E65] dark:text-slate-400 shrink-0">Tools</span>
                   )}
                 </button>
+
+                {/* Developer Suite Page (Visible when unlocked) */}
+                {devUnlocked && (
+                  <button
+                    onClick={() => handleNav(navigateToDeveloperPage)}
+                    type="button"
+                    className={`w-full py-2.5 rounded-xl flex items-center transition-all cursor-pointer ${
+                      sidebarCollapsed ? 'justify-center px-0' : 'justify-between px-3'
+                    } ${
+                      currentPage === 'developer'
+                        ? 'bg-[#FDF3EE] dark:bg-orange-950/40 text-[#E05318] font-bold border border-orange-200/70 dark:border-orange-900/40 shadow-xs'
+                        : 'text-[#736E65] dark:text-slate-300 hover:bg-[#EFEAE1] dark:hover:bg-slate-800 hover:text-[#24211D] dark:hover:text-white'
+                    }`}
+                    title="Developer Suite (Centralized Backend, API Integration, Logs)"
+                  >
+                    <div className="flex items-center space-x-2.5 min-w-0">
+                      <Code2 className="w-4 h-4 text-sky-600 dark:text-sky-400 shrink-0" />
+                      {!sidebarCollapsed && (
+                        <span className="text-xs truncate">Developer Suite</span>
+                      )}
+                    </div>
+                    {!sidebarCollapsed && (
+                      <span className="text-[9px] text-[#736E65] dark:text-slate-400 font-mono shrink-0">Dev</span>
+                    )}
+                  </button>
+                )}
               </div>
             </div>
           </div>
 
-          {/* Bottom Footer Section: Developer Diagnostics (Only if 7-clicked) + Theme */}
+          {/* Bottom Footer Section: Quick Theme Switch */}
           <div className="p-2 sm:p-2.5 border-t border-[#E6E1D6] dark:border-slate-800 space-y-1.5 shrink-0">
-            {/* Developer Diagnostics: VISIBLE ONLY WHEN UNLOCKED VIA 7 CLICKS */}
-            {devUnlocked && (
-              <button
-                onClick={() => {
-                  openDevModal();
-                  setMobileOpen(false);
-                }}
-                type="button"
-                className={`w-full py-2 rounded-xl border border-emerald-300 dark:border-emerald-800/80 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-300 text-xs font-medium flex items-center transition-colors cursor-pointer animate-in fade-in duration-200 ${
-                  sidebarCollapsed ? 'justify-center px-0' : 'justify-between px-3'
-                }`}
-                title="Developer Diagnostics"
-              >
-                <div className="flex items-center space-x-2 min-w-0">
-                  <Terminal className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                  {!sidebarCollapsed && (
-                    <span className="truncate">Developer Diagnostics</span>
-                  )}
-                </div>
-                {!sidebarCollapsed && (
-                  <span className="text-[9px] font-mono text-emerald-700 dark:text-emerald-400 shrink-0">
-                    Active
-                  </span>
-                )}
-              </button>
-            )}
 
             {/* Quick Theme Toggle Button */}
             <button

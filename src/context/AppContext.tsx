@@ -1,13 +1,19 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { ParsedLogFile, PageType, ThemeMode } from '../types/nmea';
 import { parseNmeaContent } from '../services/nmeaParser';
-import { SAMPLE_FILES } from '../services/sampleData';
+import { HealthCheckResult, apiClient } from '../config/apiClient';
+import { backendService } from '../services/backend/backendService';
+import { logger, AppLogEntry } from '../services/logger';
 
 export interface ConsoleMessage {
   id: string;
   timestamp: string;
   text: string;
   level: 'info' | 'warn' | 'error' | 'debug' | 'success';
+  stage?: string;
+  source?: 'client' | 'backend';
+  details?: any;
+  durationMs?: number;
 }
 
 export interface ActiveJob {
@@ -27,13 +33,13 @@ interface AppContextType {
   navigateToGraphPage: (taskId: number) => void;
   navigateToReferencePage: () => void;
   navigateToToolsPage: () => void;
+  navigateToDeveloperPage: () => void;
 
-  // Files & Data - 100% BLANK BY DEFAULT, NO HARDCODED DATA
+  // Files & Data - 100% BLANK BY DEFAULT, NO SIMULATED DATA
   files: ParsedLogFile[];
   selectedFileId: string;
   setSelectedFileId: (id: string) => void;
   processFile: (file: File | { name: string; content: string; size?: number }) => Promise<void>;
-  loadSampleFile: (sampleIndex: number) => Promise<void>;
   removeFile: (id: string) => void;
   clearFiles: () => void;
 
@@ -52,15 +58,12 @@ interface AppContextType {
   debugMode: boolean;
   toggleDebugMode: () => void;
 
-  // Developer & Diagnostic Restriction Suite
-  isDevModalOpen: boolean;
-  openDevModal: () => void;
-  closeDevModal: () => void;
+  // Developer Suite
   isDevAuthenticated: boolean;
-  authenticateDev: (pin: string) => boolean;
-  lockDevConsole: () => void;
+  authenticateDev: (pin: string) => Promise<{ success: boolean; isDemo?: boolean; message?: string }>;
   devPasscode: string;
   setDevPasscode: (newPin: string) => void;
+  logoutDeveloper: () => void;
 
   // Advanced Engineering Tuning
   batchSize: number;
@@ -71,9 +74,14 @@ interface AppContextType {
   setWorkerCount: (val: number) => void;
   flushRamCache: () => void;
 
-  // Console Logs
+  // Console & Diagnostic Logs
   logs: ConsoleMessage[];
-  addLog: (text: string, level?: 'info' | 'warn' | 'error' | 'debug' | 'success') => void;
+  addLog: (
+    text: string,
+    level?: 'info' | 'warn' | 'error' | 'debug' | 'success',
+    stage?: 'ingestion' | 'network' | 'tasks' | 'charts' | 'developer' | 'backend' | 'system',
+    details?: any
+  ) => void;
   clearLogs: () => void;
 
   // Fullscreen & Sidebar Maximization
@@ -91,6 +99,12 @@ interface AppContextType {
   // Workflow gating: Task Matrix & Charts visible only after proceeding
   hasProceededToTasks: boolean;
   proceedToTaskMatrix: () => void;
+
+  // Backend Integration State
+  routeToBackend: boolean;
+  setRouteToBackend: (val: boolean) => void;
+  backendStatus: HealthCheckResult | null;
+  refreshBackendStatus: () => Promise<void>;
 }
 
 const COLOR_CYCLE = ['#FF5A1F', '#38BDF8', '#34D399', '#F472B6', '#A78BFA', '#FBBF24', '#4ADE80'];
@@ -100,7 +114,7 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [currentPage, setCurrentPage] = useState<PageType>('file');
   const [currentTaskId, setCurrentTaskId] = useState<number>(3); // Default task: Altitude
-  // 100% BLANK INITIAL STATE - NO HARDCODED LOGS OR SAMPLES
+  // 100% BLANK INITIAL STATE - NO SIMULATED LOGS OR SAMPLES
   const [files, setFiles] = useState<ParsedLogFile[]>([]);
   const [selectedFileId, setSelectedFileId] = useState<string>('Combined');
 
@@ -109,7 +123,40 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [processingStatus, setProcessingStatus] = useState<string>('Ready');
   const [activeJobs, setActiveJobs] = useState<ActiveJob[]>([]);
 
-  // Default to light theme for clean greytHR look, with dark theme available
+  // Backend integration state
+  const [routeToBackend, setRouteToBackend] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('nmea_route_to_backend') === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const [backendStatus, setBackendStatus] = useState<HealthCheckResult | null>(null);
+
+  const refreshBackendStatus = useCallback(async () => {
+    try {
+      const res = await apiClient.checkHealth();
+      setBackendStatus(res);
+    } catch {
+      setBackendStatus(null);
+    }
+  }, []);
+
+  // Initial backend check
+  useEffect(() => {
+    refreshBackendStatus();
+  }, [refreshBackendStatus]);
+
+  // Persist routeToBackend toggle
+  useEffect(() => {
+    try {
+      localStorage.setItem('nmea_route_to_backend', String(routeToBackend));
+    } catch {
+      // ignore
+    }
+  }, [routeToBackend]);
+
+  // Default to light theme for clean look, with dark theme available
   const [theme, setTheme] = useState<ThemeMode>(() => {
     try {
       const saved = localStorage.getItem('nmea_theme_mode');
@@ -158,7 +205,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const registerDevSecretClick = useCallback(() => {
     if (devUnlocked) {
-      setDevToastMessage('Developer Diagnostics is already unlocked!');
+      setDevToastMessage('Developer Suite is already unlocked!');
       setTimeout(() => setDevToastMessage(null), 2500);
       return;
     }
@@ -173,10 +220,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
       const remaining = 7 - next;
       if (remaining > 0 && remaining <= 4) {
-        setDevToastMessage(`You are ${remaining} tap${remaining > 1 ? 's' : ''} away from Developer Diagnostics.`);
+        setDevToastMessage(`You are ${remaining} tap${remaining > 1 ? 's' : ''} away from Developer Suite.`);
       } else if (remaining <= 0) {
         setDevUnlocked(true);
-        setDevToastMessage('🎉 Developer Diagnostics Unlocked!');
+        setDevToastMessage('🎉 Developer Suite Unlocked!');
         try {
           localStorage.setItem('nmea_dev_unlocked', 'true');
         } catch {
@@ -189,7 +236,28 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     });
   }, [devUnlocked]);
 
-  // Developer restriction state
+  // Log out Developer to hide the Developer Suite back
+  const logoutDeveloper = useCallback(() => {
+    setIsDevAuthenticated(false);
+    setDevUnlocked(false);
+    try {
+      localStorage.removeItem('nmea_dev_unlocked');
+    } catch {
+      // ignore
+    }
+    setDevToastMessage('🔒 Developer Suite locked & hidden.');
+    setTimeout(() => setDevToastMessage(null), 3000);
+    setCurrentPage((prev) => (prev === 'developer' ? 'file' : prev));
+  }, []);
+
+  // Guard: If dev is locked, redirect away from developer page
+  useEffect(() => {
+    if (!devUnlocked && currentPage === 'developer') {
+      setCurrentPage('file');
+    }
+  }, [devUnlocked, currentPage]);
+
+  // Developer state
   const [isDevModalOpen, setIsDevModalOpen] = useState<boolean>(false);
   const [isDevAuthenticated, setIsDevAuthenticated] = useState<boolean>(false);
   const [devPasscode, setDevPasscode] = useState<string>('7788');
@@ -199,7 +267,38 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [retentionWindow, setRetentionWindow] = useState<number>(3600);
   const [workerCount, setWorkerCount] = useState<number>(4);
 
-  const [logs, setLogs] = useState<ConsoleMessage[]>([]);
+  const [logs, setLogs] = useState<ConsoleMessage[]>(() => {
+    return logger.getLogs().map((l) => ({
+      id: l.id,
+      timestamp: l.timestamp,
+      text: l.message,
+      level: l.level,
+      stage: l.stage,
+      source: l.source,
+      details: l.details,
+      durationMs: l.durationMs,
+    }));
+  });
+
+  // Subscribe to logger real-time broadcasts
+  useEffect(() => {
+    const unsubscribe = logger.subscribe((entry) => {
+      setLogs((prev) => [
+        ...prev.slice(-500),
+        {
+          id: entry.id,
+          timestamp: entry.timestamp,
+          text: entry.message,
+          level: entry.level,
+          stage: entry.stage,
+          source: entry.source,
+          details: entry.details,
+          durationMs: entry.durationMs,
+        },
+      ]);
+    });
+    return unsubscribe;
+  }, []);
 
   // Guard: If files are cleared, redirect from task/graph back to file page
   useEffect(() => {
@@ -208,22 +307,28 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   }, [files.length, currentPage]);
 
-  const addLog = useCallback((text: string, level: 'info' | 'warn' | 'error' | 'debug' | 'success' = 'info') => {
-    const now = new Date();
-    const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
-    const newMsg: ConsoleMessage = {
-      id: Math.random().toString(36).substring(2, 9),
-      timestamp: timeStr,
-      text,
-      level,
-    };
-    setLogs((prev) => [...prev.slice(-300), newMsg]);
-  }, []);
+  const addLog = useCallback(
+    (
+      text: string,
+      level: 'info' | 'warn' | 'error' | 'debug' | 'success' = 'info',
+      stage: 'ingestion' | 'network' | 'tasks' | 'charts' | 'developer' | 'backend' | 'system' = 'system',
+      details?: any
+    ) => {
+      logger.log({
+        source: 'client',
+        stage,
+        level,
+        message: text,
+        details,
+      });
+    },
+    []
+  );
 
   const clearLogs = useCallback(() => {
+    logger.clear();
     setLogs([]);
-    addLog('Log buffer cleared.', 'info');
-  }, [addLog]);
+  }, []);
 
   const toggleTheme = useCallback(() => {
     setTheme((prev) => {
@@ -259,30 +364,31 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   }, []);
 
   const authenticateDev = useCallback(
-    (pin: string): boolean => {
-      if (pin === devPasscode || pin === 'admin') {
+    async (pin: string): Promise<{ success: boolean; isDemo?: boolean; message?: string }> => {
+      const res = await backendService.verifyDevPassword(pin);
+      if (res.success) {
         setIsDevAuthenticated(true);
-        addLog('Developer & Diagnostic Console unlocked.', 'success');
-        return true;
+        addLog(`Developer access granted: ${res.message || 'Authenticated'}`, 'success');
+      } else {
+        addLog(`Developer authentication failed: ${res.message || 'Invalid password'}`, 'error');
       }
-      addLog('Authentication failed: Invalid authorization PIN.', 'error');
-      return false;
+      return res;
     },
-    [devPasscode, addLog]
+    [addLog]
   );
 
   const lockDevConsole = useCallback(() => {
     setIsDevAuthenticated(false);
-    addLog('Developer & Diagnostic Console locked.', 'warn');
+    addLog('Developer Console locked.', 'warn');
   }, [addLog]);
 
   const flushRamCache = useCallback(() => {
     addLog('Telemetry RAM cache flushed.', 'info');
   }, [addLog]);
 
-  // Initial setup: clean blank workspace (NO preloaded hardcoded files)
+  // Initial setup
   useEffect(() => {
-    addLog('NMEA Log Analyzer initialized. Workspace ready for log upload.', 'info');
+    addLog('NMEA Log Analyzer initialized. Ready for genuine log upload.', 'info');
   }, [addLog]);
 
   // Sync theme to root html and body
@@ -335,16 +441,39 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setActiveJobs((prev) =>
           prev.map((j) => (j.id === jobId ? { ...j, pct: 60, status: 'Validating' } : j))
         );
-        await new Promise((r) => setTimeout(r, 100));
+        await new Promise((r) => setTimeout(r, 80));
 
         setProcessingProgress(85);
         setProcessingStatus(`Building index...`);
         setActiveJobs((prev) =>
           prev.map((j) => (j.id === jobId ? { ...j, pct: 90, status: 'Indexing' } : j))
         );
-        await new Promise((r) => setTimeout(r, 100));
+        await new Promise((r) => setTimeout(r, 80));
 
         const parsed = parseNmeaContent(content, filename, fileId, jobColor, fileSize);
+
+        // Optional Backend Routing: If user activated auto-route to backend
+        if (routeToBackend) {
+          addLog(`Dispatching ${filename} to backend API (/nmea/upload)...`, 'info');
+          if (fileInput instanceof File) {
+            backendService.uploadFile(fileInput, filename).then((backendRes) => {
+              if (backendRes.success) {
+                addLog(`Backend upload successful for ${filename}: ${backendRes.message || 'OK'}`, 'success');
+              } else {
+                addLog(`Backend upload notice: ${backendRes.error}`, 'warn');
+              }
+            });
+          } else {
+            const blob = new Blob([content], { type: 'text/plain' });
+            backendService.uploadFile(blob, filename).then((backendRes) => {
+              if (backendRes.success) {
+                addLog(`Backend upload successful for ${filename}: ${backendRes.message || 'OK'}`, 'success');
+              } else {
+                addLog(`Backend upload notice: ${backendRes.error}`, 'warn');
+              }
+            });
+          }
+        }
 
         setProcessingProgress(100);
         setProcessingStatus(`Complete`);
@@ -357,7 +486,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
         addLog(`Successfully parsed ${filename}: ${parsed.totalSentences} sentences, ${parsed.epochs.length} epochs.`, 'success');
 
-        await new Promise((r) => setTimeout(r, 200));
+        await new Promise((r) => setTimeout(r, 150));
         setActiveJobs((prev) => prev.filter((j) => j.id !== jobId));
         setIsProcessing(false);
       } catch (err: any) {
@@ -367,21 +496,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         throw err;
       }
     },
-    [files.length, addLog]
-  );
-
-  const loadSampleFile = useCallback(
-    async (sampleIndex: number) => {
-      const sample = SAMPLE_FILES[sampleIndex];
-      if (!sample) return;
-      const content = sample.generate();
-      await processFile({
-        name: sample.name,
-        content,
-        size: sample.sizeBytes,
-      });
-    },
-    [processFile]
+    [files.length, addLog, routeToBackend]
   );
 
   const removeFile = useCallback(
@@ -428,6 +543,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setCurrentPage('tools');
   }, []);
 
+  const navigateToDeveloperPage = useCallback(() => {
+    setCurrentPage('developer');
+  }, []);
+
   return (
     <AppContext.Provider
       value={{
@@ -439,11 +558,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         navigateToGraphPage,
         navigateToReferencePage,
         navigateToToolsPage,
+        navigateToDeveloperPage,
         files,
         selectedFileId,
         setSelectedFileId,
         processFile,
-        loadSampleFile,
         removeFile,
         clearFiles,
         isProcessing,
@@ -457,14 +576,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         toggleProgressBar,
         debugMode,
         toggleDebugMode,
-        isDevModalOpen,
-        openDevModal,
-        closeDevModal,
         isDevAuthenticated,
         authenticateDev,
-        lockDevConsole,
         devPasscode,
         setDevPasscode,
+        logoutDeveloper,
         batchSize,
         setBatchSize,
         retentionWindow,
@@ -485,6 +601,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         devToastMessage,
         hasProceededToTasks: files.length > 0,
         proceedToTaskMatrix: navigateToTaskPage,
+        routeToBackend,
+        setRouteToBackend,
+        backendStatus,
+        refreshBackendStatus,
       }}
     >
       {children}

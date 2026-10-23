@@ -6,7 +6,6 @@ import {
   Trash2,
   ArrowRight,
   CheckCircle2,
-  FileCheck
 } from 'lucide-react';
 
 export const FilePage: React.FC = () => {

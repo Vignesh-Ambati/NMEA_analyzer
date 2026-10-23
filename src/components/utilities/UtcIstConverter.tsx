@@ -154,7 +154,7 @@ export const UtcIstConverter: React.FC = () => {
               <div className="absolute left-0 sm:left-1/2 sm:-translate-x-1/2 top-full mt-2 hidden group-hover:block z-50 w-72 sm:w-80 p-3 rounded-xl bg-[#FAF8F5] dark:bg-slate-900 border border-[#E6E1D6] dark:border-slate-800 shadow-xl text-xs text-[#24211D] dark:text-slate-200 pointer-events-none">
                 <div className="font-semibold text-[#E05318] mb-1">UTC &harr; IST Timezone Converter</div>
                 <p className="text-[11px] text-[#736E65] dark:text-slate-300 leading-relaxed">
-                  Bi-directional converter between GNSS standard UTC (GMT+0) and Indian Standard Time (IST, GMT+5:30). Supports <span className="font-mono text-[#E05318]">141105.00,17,10,2026</span> or time-only <span className="font-mono text-[#E05318]">141105.00</span> with automatic day shift calculation.
+                  Bi-directional converter between GNSS standard UTC and Indian Standard Time . Supports <span className="font-mono text-[#E05318]">141105.00,17,10,2026</span> or time-only <span className="font-mono text-[#E05318]">141105.00</span> with automatic day shift calculation.
                 </p>
               </div>
             </div>
@@ -162,7 +162,7 @@ export const UtcIstConverter: React.FC = () => {
 
           {/* Exactly 1-line tag below Utility Name */}
           <p className="text-xs text-[#736E65] dark:text-slate-400 mt-1 truncate">
-            Bi-directional conversion between GNSS UTC (GMT+0) and IST (GMT+5:30).
+            Bi-directional conversion between GNSS UTC and IST.
           </p>
         </div>
 
@@ -181,7 +181,7 @@ export const UtcIstConverter: React.FC = () => {
                   : 'text-[#736E65] dark:text-slate-300 hover:text-[#24211D]'
               }`}
             >
-              UTC &rarr; IST (+5:30)
+              UTC &rarr; IST
             </button>
             <button
               type="button"
@@ -195,7 +195,7 @@ export const UtcIstConverter: React.FC = () => {
                   : 'text-[#736E65] dark:text-slate-300 hover:text-[#24211D]'
               }`}
             >
-              IST &rarr; UTC (-5:30)
+              IST &rarr; UTC
             </button>
           </div>
 
@@ -227,7 +227,7 @@ export const UtcIstConverter: React.FC = () => {
           className="px-5 py-2.5 rounded-xl text-xs font-semibold bg-[#E05318] hover:bg-[#C94713] text-white shadow-xs transition-all cursor-pointer flex items-center space-x-2"
         >
           <ArrowRightLeft className="w-4 h-4" />
-          <span>Convert to {direction === 'utc_to_ist' ? 'IST (+5:30)' : 'UTC (-5:30)'}</span>
+          <span>Convert to {direction === 'utc_to_ist' ? 'IST' : 'UTC '}</span>
         </button>
         <button
           type="button"

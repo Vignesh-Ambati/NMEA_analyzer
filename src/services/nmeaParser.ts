@@ -1,4 +1,5 @@
 import { NMEASentence, EpochData, ParsedLogFile, LogStats, PlotDataPoint } from '../types/nmea';
+import { logger } from './logger';
 
 export function verifyChecksum(sentence: string): boolean {
   const trimmed = sentence.trim();
@@ -54,9 +55,16 @@ export function parseNmeaContent(
   fileColor: string,
   fileSize: number
 ): ParsedLogFile {
+  const startTimeMs = performance.now();
   const lines = content.split(/\r?\n/);
   const rawSentences: NMEASentence[] = [];
   const sentenceCounts: Record<string, number> = {};
+
+  logger.ingestion(`Ingestion start: ${filename} (${(fileSize / 1024).toFixed(1)} KB, ${lines.length} lines)`, 'info', {
+    filename,
+    fileSize,
+    linesCount: lines.length,
+  });
 
   let validCount = 0;
   let invalidCount = 0;
@@ -285,7 +293,7 @@ export function parseNmeaContent(
     sbasUsageCount: sbasCount,
   };
 
-  return {
+  const result: ParsedLogFile = {
     id: fileId,
     filename,
     fileSize,
@@ -301,6 +309,23 @@ export function parseNmeaContent(
     color: fileColor,
     stats,
   };
+
+  const parseDurationMs = Math.round(performance.now() - startTimeMs);
+  logger.ingestion(
+    `Ingestion complete: ${filename} -> ${rawSentences.length} sentences (${validCount} valid, ${invalidCount} invalid), ${epochs.length} epochs in ${parseDurationMs}ms`,
+    'success',
+    {
+      filename,
+      totalSentences: rawSentences.length,
+      validSentences: validCount,
+      invalidSentences: invalidCount,
+      epochsCount: epochs.length,
+      durationMs: parseDurationMs,
+      sentenceCounts,
+    }
+  );
+
+  return result;
 }
 
 export function extractTaskData(file: ParsedLogFile, taskId: number): PlotDataPoint[] {

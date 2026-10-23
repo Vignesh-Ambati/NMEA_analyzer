@@ -23,12 +23,12 @@ export const TimeDifferenceCalculator: React.FC = () => {
   const calculateDiff = () => {
     setError(null);
     if (!t1Input.trim()) {
-      setError('Please enter Start Time (T1)');
+      setError('Please enter Start Time ( Time-1 )');
       setResult(null);
       return;
     }
     if (!t2Input.trim()) {
-      setError('Please enter End Time (T2)');
+      setError('Please enter End Time ( Time-2 )');
       setResult(null);
       return;
     }
@@ -163,7 +163,7 @@ export const TimeDifferenceCalculator: React.FC = () => {
         {/* T1 Start Input */}
         <div className="space-y-1.5">
           <label className="text-xs font-semibold text-[#24211D] dark:text-slate-200 block">
-            Start Time (T1)
+            Start Time ( Time-1 )
           </label>
           <input
             type="text"
@@ -178,7 +178,7 @@ export const TimeDifferenceCalculator: React.FC = () => {
         {/* T2 End Input */}
         <div className="space-y-1.5">
           <label className="text-xs font-semibold text-[#24211D] dark:text-slate-200 block">
-            End Time (T2)
+            End Time ( Time-2 )
           </label>
           <input
             type="text"
