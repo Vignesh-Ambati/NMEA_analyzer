@@ -1,5 +1,3 @@
-# Exposes strictly the configured logger instance
+from .Logger import error_logger, system_logger
 
-from .Logger import logger
-
-__all__ = ["logger"]
+__all__ = ["system_logger", "error_logger"]

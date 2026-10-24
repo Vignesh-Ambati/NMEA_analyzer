@@ -25,7 +25,6 @@ def _logging_WriteQueue(_logQueue, message: str) -> None:
     except Exception:
         pass
 
-
 def _isolated_WorkerTask(_filePath: str, _progressVal, _logQueue=None) -> str:
     try:
         _processor = NmeaProcessor(_filePath)

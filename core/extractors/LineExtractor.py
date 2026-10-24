@@ -3,8 +3,13 @@
 import os
 import re
 from pathlib import Path
+from abc import ABC, abstractmethod
 from typing import Callable, Optional
-from .BaseTextExtractor import BaseTextProcessor
+
+class BaseTextProcessor(ABC):
+    @abstractmethod
+    def process(self, progress_callback: Optional[Callable[[int, int], None]] = None) -> int:
+        pass
 
 class RegexLineExtractor(BaseTextProcessor):
     def __init__(self, input_path: str, output_path: str, expression: str, 
@@ -67,3 +72,8 @@ class RegexLineExtractor(BaseTextProcessor):
             progress_callback(100, lines_found)
             
         return lines_found
+
+__all__ = [
+    "BaseTextProcessor", 
+    "RegexLineExtractor"
+]
