@@ -155,6 +155,23 @@ export const DeveloperPage: React.FC = () => {
     copyToClipboard(textStr, 'export-text');
   };
 
+  const handleExportOfflineDiagnostics = async () => {
+    try {
+      const result = await logger.saveOfflineDiagnosticsToFile('offline-debug-report.json');
+      if (result.success) {
+        setBackendLogMsg(`Offline diagnostics saved to ${result.fileName}`);
+        addLog(`Offline diagnostics exported to a local file: ${result.fileName}`, 'success', 'system');
+      } else {
+        setBackendLogMsg(`Offline diagnostics export failed: ${result.error}`);
+        addLog(`Offline diagnostics export failed: ${result.error}`, 'error', 'system');
+      }
+      setTimeout(() => setBackendLogMsg(null), 4000);
+    } catch (err: any) {
+      setBackendLogMsg(`Export failed: ${err?.message || 'Unknown error'}`);
+      addLog(`Offline diagnostics export failed: ${err?.message || 'Unknown error'}`, 'error', 'system');
+    }
+  };
+
   // PIN update state
   const [newPin, setNewPin] = useState<string>('');
   const [pinChangeMsg, setPinChangeMsg] = useState<string | null>(null);
@@ -474,20 +491,35 @@ export const DeveloperPage: React.FC = () => {
 
         {/* Live Server Connection Status + Log Out Button */}
         <div className="flex items-center space-x-2 shrink-0">
-          <div
-            className={`px-3 py-1.5 rounded-xl border font-mono text-xs font-semibold flex items-center space-x-2 ${
+            {/* Centralized Backend Sync Status Pill */}
+          <button
+            onClick={refreshBackendStatus}
+            type="button"
+            className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-full text-xs font-mono font-semibold transition-all cursor-pointer border shadow-xs ${
               backendStatus?.reachable
-                ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300'
-                : 'bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-800 text-amber-700 dark:text-amber-300'
+                ? 'bg-emerald-50/90 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border-emerald-300/80 dark:border-emerald-800/70 hover:bg-emerald-100/80 dark:hover:bg-emerald-900/60'
+                : 'bg-rose-50/90 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 border-rose-300/80 dark:border-rose-800/70 hover:bg-rose-100/80 dark:hover:bg-rose-900/60'
             }`}
+            title={
+              backendStatus?.reachable
+                ? `Backend Synced (${backendStatus.latencyMs ? `${backendStatus.latencyMs}ms` : 'Online'}) · Click to refresh`
+                : 'Backend Disconnected · Click to test / reconnect'
+            }
           >
             <span
-              className={`w-2 h-2 rounded-full ${
-                backendStatus?.reachable ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'
+              className={`w-2 h-2 rounded-full shrink-0 ${
+                backendStatus?.reachable
+                  ? 'bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.7)] animate-pulse'
+                  : 'bg-rose-500 shadow-[0_0_6px_rgba(244,63,94,0.7)]'
               }`}
             />
-            <span>{backendStatus?.reachable ? `ONLINE (${backendStatus.latencyMs}ms)` : 'STANDALONE'}</span>
-          </div>
+            <span className="hidden sm:inline">
+              {backendStatus?.reachable ? 'Backend Synced' : 'Backend Offline'}
+            </span>
+            <span className="inline sm:hidden">
+              {backendStatus?.reachable ? 'Synced' : 'Offline'}
+            </span>
+          </button>
 
           <button
             onClick={handlePing}
@@ -950,22 +982,22 @@ export const DeveloperPage: React.FC = () => {
 
                 <button
                   type="button"
+                  onClick={handleExportOfflineDiagnostics}
+                  className="px-2 py-1.5 text-[11px] font-mono rounded-lg bg-amber-900/60 hover:bg-amber-800/60 text-amber-200 flex items-center space-x-1 transition-colors cursor-pointer"
+                  title="Save local offline backend diagnostics report"
+                >
+                  <Download className="w-3 h-3" />
+                  <span className="hidden sm:inline">Offline Log</span>
+                </button>
+
+                <button
+                  type="button"
                   onClick={handleExportJson}
                   className="px-2 py-1.5 text-[11px] font-mono rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center space-x-1 transition-colors cursor-pointer"
                   title="Copy full diagnostic report as JSON"
                 >
                   {copiedKey === 'export-json' ? <Check className="w-3 h-3 text-emerald-400" /> : <Download className="w-3 h-3" />}
                   <span className="hidden sm:inline">{copiedKey === 'export-json' ? 'Copied' : 'JSON'}</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleExportText}
-                  className="px-2 py-1.5 text-[11px] font-mono rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center space-x-1 transition-colors cursor-pointer"
-                  title="Copy full diagnostic report as text"
-                >
-                  {copiedKey === 'export-text' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                  <span className="hidden sm:inline">{copiedKey === 'export-text' ? 'Copied' : 'Text'}</span>
                 </button>
 
                 <button

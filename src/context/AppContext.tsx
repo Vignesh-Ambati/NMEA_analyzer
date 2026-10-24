@@ -126,7 +126,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   // Backend integration state
   const [routeToBackend, setRouteToBackend] = useState<boolean>(() => {
     try {
-      return localStorage.getItem('nmea_route_to_backend') === 'true';
+      localStorage.removeItem('nmea_route_to_backend');
+      return false;
     } catch {
       return false;
     }
@@ -159,8 +160,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   // Default to light theme for clean look, with dark theme available
   const [theme, setTheme] = useState<ThemeMode>(() => {
     try {
-      const saved = localStorage.getItem('nmea_theme_mode');
-      if (saved === 'dark' || saved === 'light') return saved;
+      localStorage.removeItem('nmea_theme_mode');
     } catch {
       // ignore
     }
@@ -173,10 +173,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   // Sidebar minimize state (persisted)
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
     try {
-      return localStorage.getItem('nmea_sidebar_collapsed') === 'true';
+      localStorage.removeItem('nmea_sidebar_collapsed');
     } catch {
-      return false;
+      // ignore
     }
+    return false;
   });
 
   const toggleSidebar = useCallback(() => {
@@ -194,10 +195,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   // 7-Click Secret Developer Mode Unlock state
   const [devUnlocked, setDevUnlocked] = useState<boolean>(() => {
     try {
-      return localStorage.getItem('nmea_dev_unlocked') === 'true';
+      localStorage.removeItem('nmea_dev_unlocked');
     } catch {
-      return false;
+      // ignore
     }
+    return false;
   });
   const [devClickCount, setDevClickCount] = useState<number>(0);
   const [devToastMessage, setDevToastMessage] = useState<string | null>(null);
@@ -260,7 +262,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   // Developer state
   const [isDevModalOpen, setIsDevModalOpen] = useState<boolean>(false);
   const [isDevAuthenticated, setIsDevAuthenticated] = useState<boolean>(false);
-  const [devPasscode, setDevPasscode] = useState<string>('7788');
+  const [devPasscode, setDevPasscode] = useState<string>('');
 
   // Engineering Tuning Parameters
   const [batchSize, setBatchSize] = useState<number>(500);

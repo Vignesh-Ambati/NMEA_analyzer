@@ -28,20 +28,50 @@ export interface AppLogEntry {
   durationMs?: number;
 }
 
+export interface OfflineDiagnosticEntry {
+  id: string;
+  timestamp: string;
+  uiAction: string;
+  route?: string;
+  method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
+  backendUrl?: string;
+  statusCode?: number;
+  statusText?: string;
+  level: LogLevel;
+  message: string;
+  error?: string;
+  payload?: any;
+  fallbackAction?: string;
+  notes?: string;
+}
+
 export type LogSubscriber = (entry: AppLogEntry, allLogs: AppLogEntry[]) => void;
 
 const MAX_LOGS = 1000;
 const STORAGE_KEY = 'nmea_diagnostic_logs';
+const OFFLINE_STORAGE_KEY = 'nmea_offline_diagnostics';
 
 class DiagnosticLogger {
   private logs: AppLogEntry[] = [];
+  private offlineDiagnostics: OfflineDiagnosticEntry[] = [];
   private subscribers: Set<LogSubscriber> = new Set();
   private isAutoPollActive = false;
   private pollIntervalRef: any = null;
 
   constructor() {
-    this.loadPersistedLogs();
-    this.system('Diagnostic Logger initialized and ready');
+    this.clearPersistedDiagnostics();
+    this.logs = [];
+    this.offlineDiagnostics = [];
+    this.system('Diagnostic Logger initialized in clean session');
+  }
+
+  private clearPersistedDiagnostics(): void {
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(OFFLINE_STORAGE_KEY);
+    } catch {
+      // ignore
+    }
   }
 
   private formatTime(date: Date = new Date()): string {
@@ -53,26 +83,123 @@ class DiagnosticLogger {
   }
 
   private loadPersistedLogs(): void {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) {
-          this.logs = parsed.slice(-MAX_LOGS);
-        }
-      }
-    } catch {
-      this.logs = [];
-    }
+    // Intentionally do not restore prior browser data so each dev session starts fresh.
+    this.logs = [];
+  }
+
+  private loadPersistedOfflineDiagnostics(): void {
+    // Intentionally do not restore prior browser data so each dev session starts fresh.
+    this.offlineDiagnostics = [];
   }
 
   private persistLogs(): void {
     try {
-      // Save last 300 logs to prevent exceeding localStorage quotas
       const slice = this.logs.slice(-300);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(slice));
     } catch {
       // ignore storage quota errors
+    }
+  }
+
+  private persistOfflineDiagnostics(): void {
+    try {
+      const slice = this.offlineDiagnostics.slice(-250);
+      localStorage.setItem(OFFLINE_STORAGE_KEY, JSON.stringify(slice));
+    } catch {
+      // ignore storage quota errors
+    }
+  }
+
+  public recordOfflineDiagnostic(entry: Omit<OfflineDiagnosticEntry, 'id' | 'timestamp'>): OfflineDiagnosticEntry {
+    const now = new Date();
+    const fullEntry: OfflineDiagnosticEntry = {
+      ...entry,
+      id: `offline-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      timestamp: now.toISOString(),
+    };
+
+    this.offlineDiagnostics.push(fullEntry);
+    if (this.offlineDiagnostics.length > 250) {
+      this.offlineDiagnostics.shift();
+    }
+
+    this.persistOfflineDiagnostics();
+
+    this.log({
+      source: 'client',
+      stage: 'network',
+      level: entry.level || 'error',
+      message: entry.message || `Offline backend issue: ${entry.uiAction}`,
+      details: {
+        uiAction: entry.uiAction,
+        route: entry.route,
+        method: entry.method,
+        backendUrl: entry.backendUrl,
+        statusCode: entry.statusCode,
+        statusText: entry.statusText,
+        error: entry.error,
+        payload: entry.payload,
+        fallbackAction: entry.fallbackAction,
+        notes: entry.notes,
+      },
+    });
+
+    return fullEntry;
+  }
+
+  public getOfflineDiagnostics(): OfflineDiagnosticEntry[] {
+    return [...this.offlineDiagnostics];
+  }
+
+  public exportOfflineDiagnostics(): string {
+    return JSON.stringify({
+      generatedAt: new Date().toISOString(),
+      total: this.offlineDiagnostics.length,
+      entries: this.offlineDiagnostics,
+    }, null, 2);
+  }
+
+  public async saveOfflineDiagnosticsToFile(filename: string = 'offline-debug.json'): Promise<{ success: boolean; fileName?: string; error?: string }> {
+    const report = this.exportOfflineDiagnostics();
+    const blob = new Blob([report], { type: 'application/json' });
+    const safeFileName = (filename || 'offline-debug.json').replace(/[\\/]+/g, '').replace(/^\.+/, '');
+
+    try {
+      if ('showSaveFilePicker' in window && typeof window.showSaveFilePicker === 'function') {
+        const handle = await window.showSaveFilePicker({
+          suggestedName: safeFileName,
+          types: [{
+            description: 'JSON Diagnostics',
+            accept: { 'application/json': ['.json'] },
+          }],
+        });
+        const writable = await handle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+        return { success: true, fileName: safeFileName };
+      }
+
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = safeFileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      return { success: true, fileName: safeFileName };
+    } catch (err: any) {
+      const message = err?.message || 'Unable to save offline diagnostics';
+      this.recordOfflineDiagnostic({
+        uiAction: 'save_offline_report',
+        route: '/ui/logs',
+        method: 'POST',
+        level: 'warn',
+        message: 'Offline diagnostics export failed',
+        error: message,
+        fallbackAction: 'Browser file export fallback was cancelled or unsupported',
+      });
+      return { success: false, error: message };
     }
   }
 
@@ -95,7 +222,6 @@ class DiagnosticLogger {
 
     this.persistLogs();
 
-    // Notify subscribers
     this.subscribers.forEach((sub) => {
       try {
         sub(fullEntry, this.logs);
@@ -194,8 +320,10 @@ class DiagnosticLogger {
    */
   public clear(): void {
     this.logs = [];
+    this.offlineDiagnostics = [];
     try {
       localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(OFFLINE_STORAGE_KEY);
     } catch {
       // ignore
     }
@@ -209,7 +337,7 @@ class DiagnosticLogger {
     const startTime = performance.now();
     try {
       this.network('Querying backend server logs (GET /api/dev/logs)...', 'debug');
-      
+
       const response = await apiClient.get('/dev/logs');
       const duration = Math.round(performance.now() - startTime);
 
@@ -234,6 +362,16 @@ class DiagnosticLogger {
           error: response.error,
           hint: 'Ensure FastAPI daemon is running with endpoint GET /api/dev/logs',
         });
+        this.recordOfflineDiagnostic({
+          uiAction: 'fetch_backend_logs',
+          route: '/dev/logs',
+          method: 'GET',
+          statusCode: response.statusCode,
+          level: 'warn',
+          message: 'Backend log fetch failed while offline or unavailable',
+          error: errMsg,
+          fallbackAction: 'Developer console remains in local-only mode',
+        });
         return { count: 0, error: errMsg };
       }
     } catch (err: any) {
@@ -241,6 +379,16 @@ class DiagnosticLogger {
       this.network(`Failed to query backend logs: ${errMsg}`, 'error', {
         error: errMsg,
         hint: 'Verify backend host and port in Developer Suite',
+      });
+      this.recordOfflineDiagnostic({
+        uiAction: 'fetch_backend_logs',
+        route: '/dev/logs',
+        method: 'GET',
+        statusCode: 0,
+        level: 'error',
+        message: 'Attempt to query backend logs failed',
+        error: errMsg,
+        fallbackAction: 'No backend log polling available in offline mode',
       });
       return { count: 0, error: errMsg };
     }

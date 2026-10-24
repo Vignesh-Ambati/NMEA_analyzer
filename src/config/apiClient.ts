@@ -102,6 +102,20 @@ class CentralizedApiClient {
         durationMs,
       }, durationMs);
 
+      logger.recordOfflineDiagnostic({
+        uiAction: `api_get_${endpoint.replace(/\W+/g, '_') || 'root'}`,
+        route: endpoint,
+        method: 'GET',
+        backendUrl: url.toString(),
+        statusCode: 0,
+        level: 'error',
+        message: `GET ${endpoint} failed while backend was unreachable`,
+        error: errMsg,
+        payload: params,
+        fallbackAction: 'UI kept running in offline-safe fallback mode',
+        notes: 'This was captured while backend was offline or refusing the connection.',
+      });
+
       return {
         success: false,
         error: errMsg,
@@ -172,6 +186,20 @@ class CentralizedApiClient {
         error: errMsg,
         durationMs,
       }, durationMs);
+
+      logger.recordOfflineDiagnostic({
+        uiAction: `api_post_${endpoint.replace(/\W+/g, '_') || 'root'}`,
+        route: endpoint,
+        method: 'POST',
+        backendUrl: url,
+        statusCode: 0,
+        level: 'error',
+        message: `POST ${endpoint} failed while backend was unreachable`,
+        error: errMsg,
+        payload: body,
+        fallbackAction: 'UI stored the request locally and waited for backend recovery',
+        notes: 'This was captured during a failed POST request when the backend was unavailable.',
+      });
 
       return {
         success: false,
@@ -246,6 +274,19 @@ class CentralizedApiClient {
         latencyMs,
         target: `${rootUrl}${ENDPOINTS.HEALTH}`,
       }, latencyMs);
+
+      logger.recordOfflineDiagnostic({
+        uiAction: 'backend_health_check',
+        route: ENDPOINTS.HEALTH,
+        method: 'GET',
+        backendUrl: `${rootUrl}${ENDPOINTS.HEALTH}`,
+        statusCode: 0,
+        level: 'warn',
+        message: 'Backend health check failed because the service was offline',
+        error: errMsg,
+        fallbackAction: 'Frontend switched to offline-safe UI mode and kept local diagnostics',
+        notes: 'This status is logged automatically when the backend cannot be reached.',
+      });
 
       return {
         reachable: false,

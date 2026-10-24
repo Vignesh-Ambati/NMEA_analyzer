@@ -17,27 +17,26 @@ export interface BackendConfig {
 const STORAGE_KEY = 'nmea_centralized_backend_config';
 
 /**
- * Resolve default configuration using environment variables or current window location
+ * Resolve default configuration using environment variables or local Vite defaults.
  */
 const getDefaultConfig = (): BackendConfig => {
   const metaEnv = ((import.meta as any).env || {}) as Record<string, string | undefined>;
   const envProtocol = (metaEnv.VITE_BACKEND_PROTOCOL || '').toLowerCase();
   const envHost = metaEnv.VITE_BACKEND_HOST;
-  const envPort = metaEnv.VITE_BACKEND_PORT;
-  const envApiPrefix = metaEnv.VITE_API_BASE_URL;
+  const envPort = metaEnv.VITE_BACKEND_PORT || '8000';
+  const envApiPrefix = metaEnv.VITE_API_BASE_URL || '/api';
   const envWsProtocol = (metaEnv.VITE_WS_PROTOCOL || '').toLowerCase();
 
   const isBrowser = typeof window !== 'undefined';
   const defaultProtocol = envProtocol === 'https' ? 'https' : (isBrowser && window.location.protocol === 'https:' ? 'https' : 'http');
-  const defaultHost = envHost || (isBrowser ? window.location.hostname : 'localhost');
-  const defaultPort = envPort || (isBrowser && window.location.port ? window.location.port : '3000');
+  const defaultHost = envHost || (isBrowser ? window.location.hostname : '127.0.0.1');
   const defaultWsProtocol = envWsProtocol === 'wss' ? 'wss' : (defaultProtocol === 'https' ? 'wss' : 'ws');
 
   return {
     protocol: defaultProtocol,
-    host: defaultHost || 'localhost',
-    port: defaultPort,
-    apiPrefix: envApiPrefix || '/api',
+    host: defaultHost || '127.0.0.1',
+    port: envPort,
+    apiPrefix: envApiPrefix,
     wsProtocol: defaultWsProtocol,
     timeoutMs: 15000,
   };
@@ -51,16 +50,9 @@ export const loadBackendConfig = (): BackendConfig => {
   if (typeof window === 'undefined') return defaults;
 
   try {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      return {
-        ...defaults,
-        ...parsed,
-      };
-    }
+    localStorage.removeItem(STORAGE_KEY);
   } catch {
-    // ignore parse errors
+    // ignore
   }
 
   return defaults;

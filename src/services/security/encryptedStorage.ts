@@ -6,6 +6,7 @@
  */
 
 const SALT_KEY = 'NMEA_SEC_VAULT_v1';
+const APP_STORAGE_PREFIXES = ['_enc_', 'nmea_'];
 
 function xorCipher(text: string, key: string): string {
   let result = '';
@@ -44,6 +45,22 @@ export const encryptedStorage = {
       localStorage.removeItem(`_enc_${key}`);
     } catch {
       // fallback
+    }
+  },
+
+  clearAllAppState(): void {
+    try {
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (!key) continue;
+        if (APP_STORAGE_PREFIXES.some((prefix) => key.startsWith(prefix))) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach((key) => localStorage.removeItem(key));
+    } catch {
+      // ignore
     }
   }
 };

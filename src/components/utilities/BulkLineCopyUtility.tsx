@@ -190,9 +190,6 @@ export const BulkLineCopyUtility: React.FC = () => {
             <h3 className="text-lg font-bold text-[#24211D] dark:text-slate-100">
               Data Extractor Pro
             </h3>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-orange-100 dark:bg-orange-950/60 text-[#E05318] font-bold">
-              PRO UTILITY
-            </span>
           </div>
           <p className="text-xs text-[#736E65] dark:text-slate-400 mt-1">
             High-Performance Regex & Line Extraction Engine

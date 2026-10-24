@@ -160,11 +160,8 @@ export const Header: React.FC<HeaderProps> = ({ setMobileOpen }) => {
               <Wrench className="w-3.5 h-3.5" />
             </div>
             <div className="flex items-center space-x-2 min-w-0">
-              <span className="text-xs font-bold text-[#24211D] dark:text-slate-100 tracking-tight">
+              <span className="text-s font-bold text-[#24211D] dark:text-slate-100 tracking-tight">
                 Standard Utilities
-              </span>
-              <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-100/80 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-200/60 dark:border-amber-800/40">
-                Data Extractor Pro · Time · UTC ⇋ IST
               </span>
             </div>
           </div>
@@ -177,11 +174,8 @@ export const Header: React.FC<HeaderProps> = ({ setMobileOpen }) => {
               <BookOpen className="w-3.5 h-3.5" />
             </div>
             <div className="flex items-center space-x-2 min-w-0">
-              <span className="text-xs font-bold text-[#24211D] dark:text-slate-100 tracking-tight">
+              <span className="text-s font-bold text-[#24211D] dark:text-slate-100 tracking-tight">
                 Protocol & Sentence Guide
-              </span>
-              <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-100/80 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/40">
-                NMEA 0183 & UBX Reference
               </span>
             </div>
           </div>
@@ -194,11 +188,8 @@ export const Header: React.FC<HeaderProps> = ({ setMobileOpen }) => {
               <Code2 className="w-3.5 h-3.5" />
             </div>
             <div className="flex items-center space-x-2 min-w-0">
-              <span className="text-xs font-bold text-[#24211D] dark:text-slate-100 tracking-tight">
+              <span className="text-s font-bold text-[#24211D] dark:text-slate-100 tracking-tight">
                 Developer Suite
-              </span>
-              <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-sky-100/80 dark:bg-sky-950/60 text-sky-800 dark:text-sky-300 border border-sky-200/60 dark:border-sky-800/40">
-                Backend · Telemetry · Engine
               </span>
             </div>
           </div>
@@ -207,37 +198,6 @@ export const Header: React.FC<HeaderProps> = ({ setMobileOpen }) => {
 
       {/* RIGHT SECTION: Telemetry Counter Pill + Curved Controls */}
       <div className="flex items-center space-x-2 sm:space-x-3 shrink-0">
-        
-        {/* Centralized Backend Sync Status Pill */}
-        <button
-          onClick={refreshBackendStatus}
-          type="button"
-          className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-full text-xs font-mono font-semibold transition-all cursor-pointer border shadow-xs ${
-            backendStatus?.reachable
-              ? 'bg-emerald-50/90 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border-emerald-300/80 dark:border-emerald-800/70 hover:bg-emerald-100/80 dark:hover:bg-emerald-900/60'
-              : 'bg-rose-50/90 dark:bg-rose-950/40 text-rose-700 dark:text-rose-400 border-rose-300/80 dark:border-rose-800/70 hover:bg-rose-100/80 dark:hover:bg-rose-900/60'
-          }`}
-          title={
-            backendStatus?.reachable
-              ? `Backend Synced (${backendStatus.latencyMs ? `${backendStatus.latencyMs}ms` : 'Online'}) · Click to refresh`
-              : 'Backend Disconnected · Click to test / reconnect'
-          }
-        >
-          <span
-            className={`w-2 h-2 rounded-full shrink-0 ${
-              backendStatus?.reachable
-                ? 'bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.7)] animate-pulse'
-                : 'bg-rose-500 shadow-[0_0_6px_rgba(244,63,94,0.7)]'
-            }`}
-          />
-          <span className="hidden sm:inline">
-            {backendStatus?.reachable ? 'Backend Synced' : 'Backend Offline'}
-          </span>
-          <span className="inline sm:hidden">
-            {backendStatus?.reachable ? 'Synced' : 'Offline'}
-          </span>
-        </button>
-
         {/* Active Telemetry Dataset Pill (ONLY on workflow pages when datasets exist) */}
         {isWorkflowPage && hasFiles && (
           <button
