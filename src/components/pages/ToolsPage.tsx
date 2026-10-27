@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
 import { Clock, ArrowRightLeft, FileText, Wrench } from 'lucide-react';
-import { UtilityConfig, UtilityId } from '../utilities/types';
-import { TimeDifferenceCalculator } from '../utilities/TimeDifferenceCalculator';
-import { UtcIstConverter } from '../utilities/UtcIstConverter';
-import { BulkLineCopyUtility } from '../utilities/BulkLineCopyUtility';
+import {
+  UtilityConfig,
+  UtilityId,
+  TimeDifferenceCalculator,
+  UtcIstConverter,
+  BulkLineCopyUtility,
+} from '../../utilities';
 
 const UTILITIES_CONFIG: UtilityConfig[] = [
   {
@@ -76,7 +79,6 @@ export const ToolsPage: React.FC = () => {
         >
           All Utilities
         </button>
-
         <button
           onClick={() => setActiveTab('timediff')}
           type="button"
@@ -88,7 +90,6 @@ export const ToolsPage: React.FC = () => {
         >
           Time Difference
         </button>
-
         <button
           onClick={() => setActiveTab('utc_ist')}
           type="button"
@@ -100,7 +101,6 @@ export const ToolsPage: React.FC = () => {
         >
           UTC &harr; IST Converter
         </button>
-
         <button
           onClick={() => setActiveTab('linecopy')}
           type="button"
@@ -134,7 +134,6 @@ export const ToolsPage: React.FC = () => {
                       Open Tool
                     </span>
                   </div>
-
                   <div className="flex items-start space-x-3.5">
                     <div className="w-10 h-10 rounded-xl bg-[#FDF3EE] dark:bg-orange-950/40 border border-orange-200/60 dark:border-orange-900/40 text-[#E05318] flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
                       <IconComponent className="w-5 h-5" />

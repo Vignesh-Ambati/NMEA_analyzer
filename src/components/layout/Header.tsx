@@ -65,7 +65,7 @@ export const Header: React.FC<HeaderProps> = ({ setMobileOpen }) => {
   const canGoForward = hasFiles && (currentPage === 'file' || currentPage === 'task');
   const isWorkflowPage = currentPage === 'file' || currentPage === 'task' || currentPage === 'graph';
 
-  const totalSentences = files.reduce((acc, f) => acc + f.totalSentences, 0);
+  const totalSentences = files.reduce((acc, f) => acc + (f.totalSentences || 0), 0);
 
   return (
     <header className="h-16 px-3 sm:px-6 bg-[#FAF8F5]/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-[#E6E1D6] dark:border-slate-800 flex items-center justify-between shrink-0 select-none z-30 transition-colors">

@@ -8,7 +8,7 @@
  *   "14:11:05.00"
  */
 
-import { ParsedGnssTime } from '../types';
+import { ParsedGnssTime } from './types';
 export type { ParsedGnssTime };
 
 export function parseGnssTimeInput(input: string): ParsedGnssTime {

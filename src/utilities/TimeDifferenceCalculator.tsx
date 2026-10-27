@@ -41,6 +41,7 @@ export const TimeDifferenceCalculator: React.FC = () => {
       setResult(null);
       return;
     }
+
     if (!p2.isValid) {
       setError(`End Time Error: ${p2.errorMessage || 'Invalid input'}`);
       setResult(null);
@@ -51,6 +52,7 @@ export const TimeDifferenceCalculator: React.FC = () => {
     if (p1.hasDate && p2.hasDate && p1.timestampMs !== undefined && p2.timestampMs !== undefined) {
       const diffMs = Math.abs(p2.timestampMs - p1.timestampMs);
       const totalSec = diffMs / 1000;
+
       const days = Math.floor(totalSec / 86400);
       const hours = Math.floor((totalSec % 86400) / 3600);
       const minutes = Math.floor((totalSec % 3600) / 60);
@@ -74,12 +76,7 @@ export const TimeDifferenceCalculator: React.FC = () => {
         isDateCompared: true,
       });
     } else {
-      // Time-only comparison (or one date missing)
-      let diffSec = p2.totalSecondsOfDay - p1.totalSecondsOfDay;
-      if (diffSec < 0) {
-        diffSec = Math.abs(diffSec);
-      }
-
+      const diffSec = Math.abs(p2.totalSecondsOfDay - p1.totalSecondsOfDay);
       const hours = Math.floor(diffSec / 3600);
       const minutes = Math.floor((diffSec % 3600) / 60);
       const seconds = (diffSec % 60).toFixed(3);
@@ -120,7 +117,6 @@ export const TimeDifferenceCalculator: React.FC = () => {
             <h3 className="text-base font-bold text-[#24211D] dark:text-slate-100">
               Time Difference Calculator
             </h3>
-
             {/* Modern Info button with hover popover */}
             <div className="relative group inline-flex items-center">
               <button
@@ -130,7 +126,6 @@ export const TimeDifferenceCalculator: React.FC = () => {
               >
                 <Info className="w-3.5 h-3.5" />
               </button>
-
               {/* Hover Info Tooltip */}
               <div className="absolute left-0 sm:left-1/2 sm:-translate-x-1/2 top-full mt-2 hidden group-hover:block z-50 w-72 sm:w-80 p-3 rounded-xl bg-[#FAF8F5] dark:bg-slate-900 border border-[#E6E1D6] dark:border-slate-800 shadow-xl text-xs text-[#24211D] dark:text-slate-200 pointer-events-none">
                 <div className="font-semibold text-[#E05318] mb-1">Time Difference Calculator</div>
@@ -140,13 +135,11 @@ export const TimeDifferenceCalculator: React.FC = () => {
               </div>
             </div>
           </div>
-
           {/* Exactly 1-line tag below Utility Name */}
           <p className="text-xs text-[#736E65] dark:text-slate-400 mt-1 truncate">
             Calculate duration and elapsed seconds between two GNSS timestamps.
           </p>
         </div>
-
         {/* Reset Button (Styled as a real button) */}
         <button
           type="button"

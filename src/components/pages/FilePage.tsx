@@ -168,7 +168,7 @@ export const FilePage: React.FC = () => {
                         {file.filename}
                       </div>
                       <div className="text-[11px] text-[#736E65] dark:text-slate-400 font-mono mt-0.5 truncate">
-                        {file.totalSentences.toLocaleString()} sentences · {file.epochs.length} epochs · {(file.fileSize / 1024).toFixed(0)} KB
+                        {(file.totalSentences || 0).toLocaleString()} sentences · {((file.fileSize || 0) / 1024).toFixed(0)} KB
                       </div>
                     </div>
                   </div>

@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { PageType, ParsedLogFile, ThemeMode } from '../types/nmea';
+import { PageType, ParsedLogFile, ThemeMode } from '../types';
 import { logger } from '../services/logger';
+import { checkBackendHealth, getBackendPingIntervalMs } from '../backend';
 
 export interface ConsoleMessage {
   id: string;
@@ -8,7 +9,7 @@ export interface ConsoleMessage {
   text: string;
   level: 'info' | 'warn' | 'error' | 'debug' | 'success';
   stage?: string;
-  source?: 'client' | 'backend';
+  source?: 'client';
   details?: any;
   durationMs?: number;
 }
@@ -69,7 +70,7 @@ interface AppContextType {
   addLog: (
     text: string,
     level?: 'info' | 'warn' | 'error' | 'debug' | 'success',
-    stage?: 'ingestion' | 'network' | 'tasks' | 'charts' | 'developer' | 'backend' | 'system',
+    stage?: 'ingestion' | 'network' | 'tasks' | 'charts' | 'developer' | 'system',
     details?: any
   ) => void;
   clearLogs: () => void;
@@ -86,6 +87,12 @@ interface AppContextType {
 
   hasProceededToTasks: boolean;
   proceedToTaskMatrix: () => void;
+
+  backendStatus: 'online' | 'offline' | 'checking';
+  isCheckingBackend: boolean;
+  lastBackendPingTime: string | null;
+  backendLatencyMs: number | null;
+  pingBackend: () => Promise<boolean>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -106,6 +113,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [debugMode, setDebugMode] = useState<boolean>(false);
   const [isFullpage, setIsFullpage] = useState<boolean>(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
+
+  // Backend status and ping state
+  const [backendStatus, setBackendStatus] = useState<'online' | 'offline' | 'checking'>('checking');
+  const [isCheckingBackend, setIsCheckingBackend] = useState<boolean>(false);
+  const [lastBackendPingTime, setLastBackendPingTime] = useState<string | null>(null);
+  const [backendLatencyMs, setBackendLatencyMs] = useState<number | null>(null);
 
   const toggleSidebar = useCallback(() => {
     setSidebarCollapsed((prev) => {
@@ -219,7 +232,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     (
       text: string,
       level: 'info' | 'warn' | 'error' | 'debug' | 'success' = 'info',
-      stage: 'ingestion' | 'network' | 'tasks' | 'charts' | 'developer' | 'backend' | 'system' = 'system',
+      stage: 'ingestion' | 'network' | 'tasks' | 'charts' | 'developer' | 'system' = 'system',
       details?: any
     ) => {
       logger.log({
@@ -361,6 +374,48 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setCurrentPage('developer');
   }, []);
 
+  const pingBackend = useCallback(async (): Promise<boolean> => {
+    setIsCheckingBackend(true);
+    setBackendStatus((prev) => (prev === 'online' ? 'online' : 'checking'));
+
+    const result = await checkBackendHealth();
+
+    setIsCheckingBackend(false);
+    setBackendStatus(result.online ? 'online' : 'offline');
+    setLastBackendPingTime(result.checkedAt);
+    setBackendLatencyMs(result.latencyMs);
+
+    if (result.online) {
+      addLog(
+        `Backend ping check: ONLINE (${result.latencyMs}ms) at ${result.url}`,
+        'success',
+        'network',
+        { latencyMs: result.latencyMs, data: result.data }
+      );
+    } else {
+      addLog(
+        `Backend ping check: OFFLINE (${result.error}) at ${result.url}`,
+        'warn',
+        'network',
+        { error: result.error, latencyMs: result.latencyMs }
+      );
+    }
+
+    return result.online;
+  }, [addLog]);
+
+  // Periodic automatic async ping every 30 minutes (and immediate check on mount)
+  useEffect(() => {
+    pingBackend();
+
+    const intervalMs = getBackendPingIntervalMs();
+    const intervalTimer = setInterval(() => {
+      pingBackend();
+    }, intervalMs);
+
+    return () => clearInterval(intervalTimer);
+  }, [pingBackend]);
+
   return (
     <AppContext.Provider
       value={{
@@ -442,6 +497,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         devToastMessage,
         hasProceededToTasks: files.length > 0,
         proceedToTaskMatrix: navigateToTaskPage,
+
+        backendStatus,
+        isCheckingBackend,
+        lastBackendPingTime,
+        backendLatencyMs,
+        pingBackend,
       }}
     >
       {children}

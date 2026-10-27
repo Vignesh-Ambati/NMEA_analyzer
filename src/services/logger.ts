@@ -11,14 +11,14 @@
  * and exportable diagnostics available directly in Developer Suite.
  */
 
-export type LogStage = 'ingestion' | 'network' | 'tasks' | 'charts' | 'developer' | 'backend' | 'system';
+export type LogStage = 'ingestion' | 'network' | 'tasks' | 'charts' | 'developer' | 'system';
 export type LogLevel = 'info' | 'warn' | 'error' | 'debug' | 'success';
 
 export interface AppLogEntry {
   id: string;
   timestamp: string;
   isoDate: string;
-  source: 'client' | 'backend';
+  source: 'client';
   stage: LogStage;
   level: LogLevel;
   message: string;
@@ -32,7 +32,6 @@ export interface OfflineDiagnosticEntry {
   uiAction: string;
   route?: string;
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
-  backendUrl?: string;
   statusCode?: number;
   statusText?: string;
   level: LogLevel;
@@ -88,7 +87,6 @@ class DiagnosticLogger {
         uiAction: entry.uiAction,
         route: entry.route,
         method: entry.method,
-        backendUrl: entry.backendUrl,
         statusCode: entry.statusCode,
         statusText: entry.statusText,
         error: entry.error,
@@ -231,7 +229,7 @@ class DiagnosticLogger {
   }
 
   public backend(message: string, level: LogLevel = 'info', details?: any, durationMs?: number): AppLogEntry {
-    return this.log({ source: 'client', stage: 'backend', level, message, details, durationMs });
+    return this.log({ source: 'client', stage: 'network', level, message, details, durationMs });
   }
 }
 

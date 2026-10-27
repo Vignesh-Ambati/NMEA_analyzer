@@ -50,10 +50,3 @@ export interface TimezoneConvertResult {
   outputDate?: string;
   dayShift: -1 | 0 | 1;
 }
-
-export interface SlicedLineResult {
-  lines: string[];
-  totalInputLines: number;
-  matchedCount: number;
-  removedChecksumsCount: number;
-}

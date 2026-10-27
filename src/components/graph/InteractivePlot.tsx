@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
-import { PlotDataPoint, SeriesData } from '../../types/nmea';
+import { PlotDataPoint, SeriesData } from '../../types';
 
 interface InteractivePlotProps {
   series: SeriesData[];

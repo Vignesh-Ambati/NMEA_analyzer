@@ -22,7 +22,7 @@ import {
   Activity,
 } from "lucide-react";
 import { logger } from "../../services/logger";
-import { encryptedStorage } from "../../services/security/encryptedStorage";
+import { getApiUrl, ENDPOINTS } from "../../backend";
 
 export const DeveloperPage: React.FC = () => {
   const {
@@ -42,6 +42,11 @@ export const DeveloperPage: React.FC = () => {
     isDevAuthenticated,
     authenticateDev,
     navigateToFilePage,
+    backendStatus,
+    isCheckingBackend,
+    lastBackendPingTime,
+    backendLatencyMs,
+    pingBackend,
   } = useApp();
 
   // Authentication Screen State
@@ -50,7 +55,7 @@ export const DeveloperPage: React.FC = () => {
   const [authError, setAuthError] = useState<string | null>(null);
   const [isVerifyingAuth, setIsVerifyingAuth] = useState<boolean>(false);
 
-  // Authenticated Workspace State (2 tabs: 'backend' | 'engine' | 'logs')
+  // Authenticated Workspace State (2 tabs: 'engine' | 'logs')
   const [activeTab, setActiveTab] = useState<"engine" | "logs">("engine");
 
   // Terminal state
@@ -158,11 +163,15 @@ export const DeveloperPage: React.FC = () => {
   const handleChangePin = (e: React.FormEvent) => {
     e.preventDefault();
     if (newPin.trim().length >= 4) {
-      encryptedStorage.setItem("dev_pin", newPin.trim());
-      setPinChangeMsg(`PIN saved to encrypted vault: ${newPin.trim()}`);
+      try {
+        localStorage.setItem("dev_pin", newPin.trim());
+      } catch {
+        // fallback
+      }
+      setPinChangeMsg(`PIN saved locally: ${newPin.trim()}`);
       setNewPin("");
       addLog(
-        "Developer authorization PIN updated in encrypted storage.",
+        "Developer authorization PIN updated locally.",
         "info",
       );
       setTimeout(() => setPinChangeMsg(null), 3500);
@@ -363,6 +372,56 @@ export const DeveloperPage: React.FC = () => {
                 Adjust the local UI tuning values that remain inside the
                 application state for this session.
               </p>
+            </div>
+
+            {/* Core Backend Connection Status */}
+            <div className="p-4 rounded-xl bg-[#F5F2EB]/90 dark:bg-slate-950 border border-[#E6E1D6] dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center space-x-3 min-w-0">
+                <span
+                  className={`w-3 h-3 rounded-full shrink-0 ${
+                    isCheckingBackend
+                      ? 'bg-amber-400 animate-ping'
+                      : backendStatus === 'online'
+                      ? 'bg-emerald-500 shadow-xs'
+                      : 'bg-rose-500 shadow-xs'
+                  }`}
+                />
+                <div className="min-w-0">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-xs font-bold text-[#24211D] dark:text-slate-100">
+                      Core Backend Service ({getApiUrl(ENDPOINTS.HEALTH)})
+                    </span>
+                    <span
+                      className={`text-[10px] font-mono px-2 py-0.5 rounded-md font-semibold ${
+                        backendStatus === 'online'
+                          ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300'
+                          : isCheckingBackend
+                          ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300'
+                          : 'bg-rose-100 dark:bg-rose-950/60 text-rose-800 dark:text-rose-300'
+                      }`}
+                    >
+                      {isCheckingBackend
+                        ? 'Checking...'
+                        : backendStatus === 'online'
+                        ? 'Online'
+                        : 'Offline'}
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-[#736E65] dark:text-slate-400 font-mono mt-0.5">
+                    Latency: {backendLatencyMs !== null ? `${backendLatencyMs}ms` : 'N/A'} · Last ping: {lastBackendPingTime || 'Never'} · Auto-ping: every 30m
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => pingBackend()}
+                disabled={isCheckingBackend}
+                className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-[#EFEAE1] dark:bg-slate-800 text-[#736E65] dark:text-slate-200 hover:text-[#E05318] hover:bg-[#E5DFD4] dark:hover:bg-slate-700 border border-[#E6E1D6] dark:border-slate-700 shadow-xs flex items-center space-x-1.5 transition-all cursor-pointer shrink-0 self-start sm:self-auto"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isCheckingBackend ? 'animate-spin text-[#E05318]' : ''}`} />
+                <span>{isCheckingBackend ? 'Pinging...' : 'Ping Backend Now'}</span>
+              </button>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

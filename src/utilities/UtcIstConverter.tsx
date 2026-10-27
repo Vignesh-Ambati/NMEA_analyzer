@@ -1,116 +1,111 @@
 import React, { useState } from 'react';
-import { ArrowRightLeft, RotateCcw, AlertCircle, Sparkles, Copy, Check, Info } from 'lucide-react';
-import { parseGnssTimeInput } from './timeParser';
+import { ArrowRightLeft, Sparkles, Copy, Check, RotateCcw, AlertCircle, Info } from 'lucide-react';
+import { parseGnssTimeInput, ParsedGnssTime } from './timeParser';
 
-interface ConversionResult {
-  sourceNmea: string;
-  sourceFormattedTime: string;
-  sourceFormattedDate?: string;
-  hasDate: boolean;
-  targetNmeaTime: string;
+interface ConvertResult {
+  direction: 'utc_to_ist' | 'ist_to_utc';
+  inputParsed: ParsedGnssTime;
   targetFormattedTime: string;
   targetFormattedDate?: string;
-  targetFullNmea?: string;
+  targetFullNmea: string;
+  targetNmeaTime: string;
   dayShiftText: string;
-  direction: 'utc_to_ist' | 'ist_to_utc';
-  unixEpochSec?: number;
+  hasDate: boolean;
 }
 
 export const UtcIstConverter: React.FC = () => {
-  const [inputVal, setInputVal] = useState('');
   const [direction, setDirection] = useState<'utc_to_ist' | 'ist_to_utc'>('utc_to_ist');
-  const [result, setResult] = useState<ConversionResult | null>(null);
+  const [inputVal, setInputVal] = useState('');
+  const [result, setResult] = useState<ConvertResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
   const convertTime = () => {
     setError(null);
     if (!inputVal.trim()) {
-      setError('Please enter a timestamp');
+      setError(`Please enter a valid GNSS timestamp to convert`);
       setResult(null);
       return;
     }
 
     const parsed = parseGnssTimeInput(inputVal);
-
     if (!parsed.isValid) {
-      setError(parsed.errorMessage || 'Invalid input timestamp');
+      setError(parsed.errorMessage || 'Invalid GNSS time format');
       setResult(null);
       return;
     }
 
-    const pad2 = (n: number) => n.toString().padStart(2, '0');
-    const secWhole = Math.floor(parsed.seconds);
-    const secDec = parsed.seconds % 1;
-    const secDecStr = secDec > 0 ? secDec.toFixed(2).substring(1) : (parsed.rawSecondsStr.includes('.') ? parsed.rawSecondsStr.substring(parsed.rawSecondsStr.indexOf('.')) : '.00');
-    const formattedSec = `${pad2(secWhole)}${secDecStr.padEnd(3, '0')}`;
-
-    const offsetHours = direction === 'utc_to_ist' ? 5.5 : -5.5;
+    const offsetSeconds = 5 * 3600 + 30 * 60; // 5h 30m = 19800 seconds
 
     if (parsed.hasDate && parsed.timestampMs !== undefined) {
-      // Full Date conversion
-      const offsetMs = offsetHours * 3600 * 1000;
-      const targetDate = new Date(parsed.timestampMs + offsetMs);
+      const shiftMs = direction === 'utc_to_ist' ? offsetSeconds * 1000 : -offsetSeconds * 1000;
+      const targetDate = new Date(parsed.timestampMs + shiftMs);
 
-      const targetH = targetDate.getUTCHours();
-      const targetM = targetDate.getUTCMinutes();
-      const targetD = targetDate.getUTCDate();
-      const targetMo = targetDate.getUTCMonth() + 1;
-      const targetY = targetDate.getUTCFullYear();
+      const tHours = targetDate.getUTCHours();
+      const tMinutes = targetDate.getUTCMinutes();
+      const tSeconds = targetDate.getUTCSeconds();
+      const tMilliseconds = targetDate.getUTCMilliseconds();
 
-      const targetFormattedTime = `${pad2(targetH)}:${pad2(targetM)}:${formattedSec}`;
-      const targetNmeaTime = `${pad2(targetH)}${pad2(targetM)}${formattedSec}`;
-      const targetFormattedDate = `${pad2(targetD)}/${pad2(targetMo)}/${targetY}`;
-      const targetFullNmea = `${targetNmeaTime},${pad2(targetD)},${pad2(targetMo)},${targetY}`;
+      const pad = (n: number, z = 2) => String(n).padStart(z, '0');
+      const formattedTime = `${pad(tHours)}:${pad(tMinutes)}:${pad(tSeconds)}.${pad(tMilliseconds, 3)}`;
 
-      // Check day shift
-      let dayShiftText = 'Same Day';
-      if (targetD !== parsed.day) {
-        dayShiftText = direction === 'utc_to_ist' ? '+1 Day (Next Day)' : '-1 Day (Previous Day)';
+      const tDay = targetDate.getUTCDate();
+      const tMonth = targetDate.getUTCMonth() + 1;
+      const tYear = targetDate.getUTCFullYear();
+      const formattedDate = `${pad(tDay)}/${pad(tMonth)}/${tYear}`;
+
+      const nmeaTime = `${pad(tHours)}${pad(tMinutes)}${pad(tSeconds)}.${pad(tMilliseconds, 3)}`;
+      const fullNmea = `${nmeaTime},${pad(tDay)},${pad(tMonth)},${tYear}`;
+
+      const dayDiff = tDay - (parsed.day || tDay);
+      let dayShiftText = 'Same calendar day';
+      if (dayDiff > 0 || (dayDiff < -20 && tMonth > (parsed.month || 1))) {
+        dayShiftText = '+1 Day Rollover (Next Day)';
+      } else if (dayDiff < 0 || (dayDiff > 20 && tMonth < (parsed.month || 1))) {
+        dayShiftText = '-1 Day Rollover (Previous Day)';
       }
 
       setResult({
-        sourceNmea: parsed.nmeaTimeStr + (parsed.nmeaDateStr ? `,${parsed.nmeaDateStr}` : ''),
-        sourceFormattedTime: parsed.formattedTime,
-        sourceFormattedDate: parsed.formattedDate,
-        hasDate: true,
-        targetNmeaTime,
-        targetFormattedTime,
-        targetFormattedDate,
-        targetFullNmea,
-        dayShiftText,
         direction,
-        unixEpochSec: Math.floor(targetDate.getTime() / 1000),
+        inputParsed: parsed,
+        targetFormattedTime: formattedTime,
+        targetFormattedDate: formattedDate,
+        targetFullNmea: fullNmea,
+        targetNmeaTime: nmeaTime,
+        dayShiftText,
+        hasDate: true,
       });
     } else {
-      // Time-only conversion (+5h 30m or -5h 30m)
-      const offsetMinutes = direction === 'utc_to_ist' ? 330 : -330;
-      let totalMinutes = parsed.hours * 60 + parsed.minutes + offsetMinutes;
-
+      const secOfDay = parsed.totalSecondsOfDay;
+      let targetSecOfDay = direction === 'utc_to_ist' ? secOfDay + offsetSeconds : secOfDay - offsetSeconds;
       let dayShiftText = 'Same Day';
-      if (totalMinutes >= 1440) {
-        dayShiftText = '+1 Day (Crosses Midnight)';
-        totalMinutes = totalMinutes % 1440;
-      } else if (totalMinutes < 0) {
-        dayShiftText = '-1 Day (Crosses Midnight)';
-        totalMinutes = (totalMinutes + 1440) % 1440;
+
+      if (targetSecOfDay >= 86400) {
+        targetSecOfDay -= 86400;
+        dayShiftText = '+1 Day (Next Day)';
+      } else if (targetSecOfDay < 0) {
+        targetSecOfDay += 86400;
+        dayShiftText = '-1 Day (Previous Day)';
       }
 
-      const targetH = Math.floor(totalMinutes / 60);
-      const targetM = totalMinutes % 60;
+      const tHours = Math.floor(targetSecOfDay / 3600);
+      const tMinutes = Math.floor((targetSecOfDay % 3600) / 60);
+      const tSecRem = targetSecOfDay % 60;
+      const tSeconds = Math.floor(tSecRem);
+      const frac = (tSecRem - tSeconds).toFixed(2).slice(1);
 
-      const targetFormattedTime = `${pad2(targetH)}:${pad2(targetM)}:${formattedSec}`;
-      const targetNmeaTime = `${pad2(targetH)}${pad2(targetM)}${formattedSec}`;
+      const pad = (n: number) => String(n).padStart(2, '0');
+      const formattedTime = `${pad(tHours)}:${pad(tMinutes)}:${pad(tSeconds)}${frac}`;
+      const nmeaTime = `${pad(tHours)}${pad(tMinutes)}${pad(tSeconds)}${frac}`;
 
       setResult({
-        sourceNmea: parsed.nmeaTimeStr,
-        sourceFormattedTime: parsed.formattedTime,
-        hasDate: false,
-        targetNmeaTime,
-        targetFormattedTime,
-        targetFullNmea: targetNmeaTime,
-        dayShiftText,
         direction,
+        inputParsed: parsed,
+        targetFormattedTime: formattedTime,
+        targetFullNmea: nmeaTime,
+        targetNmeaTime: nmeaTime,
+        dayShiftText,
+        hasDate: false,
       });
     }
   };
@@ -123,8 +118,7 @@ export const UtcIstConverter: React.FC = () => {
 
   const handleCopyTarget = () => {
     if (!result) return;
-    const toCopy = result.targetFullNmea || result.targetFormattedTime;
-    navigator.clipboard.writeText(toCopy);
+    navigator.clipboard.writeText(result.targetFullNmea);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -137,9 +131,8 @@ export const UtcIstConverter: React.FC = () => {
           <div className="flex items-center space-x-2">
             <ArrowRightLeft className="w-4 h-4 text-[#E05318]" />
             <h3 className="text-base font-bold text-[#24211D] dark:text-slate-100">
-              UTC &harr; IST Timezone Converter
+              UTC ⇋ IST Timezone Converter
             </h3>
-
             {/* Modern Info button with hover popover */}
             <div className="relative group inline-flex items-center">
               <button
@@ -149,7 +142,6 @@ export const UtcIstConverter: React.FC = () => {
               >
                 <Info className="w-3.5 h-3.5" />
               </button>
-
               {/* Hover Info Tooltip */}
               <div className="absolute left-0 sm:left-1/2 sm:-translate-x-1/2 top-full mt-2 hidden group-hover:block z-50 w-72 sm:w-80 p-3 rounded-xl bg-[#FAF8F5] dark:bg-slate-900 border border-[#E6E1D6] dark:border-slate-800 shadow-xl text-xs text-[#24211D] dark:text-slate-200 pointer-events-none">
                 <div className="font-semibold text-[#E05318] mb-1">UTC &harr; IST Timezone Converter</div>
@@ -159,13 +151,11 @@ export const UtcIstConverter: React.FC = () => {
               </div>
             </div>
           </div>
-
           {/* Exactly 1-line tag below Utility Name */}
           <p className="text-xs text-[#736E65] dark:text-slate-400 mt-1 truncate">
             Bi-directional conversion between GNSS UTC and IST.
           </p>
         </div>
-
         <div className="flex items-center space-x-2 self-start sm:self-auto">
           {/* Direction Switcher */}
           <div className="flex items-center space-x-1 bg-[#EFEAE1]/70 dark:bg-slate-800 p-1 rounded-xl border border-[#E6E1D6] dark:border-slate-700 text-xs shrink-0">
@@ -198,8 +188,6 @@ export const UtcIstConverter: React.FC = () => {
               IST &rarr; UTC
             </button>
           </div>
-
-          {/* Reset Button (Styled as a real button) */}
         </div>
       </div>
 
@@ -208,7 +196,6 @@ export const UtcIstConverter: React.FC = () => {
         <label className="text-xs font-semibold text-[#24211D] dark:text-slate-200 block">
           {direction === 'utc_to_ist' ? 'Input UTC Timestamp' : 'Input IST Timestamp'}
         </label>
-
         <input
           type="text"
           value={inputVal}
@@ -255,7 +242,6 @@ export const UtcIstConverter: React.FC = () => {
               <Sparkles className="w-3.5 h-3.5" />
               <span>Converted Timezone ({result.direction === 'utc_to_ist' ? 'IST' : 'UTC'})</span>
             </div>
-
             <button
               type="button"
               onClick={handleCopyTarget}
