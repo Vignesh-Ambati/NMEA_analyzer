@@ -2,23 +2,23 @@
 import os
 from typing import Final, List, Set
 
-APP_TITLE: Final[str] = "NMEA Core Processing API"
-APP_VERSION: Final[str] = "1.0.0"
+APP_TITLE: str = "NMEA Core Processing API"
+APP_VERSION: str = "1.0.0"
 
-API_HOST: Final[str] = os.getenv("API_HOST", "127.0.0.1")
+API_HOST: str = os.getenv("API_HOST", "127.0.0.1")
 API_PORT: Final[int] = int(os.getenv("API_PORT", "8000"))
 
-API_PREFIX: Final[str] = "/api"
+API_PREFIX: str = "/api"
 
-ROUTE_HEALTH: Final[str] = "/health"
-ROUTE_DEV_LOGS: Final[str] = "/dev/logs"
-ROUTE_DEV_AUTH: Final[str] = "/dev/auth"
-ROUTE_DEV_SETTINGS: Final[str] = "/dev/settings"
-ROUTE_DEV_ENGINE_PARAMS: Final[str] = "/dev/engine-params"
-ROUTE_NMEA_PARSE: Final[str] = "/nmea/parse"
-ROUTE_NMEA_UPLOAD: Final[str] = "/nmea/upload"
-ROUTE_EXTRACTION_COPY: Final[str] = "/extraction/bulk-line-copy"
-ROUTE_EXTRACTION_STATUS: Final[str] = "/tasks/{task_id}"
+ROUTE_HEALTH: str = "/health"
+ROUTE_DEV_LOGS: str = "/dev/logs"
+ROUTE_DEV_AUTH: str = "/dev/auth"
+ROUTE_DEV_SETTINGS: str = "/dev/settings"
+ROUTE_DEV_ENGINE_PARAMS: str = "/dev/engine-params"
+ROUTE_NMEA_PARSE: str = "/nmea/parse"
+ROUTE_NMEA_UPLOAD: str = "/nmea/upload"
+ROUTE_EXTRACTION_COPY: str = "/extraction/bulk-line-copy"
+ROUTE_EXTRACTION_STATUS: str = "/tasks/{task_id}"
 
 ALLOWED_ORIGINS: Final[List[str]] = [
     "http://localhost:3000",
@@ -27,8 +27,6 @@ ALLOWED_ORIGINS: Final[List[str]] = [
     "http://127.0.0.1:5173",
 ]
 ALLOWED_ORIGINS_SET: Final[Set[str]] = set(ALLOWED_ORIGINS)
-
-DEV_PASSPHRASES: Final[Set[str]] = {"7788", "admin", "demo"}
 
 __all__ = [
     "APP_TITLE",
@@ -47,5 +45,4 @@ __all__ = [
     "ROUTE_EXTRACTION_STATUS",
     "ALLOWED_ORIGINS",
     "ALLOWED_ORIGINS_SET",
-    "DEV_PASSPHRASES",
 ]

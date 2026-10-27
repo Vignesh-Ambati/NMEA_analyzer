@@ -1,4 +1,11 @@
 import os
+import sys
+if not sys.dont_write_bytecode:
+    sys.pycache_prefix = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "OUTPUT", "pycache")
+)
+
+
 import datetime
 import ipaddress
 from pathlib import Path
@@ -11,8 +18,8 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.x509.general_name import DNSName, IPAddress
 from cryptography.x509.oid import NameOID
 
-from LOG import system_logger
 from API.Config import API_HOST, API_PORT
+from CORE import system_logger, error_logger
 from CORE.UTILITIES.constants import CERT_FILE_PATH, KEY_FILE_PATH
 
 def generate_self_signed_cert() -> None:

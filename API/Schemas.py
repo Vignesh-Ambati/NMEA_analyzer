@@ -12,7 +12,7 @@ class HealthResponse(StrictBaseModel):
     service: str
     message: str
     api_prefix: str
-    backend_state: Dict[str, Any]
+    backend_state: Dict[str, Any] = Field(default_factory=dict)
 
 
 class DevAuthRequest(StrictBaseModel):

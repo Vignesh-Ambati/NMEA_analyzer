@@ -7,3 +7,6 @@ Priority is as follows:
                     3. High Level(Can depend on above two)
                     4. Top Level(Depends on all the above)
 """
+from .MANAGERS import system_logger, error_logger
+
+__all__ = ["system_logger", "error_logger",]

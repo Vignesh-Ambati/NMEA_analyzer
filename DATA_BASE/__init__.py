@@ -6,11 +6,10 @@ from .local_db import (
     save_developer_settings,
     get_engine_params,
     save_engine_params,
-    append_log,
+    # append_log,
     fetch_logs,
-    save_backend_state,
-    load_backend_state,
 )
+from .authentication import dev_auth_repo
 
 __all__ = [
     "DB_PATH",
@@ -20,8 +19,7 @@ __all__ = [
     "save_developer_settings",
     "get_engine_params",
     "save_engine_params",
-    "append_log",
+    # "append_log",
     "fetch_logs",
-    "save_backend_state",
-    "load_backend_state",
+    "dev_auth_repo",
 ]

@@ -1,5 +1,5 @@
 import time
-from typing import Awaitable, Callable, Final, Optional, List, Set
+from typing import AsyncGenerator, Awaitable, Callable, Final, Optional, List, Set
 
 from fastapi import FastAPI, Request, Response, status
 from fastapi.exceptions import RequestValidationError
@@ -7,17 +7,29 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
+from contextlib import asynccontextmanager
 
-from DATA_BASE import append_log
-from LOG import error_logger, system_logger
+from DATA_BASE import dev_auth_repo
+from CORE import system_logger, error_logger
 from API.ENDPOINTS import router as endpoints_router
 from API.Config import ( ALLOWED_ORIGINS, ALLOWED_ORIGINS_SET, API_PREFIX, APP_TITLE, APP_VERSION, )
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    try:
+        dev_auth_repo.initialize_schema()
+        system_logger.info("Developer authentication SQLite Database initialized successfully")
+    except Exception as exc:
+        error_logger.critical(f"Failed to provision authentication database: {exc}", exc_info=True)
+        raise exc
+    yield
 
 app: FastAPI = FastAPI(
     title=APP_TITLE,
     version=APP_VERSION,
     docs_url=None,
     redoc_url=None,
+    lifespan=lifespan,
 )
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
@@ -25,13 +37,6 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         origin: Optional[str] = request.headers.get("origin")
         if origin is not None and origin not in ALLOWED_ORIGINS_SET:
             error_logger.warning(f"Blocked unauthorized origin access: {origin} on path: {request.url.path}")
-            append_log(
-                source="security",
-                stage="middleware",
-                level="warn",
-                message="Restricted origin access rejected",
-                details={"origin": origin, "path": request.url.path},
-            )
             return JSONResponse(
                 status_code=status.HTTP_404_NOT_FOUND,
                 content={"detail": "Resource not found"},
@@ -60,14 +65,6 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         except Exception as exc:
             duration_ms: float = (time.perf_counter() - start_time) * 1000.0
             error_logger.error(f"Unhandled request failure: {method} {path} from {client_host} ({duration_ms:.2f}ms): {exc}", exc_info=True, )
-            append_log(
-                source="api",
-                stage="dispatch",
-                level="critical",
-                message=f"Request crash on {method} {path}",
-                details={"client": client_host, "error": str(exc)},
-                duration_ms=int(duration_ms),
-            )
             raise exc
 
         duration_ms: float = (time.perf_counter() - start_time) * 1000.0
@@ -78,14 +75,6 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         if status_code >= 400:
             error_logger.warning(
                 f"HTTP {status_code} on {method} {path} - {duration_ms:.2f}ms (Client: {client_host})"
-            )
-            append_log(
-                source="api",
-                stage="response",
-                level="warn" if status_code < 500 else "error",
-                message=f"HTTP {status_code} on {method} {path}",
-                details={"client": client_host, "status_code": status_code},
-                duration_ms=int(duration_ms),
             )
         return response
 
@@ -102,13 +91,6 @@ app.add_middleware(
 @app.exception_handler(StarletteHTTPException)
 async def custom_http_exception_handler(request: Request, exc: StarletteHTTPException) -> JSONResponse:
     error_logger.warning(f"HTTP Exception [{exc.status_code}] on {request.method} {request.url.path} - Detail: {exc.detail}")
-    append_log(
-        source="api",
-        stage="routing",
-        level="warn" if exc.status_code < 500 else "error",
-        message=f"HTTP {exc.status_code} Error",
-        details={"path": request.url.path, "detail": str(exc.detail)},
-    )
     return JSONResponse(
         status_code=status.HTTP_404_NOT_FOUND if exc.status_code == status.HTTP_404_NOT_FOUND else exc.status_code,
         content={"detail": "Resource not found" if exc.status_code == status.HTTP_404_NOT_FOUND else exc.detail},
@@ -117,13 +99,6 @@ async def custom_http_exception_handler(request: Request, exc: StarletteHTTPExce
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
     error_logger.warning(f"Validation Failure on {request.method} {request.url.path} - Errors: {exc.errors()}")
-    append_log(
-        source="api",
-        stage="validation",
-        level="warn",
-        message="Request validation failed",
-        details={"path": request.url.path, "errors": str(exc.errors())},
-    )
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         content={"detail": "Unprocessable Entity", "errors": exc.errors()},
@@ -132,13 +107,6 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 @app.exception_handler(Exception)
 async def global_unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     error_logger.critical(f"Unhandled Server Error on {request.method} {request.url.path} - Exception: {exc}", exc_info=True, )
-    append_log(
-        source="backend",
-        stage="unhandled",
-        level="critical",
-        message=f"Fatal exception: {str(exc)}",
-        details={"path": request.url.path, "method": request.method},
-    )
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content={"detail": "Internal server error encountered"},

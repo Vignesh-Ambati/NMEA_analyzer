@@ -3,7 +3,7 @@ from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import Final
 
-_LOG_DIR: Final[Path] = Path("logs")
+_LOG_DIR: Final[Path] = Path("OUTPUT/logs")
 _LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 _LOG_FORMAT: Final[str] = ("[%(asctime)s] [%(levelname)s] [%(name)s] [%(filename)s:%(lineno)d] %(message)s")

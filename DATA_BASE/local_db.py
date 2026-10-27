@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-DB_PATH = BASE_DIR / "local_data.sqlite3"
+DB_PATH = BASE_DIR / "OUTPUT/DATABASE"
 
 def _connect() -> sqlite3.Connection:
     connection = sqlite3.connect(DB_PATH)
@@ -153,34 +153,3 @@ def fetch_logs(limit: int = 200, level: Optional[str] = None, stage: Optional[st
             }
         )
     return result
-
-
-def save_backend_state(payload: Dict[str, Any]) -> Dict[str, Any]:
-    init_db()
-    now = datetime.now(timezone.utc).isoformat()
-    with _connect() as conn:
-        conn.execute(
-            """
-            INSERT INTO backend_state (id, payload, updated_at)
-            VALUES (1, ?, ?)
-            ON CONFLICT(id) DO UPDATE SET payload = excluded.payload, updated_at = excluded.updated_at
-            """,
-            (json.dumps(payload, ensure_ascii=False), now),
-        )
-    return payload
-
-
-def load_backend_state() -> Dict[str, Any]:
-    init_db()
-    with _connect() as conn:
-        row = conn.execute(
-            "SELECT payload FROM backend_state WHERE id = 1"
-        ).fetchone()
-    if row is None:
-        return {
-            "reachable": False,
-            "status": "offline",
-            "latencyMs": 0,
-            "lastChecked": datetime.now(timezone.utc).isoformat(),
-        }
-    return json.loads(row["payload"])
