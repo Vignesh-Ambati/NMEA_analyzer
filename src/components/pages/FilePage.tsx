@@ -17,24 +17,29 @@ export const FilePage: React.FC = () => {
     processingProgress,
     processingStatus,
     navigateToTaskPage,
+    addLog,
   } = useApp();
 
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileDrop = (e: React.DragEvent) => {
+    addLog('File drop interaction detected on ingestion workspace', 'info', 'ingestion');
     e.preventDefault();
     setDragOver(false);
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       for (let i = 0; i < e.dataTransfer.files.length; i++) {
+        addLog(`Queued dropped file for UI ingestion: ${e.dataTransfer.files[i].name}`, 'debug', 'ingestion');
         processFile(e.dataTransfer.files[i]);
       }
     }
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    addLog('File browser selection triggered in ingestion workspace', 'info', 'ingestion');
     if (e.target.files && e.target.files.length > 0) {
       for (let i = 0; i < e.target.files.length; i++) {
+        addLog(`Queued selected file for UI ingestion: ${e.target.files[i].name}`, 'debug', 'ingestion');
         processFile(e.target.files[i]);
       }
     }
@@ -86,10 +91,17 @@ export const FilePage: React.FC = () => {
           onDragOver={(e) => {
             e.preventDefault();
             setDragOver(true);
+            addLog('Drag-over state entered on ingestion drop zone', 'debug', 'ingestion');
           }}
-          onDragLeave={() => setDragOver(false)}
+          onDragLeave={() => {
+            setDragOver(false);
+            addLog('Drag-over state left on ingestion drop zone', 'debug', 'ingestion');
+          }}
           onDrop={handleFileDrop}
-          onClick={() => fileInputRef.current?.click()}
+          onClick={() => {
+            addLog('Ingestion zone clicked; browser file picker opened', 'info', 'ingestion');
+            fileInputRef.current?.click();
+          }}
           className={`border-2 border-dashed rounded-2xl p-8 sm:p-12 text-center transition-all cursor-pointer flex flex-col items-center justify-center space-y-3 ${
             dragOver
               ? 'border-[#E05318] bg-orange-50/50 dark:bg-orange-950/20'
@@ -120,6 +132,11 @@ export const FilePage: React.FC = () => {
 
           <button
             type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              addLog('Browse files button clicked on ingestion page', 'info', 'ingestion');
+              fileInputRef.current?.click();
+            }}
             className="px-5 py-2.5 rounded-xl text-xs font-semibold bg-[#E05318] hover:bg-[#C94713] text-white shadow-xs transition-all cursor-pointer"
           >
             Browse Files from Device
@@ -157,7 +174,10 @@ export const FilePage: React.FC = () => {
                   </div>
 
                   <button
-                    onClick={() => removeFile(file.id)}
+                    onClick={() => {
+                      addLog(`Dataset removal requested for ${file.filename}`, 'info', 'ingestion');
+                      removeFile(file.id);
+                    }}
                     type="button"
                     className="p-2 text-[#736E65] hover:text-rose-600 rounded-lg transition-colors cursor-pointer shrink-0"
                     title="Remove File"
@@ -172,7 +192,10 @@ export const FilePage: React.FC = () => {
             {/* Launch Task Matrix Button */}
             <div className="pt-3 flex justify-end">
               <button
-                onClick={navigateToTaskPage}
+                onClick={() => {
+                  addLog('User advanced from file ingestion to task matrix', 'info', 'tasks');
+                  navigateToTaskPage();
+                }}
                 type="button"
                 className="w-full sm:w-auto px-6 py-3 rounded-xl text-xs font-bold uppercase tracking-wider bg-[#E05318] hover:bg-[#C94713] text-white shadow-md transition-all cursor-pointer flex items-center justify-center space-x-2"
               >

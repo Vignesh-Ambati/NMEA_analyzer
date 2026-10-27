@@ -34,8 +34,6 @@ export const Header: React.FC<HeaderProps> = ({ setMobileOpen }) => {
     navigateToTaskPage,
     navigateToGraphPage,
     isFullpage,
-    backendStatus,
-    refreshBackendStatus,
   } = useApp();
 
   if (isFullpage) return null;

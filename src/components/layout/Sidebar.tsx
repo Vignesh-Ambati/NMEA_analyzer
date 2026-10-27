@@ -11,8 +11,7 @@ import {
   X,
   PanelLeftClose,
   PanelLeftOpen,
-  Terminal,
-  Code2
+  Code2,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -39,21 +38,19 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) =
     devUnlocked,
     registerDevSecretClick,
     backendStatus,
-    refreshBackendStatus,
   } = useApp();
 
   if (isFullpage) return null;
 
   const handleNav = (action: () => void) => {
     action();
-    setMobileOpen(false); // Close mobile drawer upon selection
+    setMobileOpen(false);
   };
 
   const fileLoaded = files.length > 0;
 
   return (
     <>
-      {/* Mobile Backdrop Overlay (Active when drawer is open on mobile screens) */}
       {mobileOpen && (
         <div
           onClick={() => setMobileOpen(false)}
@@ -61,17 +58,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) =
         />
       )}
 
-      {/* Responsive Sidebar Container: Collapsible Icon-Rail or Full Width Drawer */}
       <aside
         className={`fixed md:static inset-y-0 left-0 z-50 bg-[#FAF8F5] dark:bg-slate-900 border-r border-[#E6E1D6] dark:border-slate-800 flex flex-col justify-between shrink-0 select-none transition-all duration-200 ease-in-out shadow-xl md:shadow-none ${
           mobileOpen ? 'translate-x-0 w-64' : '-translate-x-full md:translate-x-0'
         } ${sidebarCollapsed ? 'md:w-16' : 'md:w-64'}`}
       >
         <div className="flex flex-col h-full overflow-hidden">
-          {/* Brand Header with Pure Name & 7-Click Dev Trigger */}
           <div className="h-16 px-4 flex items-center justify-between border-b border-[#E6E1D6] dark:border-slate-800 shrink-0">
             {sidebarCollapsed ? (
-              // Collapsed state: Centered Expand toggle button with warm accent (Zero overflow, impossible to break)
               <div className="w-full flex items-center justify-center py-1">
                 <button
                   onClick={toggleSidebar}
@@ -92,12 +86,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) =
                 </button>
               </div>
             ) : (
-              // Expanded state: Brand Name (Clickable 7-times for Developer Suite) & Collapse Toggle
               <>
                 <div
                   onClick={registerDevSecretClick}
                   className="flex items-center space-x-2.5 cursor-pointer group select-none min-w-0"
-                  title={devUnlocked ? "Developer Suite Unlocked" : "Click 7 times to unlock Developer Suite"}
+                  title={devUnlocked ? 'Developer Suite Unlocked' : 'Click 7 times to unlock Developer Suite'}
                 >
                   <div className="w-8 h-8 rounded-lg bg-[#FDF3EE] dark:bg-orange-950/60 text-[#E05318] flex items-center justify-center font-bold text-xs tracking-tight border border-orange-200/70 dark:border-orange-900/50 shrink-0 group-hover:scale-105 transition-transform shadow-xs">
                     NA
@@ -135,7 +128,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) =
                 </div>
 
                 <div className="flex items-center space-x-1">
-                  {/* Desktop single collapse toggle */}
                   <button
                     onClick={toggleSidebar}
                     type="button"
@@ -146,7 +138,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) =
                     <PanelLeftClose className="w-4 h-4" />
                   </button>
 
-                  {/* Mobile Drawer Close Button */}
                   <button
                     onClick={() => setMobileOpen(false)}
                     type="button"
@@ -160,49 +151,38 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) =
             )}
           </div>
 
-          {/* Navigation Items Area */}
           <div className="flex-1 p-2 sm:p-2.5 space-y-4 overflow-y-auto overflow-x-hidden">
-            {/* SECTION 1: WORKSPACE (Requires File Upload) */}
             <div>
               {!sidebarCollapsed && (
                 <div className="px-2.5 pb-2 text-[10px] font-bold tracking-wider text-[#736E65] dark:text-slate-500 uppercase font-mono flex items-center justify-between">
                   <span>Workspace</span>
-                  {fileLoaded && (
-                    <span className="text-[9px] text-emerald-600 dark:text-emerald-400 font-sans font-semibold">
-                      file ready
-                    </span>
-                  )}
                 </div>
               )}
 
               <div className="space-y-1">
-                {/* 1. File Upload (Always Present) */}
-                <button
-                  onClick={() => handleNav(navigateToFilePage)}
-                  type="button"
-                  className={`w-full py-2.5 rounded-xl flex items-center transition-all cursor-pointer ${
-                    sidebarCollapsed ? 'justify-center px-0' : 'justify-between px-3'
-                  } ${
-                    currentPage === 'file'
-                      ? 'bg-[#FDF3EE] dark:bg-orange-950/40 text-[#E05318] font-bold border border-orange-200/70 dark:border-orange-900/40 shadow-xs'
-                      : 'text-[#736E65] dark:text-slate-300 hover:bg-[#EFEAE1] dark:hover:bg-slate-800 hover:text-[#24211D] dark:hover:text-white'
-                  }`}
-                  title="Step 1: File Ingestion"
-                >
-                  <div className="flex items-center space-x-2.5 min-w-0">
-                    <UploadCloud className="w-4 h-4 text-[#E05318] shrink-0" />
+                  <button
+                    onClick={() => handleNav(navigateToFilePage)}
+                    type="button"
+                    className={`w-full py-2.5 rounded-xl flex items-center transition-all cursor-pointer ${
+                      currentPage === 'file'
+                        ? 'bg-[#FDF3EE] dark:bg-orange-950/40 text-[#E05318] font-bold border border-orange-200/70 dark:border-orange-900/40 shadow-xs'
+                        : 'text-[#736E65] dark:text-slate-300 hover:bg-[#EFEAE1] dark:hover:bg-slate-800 hover:text-[#24211D] dark:hover:text-white'
+                    } justify-between px-3`}
+                    title="File Ingestion"
+                  >
+                    <div className="flex items-center space-x-2.5 min-w-0">
+                      <UploadCloud className="w-4 h-4 text-[#E05318] shrink-0" />
                     {!sidebarCollapsed && (
-                      <span className="text-xs truncate">1. File Upload</span>
+                      <span className="text-xs truncate">File Upload</span>
                     )}
-                  </div>
-                  {!sidebarCollapsed && fileLoaded && (
+                    </div>
+                    {!sidebarCollapsed && fileLoaded && (
                     <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-emerald-100/70 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 font-semibold shrink-0">
                       {files.length}
                     </span>
                   )}
-                </button>
+                  </button>
 
-                {/* 2. Task Matrix - ONLY VISIBLE WHEN FILE IS UPLOADED */}
                 {fileLoaded && (
                   <button
                     onClick={() => handleNav(navigateToTaskPage)}
@@ -214,23 +194,15 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) =
                         ? 'bg-[#FDF3EE] dark:bg-orange-950/40 text-[#E05318] font-bold border border-orange-200/70 dark:border-orange-900/40 shadow-xs'
                         : 'text-[#736E65] dark:text-slate-300 hover:bg-[#EFEAE1] dark:hover:bg-slate-800 hover:text-[#24211D] dark:hover:text-white'
                     }`}
-                    title="Step 2: Task Matrix"
+                    title="Task Matrix"
                   >
                     <div className="flex items-center space-x-2.5 min-w-0">
                       <LayoutGrid className="w-4 h-4 text-sky-600 dark:text-sky-400 shrink-0" />
-                      {!sidebarCollapsed && (
-                        <span className="text-xs truncate">2. Task Matrix</span>
-                      )}
+                      {!sidebarCollapsed && <span className="text-xs truncate">Task Matrix</span>}
                     </div>
-                    {!sidebarCollapsed && (
-                      <span className="text-[9px] text-[#736E65] dark:text-slate-400 font-mono shrink-0">
-                        10
-                      </span>
-                    )}
                   </button>
                 )}
 
-                {/* 3. Charts & Analytics - ONLY VISIBLE WHEN FILE IS UPLOADED */}
                 {fileLoaded && (
                   <button
                     onClick={() => handleNav(() => navigateToGraphPage(currentTaskId))}
@@ -242,20 +214,17 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) =
                         ? 'bg-[#FDF3EE] dark:bg-orange-950/40 text-[#E05318] font-bold border border-orange-200/70 dark:border-orange-900/40 shadow-xs'
                         : 'text-[#736E65] dark:text-slate-300 hover:bg-[#EFEAE1] dark:hover:bg-slate-800 hover:text-[#24211D] dark:hover:text-white'
                     }`}
-                    title="Step 3: Charts & Analytics"
+                    title="Charts & Plot"
                   >
                     <div className="flex items-center space-x-2.5 min-w-0">
                       <LineChart className="w-4 h-4 text-purple-600 dark:text-purple-400 shrink-0" />
-                      {!sidebarCollapsed && (
-                        <span className="text-xs truncate">3. Charts & Plot</span>
-                      )}
+                      {!sidebarCollapsed && <span className="text-xs truncate">Charts & Plot</span>}
                     </div>
                   </button>
                 )}
               </div>
             </div>
 
-            {/* SECTION 2: STANDALONE UTILITIES (No File Needed) */}
             <div>
               {!sidebarCollapsed && (
                 <div className="px-2.5 pb-2 text-[10px] font-bold tracking-wider text-[#736E65] dark:text-slate-500 uppercase font-mono">
@@ -264,7 +233,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) =
               )}
 
               <div className="space-y-1">
-                {/* Sentence Protocol Reference Guide */}
                 <button
                   onClick={() => handleNav(navigateToReferencePage)}
                   type="button"
@@ -279,16 +247,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) =
                 >
                   <div className="flex items-center space-x-2.5 min-w-0">
                     <BookOpen className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                    {!sidebarCollapsed && (
-                      <span className="text-xs truncate">Protocol Guide</span>
-                    )}
+                    {!sidebarCollapsed && <span className="text-xs truncate">Protocol Guide</span>}
                   </div>
-                  {!sidebarCollapsed && (
-                    <span className="text-[9px] text-[#736E65] dark:text-slate-400 shrink-0">Docs</span>
-                  )}
                 </button>
 
-                {/* Standalone Tools Suite (Time Diff, UTC/IST, Line Copy) */}
                 <button
                   onClick={() => handleNav(navigateToToolsPage)}
                   type="button"
@@ -299,20 +261,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) =
                       ? 'bg-[#FDF3EE] dark:bg-orange-950/40 text-[#E05318] font-bold border border-orange-200/70 dark:border-orange-900/40 shadow-xs'
                       : 'text-[#736E65] dark:text-slate-300 hover:bg-[#EFEAE1] dark:hover:bg-slate-800 hover:text-[#24211D] dark:hover:text-white'
                   }`}
-                  title="Standard Utilities (Time Diff, UTC/IST, Line Copy)"
+                  title="Standard Utilities"
                 >
                   <div className="flex items-center space-x-2.5 min-w-0">
                     <Wrench className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
-                    {!sidebarCollapsed && (
-                      <span className="text-xs truncate">Standard Utilities</span>
-                    )}
+                    {!sidebarCollapsed && <span className="text-xs truncate">Standard Utilities</span>}
                   </div>
-                  {!sidebarCollapsed && (
-                    <span className="text-[9px] text-[#736E65] dark:text-slate-400 shrink-0">Tools</span>
-                  )}
                 </button>
 
-                {/* Developer Suite Page (Visible when unlocked) */}
                 {devUnlocked && (
                   <button
                     onClick={() => handleNav(navigateToDeveloperPage)}
@@ -324,27 +280,19 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) =
                         ? 'bg-[#FDF3EE] dark:bg-orange-950/40 text-[#E05318] font-bold border border-orange-200/70 dark:border-orange-900/40 shadow-xs'
                         : 'text-[#736E65] dark:text-slate-300 hover:bg-[#EFEAE1] dark:hover:bg-slate-800 hover:text-[#24211D] dark:hover:text-white'
                     }`}
-                    title="Developer Suite (Centralized Backend, API Integration, Logs)"
+                    title="Developer Suite"
                   >
                     <div className="flex items-center space-x-2.5 min-w-0">
                       <Code2 className="w-4 h-4 text-sky-600 dark:text-sky-400 shrink-0" />
-                      {!sidebarCollapsed && (
-                        <span className="text-xs truncate">Developer Suite</span>
-                      )}
+                      {!sidebarCollapsed && <span className="text-xs truncate">Developer Suite</span>}
                     </div>
-                    {!sidebarCollapsed && (
-                      <span className="text-[9px] text-[#736E65] dark:text-slate-400 font-mono shrink-0">Dev</span>
-                    )}
                   </button>
                 )}
               </div>
             </div>
           </div>
 
-          {/* Bottom Footer Section: Quick Theme Switch */}
           <div className="p-2 sm:p-2.5 border-t border-[#E6E1D6] dark:border-slate-800 space-y-1.5 shrink-0">
-
-            {/* Quick Theme Toggle Button */}
             <button
               onClick={toggleTheme}
               type="button"
@@ -359,13 +307,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) =
                 ) : (
                   <Sun className="w-3.5 h-3.5 text-amber-600 shrink-0" />
                 )}
-                {!sidebarCollapsed && (
-                  <span>{theme === 'dark' ? 'Dark Mode' : 'Light Mode'}</span>
-                )}
+                {!sidebarCollapsed && <span>{theme === 'dark' ? 'Dark Mode' : 'Light Mode'}</span>}
               </div>
-              {!sidebarCollapsed && (
-                <span className="text-[10px] font-mono text-[#736E65] dark:text-slate-400">Switch</span>
-              )}
+              {!sidebarCollapsed && <span className="text-[10px] font-mono text-[#736E65] dark:text-slate-400">Switch</span>}
             </button>
           </div>
         </div>

@@ -16,14 +16,17 @@ export const TaskPage: React.FC = () => {
     navigateToFilePage,
     processFile,
     isProcessing,
+    addLog,
   } = useApp();
 
   const [categoryFilter, setCategoryFilter] = useState<TaskCategory | 'all'>('all');
   const addFileInputRef = useRef<HTMLInputElement>(null);
 
   const handleAddFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    addLog('Add-comparison-file action triggered from task matrix', 'info', 'tasks');
     if (e.target.files && e.target.files.length > 0) {
       for (let i = 0; i < e.target.files.length; i++) {
+        addLog(`Queued comparison file from task page: ${e.target.files[i].name}`, 'debug', 'tasks');
         processFile(e.target.files[i]);
       }
     }
@@ -47,7 +50,10 @@ export const TaskPage: React.FC = () => {
           </p>
         </div>
         <button
-          onClick={navigateToFilePage}
+          onClick={() => {
+            addLog('User returned to file ingestion from empty task state', 'info', 'tasks');
+            navigateToFilePage();
+          }}
           type="button"
           className="px-5 py-2.5 rounded-xl text-xs font-semibold bg-[#E05318] hover:bg-[#C94713] text-white shadow-xs transition-all cursor-pointer flex items-center space-x-2"
         >
@@ -86,7 +92,10 @@ export const TaskPage: React.FC = () => {
             className="hidden"
           />
           <button
-            onClick={() => addFileInputRef.current?.click()}
+            onClick={() => {
+              addLog('Comparison file picker opened from task page', 'info', 'tasks');
+              addFileInputRef.current?.click();
+            }}
             disabled={isProcessing}
             type="button"
             className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-[#FAF8F5] dark:bg-slate-900 text-[#24211D] dark:text-slate-200 hover:border-[#E05318] border border-[#E6E1D6] dark:border-slate-800 flex items-center space-x-2 transition-all cursor-pointer shadow-xs"
@@ -100,14 +109,20 @@ export const TaskPage: React.FC = () => {
       {/* Category Filter Buttons from dedicated TaskFilterBar */}
       <TaskFilterBar
         currentCategory={categoryFilter}
-        onSelectCategory={setCategoryFilter}
+        onSelectCategory={(category) => {
+          addLog(`Task filter changed to ${category}`, 'info', 'tasks');
+          setCategoryFilter(category);
+        }}
       />
 
       {/* Task Grid Cards from dedicated TaskGrid */}
       <TaskGrid
         tasks={filteredTasks}
         selectedTaskId={currentTaskId}
-        onSelectTask={navigateToGraphPage}
+        onSelectTask={(taskId) => {
+          addLog(`Task selected from matrix: ${taskId}`, 'info', 'tasks');
+          navigateToGraphPage(taskId);
+        }}
       />
     </div>
   );

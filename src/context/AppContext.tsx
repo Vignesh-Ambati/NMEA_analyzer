@@ -1,9 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { ParsedLogFile, PageType, ThemeMode } from '../types/nmea';
-import { parseNmeaContent } from '../services/nmeaParser';
-import { HealthCheckResult, apiClient } from '../config/apiClient';
-import { backendService } from '../services/backend/backendService';
-import { logger, AppLogEntry } from '../services/logger';
+import { PageType, ParsedLogFile, ThemeMode } from '../types/nmea';
+import { logger } from '../services/logger';
 
 export interface ConsoleMessage {
   id: string;
@@ -24,7 +21,6 @@ export interface ActiveJob {
 }
 
 interface AppContextType {
-  // Navigation & Page
   currentPage: PageType;
   currentTaskId: number;
   setCurrentTaskId: (id: number) => void;
@@ -35,7 +31,6 @@ interface AppContextType {
   navigateToToolsPage: () => void;
   navigateToDeveloperPage: () => void;
 
-  // Files & Data - 100% BLANK BY DEFAULT, NO SIMULATED DATA
   files: ParsedLogFile[];
   selectedFileId: string;
   setSelectedFileId: (id: string) => void;
@@ -43,13 +38,11 @@ interface AppContextType {
   removeFile: (id: string) => void;
   clearFiles: () => void;
 
-  // Processing state
   isProcessing: boolean;
   processingProgress: number;
   processingStatus: string;
   activeJobs: ActiveJob[];
 
-  // Settings & Toggles
   theme: ThemeMode;
   toggleTheme: () => void;
   progressBarVisible: boolean;
@@ -58,14 +51,12 @@ interface AppContextType {
   debugMode: boolean;
   toggleDebugMode: () => void;
 
-  // Developer Suite
   isDevAuthenticated: boolean;
   authenticateDev: (pin: string) => Promise<{ success: boolean; isDemo?: boolean; message?: string }>;
   devPasscode: string;
   setDevPasscode: (newPin: string) => void;
   logoutDeveloper: () => void;
 
-  // Advanced Engineering Tuning
   batchSize: number;
   setBatchSize: (val: number) => void;
   retentionWindow: number;
@@ -74,7 +65,6 @@ interface AppContextType {
   setWorkerCount: (val: number) => void;
   flushRamCache: () => void;
 
-  // Console & Diagnostic Logs
   logs: ConsoleMessage[];
   addLog: (
     text: string,
@@ -84,37 +74,25 @@ interface AppContextType {
   ) => void;
   clearLogs: () => void;
 
-  // Fullscreen & Sidebar Maximization
   isFullpage: boolean;
   setIsFullpage: (val: boolean) => void;
   sidebarCollapsed: boolean;
   setSidebarCollapsed: (val: boolean) => void;
   toggleSidebar: () => void;
 
-  // 7-Click Secret Developer Mode Unlock
   devUnlocked: boolean;
   registerDevSecretClick: () => void;
   devToastMessage: string | null;
 
-  // Workflow gating: Task Matrix & Charts visible only after proceeding
   hasProceededToTasks: boolean;
   proceedToTaskMatrix: () => void;
-
-  // Backend Integration State
-  routeToBackend: boolean;
-  setRouteToBackend: (val: boolean) => void;
-  backendStatus: HealthCheckResult | null;
-  refreshBackendStatus: () => Promise<void>;
 }
-
-const COLOR_CYCLE = ['#FF5A1F', '#38BDF8', '#34D399', '#F472B6', '#A78BFA', '#FBBF24', '#4ADE80'];
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [currentPage, setCurrentPage] = useState<PageType>('file');
-  const [currentTaskId, setCurrentTaskId] = useState<number>(3); // Default task: Altitude
-  // 100% BLANK INITIAL STATE - NO SIMULATED LOGS OR SAMPLES
+  const [currentTaskId, setCurrentTaskId] = useState<number>(3);
   const [files, setFiles] = useState<ParsedLogFile[]>([]);
   const [selectedFileId, setSelectedFileId] = useState<string>('Combined');
 
@@ -123,91 +101,30 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [processingStatus, setProcessingStatus] = useState<string>('Ready');
   const [activeJobs, setActiveJobs] = useState<ActiveJob[]>([]);
 
-  // Backend integration state
-  const [routeToBackend, setRouteToBackend] = useState<boolean>(() => {
-    try {
-      localStorage.removeItem('nmea_route_to_backend');
-      return false;
-    } catch {
-      return false;
-    }
-  });
-  const [backendStatus, setBackendStatus] = useState<HealthCheckResult | null>(null);
-
-  const refreshBackendStatus = useCallback(async () => {
-    try {
-      const res = await apiClient.checkHealth();
-      setBackendStatus(res);
-    } catch {
-      setBackendStatus(null);
-    }
-  }, []);
-
-  // Initial backend check
-  useEffect(() => {
-    refreshBackendStatus();
-  }, [refreshBackendStatus]);
-
-  // Persist routeToBackend toggle
-  useEffect(() => {
-    try {
-      localStorage.setItem('nmea_route_to_backend', String(routeToBackend));
-    } catch {
-      // ignore
-    }
-  }, [routeToBackend]);
-
-  // Default to light theme for clean look, with dark theme available
-  const [theme, setTheme] = useState<ThemeMode>(() => {
-    try {
-      localStorage.removeItem('nmea_theme_mode');
-    } catch {
-      // ignore
-    }
-    return 'light';
-  });
+  const [theme, setTheme] = useState<ThemeMode>('light');
   const [progressBarVisible, setProgressBarVisible] = useState<boolean>(true);
   const [debugMode, setDebugMode] = useState<boolean>(false);
   const [isFullpage, setIsFullpage] = useState<boolean>(false);
-
-  // Sidebar minimize state (persisted)
-  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
-    try {
-      localStorage.removeItem('nmea_sidebar_collapsed');
-    } catch {
-      // ignore
-    }
-    return false;
-  });
+  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
 
   const toggleSidebar = useCallback(() => {
     setSidebarCollapsed((prev) => {
       const next = !prev;
-      try {
-        localStorage.setItem('nmea_sidebar_collapsed', String(next));
-      } catch {
-        // ignore
-      }
+      logger.system(`Sidebar collapsed state changed to ${next ? 'collapsed' : 'expanded'}`);
       return next;
     });
   }, []);
 
-  // 7-Click Secret Developer Mode Unlock state
-  const [devUnlocked, setDevUnlocked] = useState<boolean>(() => {
-    try {
-      localStorage.removeItem('nmea_dev_unlocked');
-    } catch {
-      // ignore
-    }
-    return false;
-  });
+  const [devUnlocked, setDevUnlocked] = useState<boolean>(false);
   const [devClickCount, setDevClickCount] = useState<number>(0);
   const [devToastMessage, setDevToastMessage] = useState<string | null>(null);
   const clickTimeoutRef = React.useRef<any>(null);
 
   const registerDevSecretClick = useCallback(() => {
+    logger.developer('Developer secret click gesture registered in UI shell', 'debug');
     if (devUnlocked) {
       setDevToastMessage('Developer Suite is already unlocked!');
+      logger.developer('Developer suite already unlocked; secret click ignored', 'info');
       setTimeout(() => setDevToastMessage(null), 2500);
       return;
     }
@@ -223,14 +140,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const remaining = 7 - next;
       if (remaining > 0 && remaining <= 4) {
         setDevToastMessage(`You are ${remaining} tap${remaining > 1 ? 's' : ''} away from Developer Suite.`);
+        logger.developer(`Developer unlock sequence progress: ${next}/7`, 'debug');
       } else if (remaining <= 0) {
         setDevUnlocked(true);
         setDevToastMessage('🎉 Developer Suite Unlocked!');
-        try {
-          localStorage.setItem('nmea_dev_unlocked', 'true');
-        } catch {
-          // ignore
-        }
+        logger.developer('Developer suite unlocked via secret-click sequence', 'success');
         setTimeout(() => setDevToastMessage(null), 4000);
         return 0;
       }
@@ -238,39 +152,32 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     });
   }, [devUnlocked]);
 
-  // Log out Developer to hide the Developer Suite back
   const logoutDeveloper = useCallback(() => {
+    logger.developer('Developer logout requested from UI context', 'info');
     setIsDevAuthenticated(false);
     setDevUnlocked(false);
-    try {
-      localStorage.removeItem('nmea_dev_unlocked');
-    } catch {
-      // ignore
-    }
     setDevToastMessage('🔒 Developer Suite locked & hidden.');
     setTimeout(() => setDevToastMessage(null), 3000);
     setCurrentPage((prev) => (prev === 'developer' ? 'file' : prev));
   }, []);
 
-  // Guard: If dev is locked, redirect away from developer page
   useEffect(() => {
     if (!devUnlocked && currentPage === 'developer') {
+      logger.developer('Developer page blocked because suite is locked', 'warn');
       setCurrentPage('file');
     }
   }, [devUnlocked, currentPage]);
 
-  // Developer state
   const [isDevModalOpen, setIsDevModalOpen] = useState<boolean>(false);
   const [isDevAuthenticated, setIsDevAuthenticated] = useState<boolean>(false);
   const [devPasscode, setDevPasscode] = useState<string>('');
 
-  // Engineering Tuning Parameters
   const [batchSize, setBatchSize] = useState<number>(500);
   const [retentionWindow, setRetentionWindow] = useState<number>(3600);
   const [workerCount, setWorkerCount] = useState<number>(4);
 
-  const [logs, setLogs] = useState<ConsoleMessage[]>(() => {
-    return logger.getLogs().map((l) => ({
+  const [logs, setLogs] = useState<ConsoleMessage[]>(() =>
+    logger.getLogs().map((l) => ({
       id: l.id,
       timestamp: l.timestamp,
       text: l.message,
@@ -279,10 +186,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       source: l.source,
       details: l.details,
       durationMs: l.durationMs,
-    }));
-  });
+    }))
+  );
 
-  // Subscribe to logger real-time broadcasts
   useEffect(() => {
     const unsubscribe = logger.subscribe((entry) => {
       setLogs((prev) => [
@@ -302,9 +208,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return unsubscribe;
   }, []);
 
-  // Guard: If files are cleared, redirect from task/graph back to file page
   useEffect(() => {
     if (files.length === 0 && (currentPage === 'task' || currentPage === 'graph')) {
+      logger.system(`Page reset from ${currentPage} because no datasets remain in the workspace`);
       setCurrentPage('file');
     }
   }, [files.length, currentPage]);
@@ -330,23 +236,23 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const clearLogs = useCallback(() => {
     logger.clear();
     setLogs([]);
+    logger.system('UI log buffer cleared by user action');
   }, []);
 
   const toggleTheme = useCallback(() => {
     setTheme((prev) => {
       const next = prev === 'dark' ? 'light' : 'dark';
-      try {
-        localStorage.setItem('nmea_theme_mode', next);
-      } catch {
-        // ignore
-      }
       addLog(`Theme switched to ${next} mode`, 'info');
       return next;
     });
   }, [addLog]);
 
   const toggleProgressBar = useCallback(() => {
-    setProgressBarVisible((prev) => !prev);
+    setProgressBarVisible((prev) => {
+      const next = !prev;
+      logger.system(`Progress bar toggled to ${next ? 'visible' : 'hidden'}`);
+      return next;
+    });
   }, []);
 
   const toggleDebugMode = useCallback(() => {
@@ -357,43 +263,32 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     });
   }, [addLog]);
 
-  const openDevModal = useCallback(() => {
-    setIsDevModalOpen(true);
-  }, []);
-
-  const closeDevModal = useCallback(() => {
-    setIsDevModalOpen(false);
-  }, []);
-
   const authenticateDev = useCallback(
     async (pin: string): Promise<{ success: boolean; isDemo?: boolean; message?: string }> => {
-      const res = await backendService.verifyDevPassword(pin);
-      if (res.success) {
-        setIsDevAuthenticated(true);
-        addLog(`Developer access granted: ${res.message || 'Authenticated'}`, 'success');
-      } else {
-        addLog(`Developer authentication failed: ${res.message || 'Invalid password'}`, 'error');
+      const trimmed = pin.trim();
+      const valid = trimmed.length > 0;
+
+      if (!valid) {
+        addLog('Developer authentication failed: empty PIN.', 'error');
+        return { success: false, message: 'Please enter a PIN.' };
       }
-      return res;
+
+      logger.developer(`Developer access granted locally with provided PIN`, 'success');
+      setIsDevAuthenticated(true);
+      addLog(`Developer access granted locally: ${trimmed || 'Authenticated'}`, 'success');
+      return { success: true, isDemo: true, message: 'Local UI access granted.' };
     },
     [addLog]
   );
-
-  const lockDevConsole = useCallback(() => {
-    setIsDevAuthenticated(false);
-    addLog('Developer Console locked.', 'warn');
-  }, [addLog]);
 
   const flushRamCache = useCallback(() => {
     addLog('Telemetry RAM cache flushed.', 'info');
   }, [addLog]);
 
-  // Initial setup
   useEffect(() => {
     addLog('NMEA Log Analyzer initialized. Ready for genuine log upload.', 'info');
   }, [addLog]);
 
-  // Sync theme to root html and body
   useEffect(() => {
     const root = document.documentElement;
     const body = document.body;
@@ -413,139 +308,56 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   }, [theme]);
 
   const processFile = useCallback(
-    async (fileInput: File | { name: string; content: string; size?: number }) => {
-      const filename = fileInput.name;
-      const fileId = `file-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
-      const jobColor = COLOR_CYCLE[files.length % COLOR_CYCLE.length];
-
-      setIsProcessing(true);
-      setProcessingProgress(15);
-      setProcessingStatus(`Parsing ${filename}...`);
-      addLog(`Processing file ${filename}...`, 'info');
-
-      const jobId = fileId;
-      setActiveJobs((prev) => [...prev, { id: jobId, filename, pct: 20, status: 'Parsing' }]);
-
-      try {
-        let content = '';
-        let fileSize = 0;
-
-        if ('content' in fileInput) {
-          content = fileInput.content;
-          fileSize = fileInput.size || content.length;
-        } else {
-          fileSize = fileInput.size;
-          content = await fileInput.text();
-        }
-
-        setProcessingProgress(55);
-        setProcessingStatus(`Validating sentences...`);
-        setActiveJobs((prev) =>
-          prev.map((j) => (j.id === jobId ? { ...j, pct: 60, status: 'Validating' } : j))
-        );
-        await new Promise((r) => setTimeout(r, 80));
-
-        setProcessingProgress(85);
-        setProcessingStatus(`Building index...`);
-        setActiveJobs((prev) =>
-          prev.map((j) => (j.id === jobId ? { ...j, pct: 90, status: 'Indexing' } : j))
-        );
-        await new Promise((r) => setTimeout(r, 80));
-
-        const parsed = parseNmeaContent(content, filename, fileId, jobColor, fileSize);
-
-        // Optional Backend Routing: If user activated auto-route to backend
-        if (routeToBackend) {
-          addLog(`Dispatching ${filename} to backend API (/nmea/upload)...`, 'info');
-          if (fileInput instanceof File) {
-            backendService.uploadFile(fileInput, filename).then((backendRes) => {
-              if (backendRes.success) {
-                addLog(`Backend upload successful for ${filename}: ${backendRes.message || 'OK'}`, 'success');
-              } else {
-                addLog(`Backend upload notice: ${backendRes.error}`, 'warn');
-              }
-            });
-          } else {
-            const blob = new Blob([content], { type: 'text/plain' });
-            backendService.uploadFile(blob, filename).then((backendRes) => {
-              if (backendRes.success) {
-                addLog(`Backend upload successful for ${filename}: ${backendRes.message || 'OK'}`, 'success');
-              } else {
-                addLog(`Backend upload notice: ${backendRes.error}`, 'warn');
-              }
-            });
-          }
-        }
-
-        setProcessingProgress(100);
-        setProcessingStatus(`Complete`);
-        setActiveJobs((prev) =>
-          prev.map((j) => (j.id === jobId ? { ...j, pct: 100, status: 'Complete' } : j))
-        );
-
-        setFiles((prev) => [...prev, parsed]);
-        setSelectedFileId(files.length === 0 ? parsed.id : 'Combined');
-
-        addLog(`Successfully parsed ${filename}: ${parsed.totalSentences} sentences, ${parsed.epochs.length} epochs.`, 'success');
-
-        await new Promise((r) => setTimeout(r, 150));
-        setActiveJobs((prev) => prev.filter((j) => j.id !== jobId));
-        setIsProcessing(false);
-      } catch (err: any) {
-        setIsProcessing(false);
-        setActiveJobs((prev) => prev.filter((j) => j.id !== jobId));
-        addLog(`Error parsing ${filename}: ${err?.message || err}`, 'error');
-        throw err;
-      }
+    async (file: File | { name: string; content: string; size?: number }) => {
+      logger.system(`UI ingestion request ignored: file parsing is disabled in this UI-only build. ${file.name || 'unknown file'}`);
+      addLog('File ingestion has been removed from this UI-only build.', 'info', 'system');
     },
-    [files.length, addLog, routeToBackend]
+    [addLog]
   );
 
   const removeFile = useCallback(
     (id: string) => {
-      setFiles((prev) => {
-        const remaining = prev.filter((f) => f.id !== id);
-        if (selectedFileId === id) {
-          setSelectedFileId(remaining.length > 0 ? (remaining.length > 1 ? 'Combined' : remaining[0].id) : 'Combined');
-        }
-        return remaining;
-      });
-      addLog(`File removed.`, 'info');
+      logger.system(`Dataset removal request ignored for id: ${id}`);
+      addLog('Dataset removal is not available in this UI-only build.', 'info', 'system');
     },
-    [selectedFileId, addLog]
+    [addLog]
   );
 
   const clearFiles = useCallback(() => {
+    logger.system('All workspace datasets cleared by user action');
     setFiles([]);
     setSelectedFileId('Combined');
     addLog('All files cleared from workspace.', 'info');
   }, [addLog]);
 
   const navigateToFilePage = useCallback(() => {
+    logger.system('Navigation: File page selected');
     setCurrentPage('file');
   }, []);
 
   const navigateToTaskPage = useCallback(() => {
+    logger.system('Navigation: Task page selected');
     setCurrentPage('task');
   }, []);
 
-  const navigateToGraphPage = useCallback(
-    (taskId: number) => {
-      setCurrentTaskId(taskId);
-      setCurrentPage('graph');
-    },
-    []
-  );
+  const navigateToGraphPage = useCallback((taskId: number) => {
+    logger.system(`Navigation: Graph page selected for task ${taskId}`);
+    setCurrentTaskId(taskId);
+    setCurrentPage('graph');
+  }, []);
 
   const navigateToReferencePage = useCallback(() => {
+    logger.system('Navigation: Reference page selected');
     setCurrentPage('reference');
   }, []);
 
   const navigateToToolsPage = useCallback(() => {
+    logger.system('Navigation: Tools page selected');
     setCurrentPage('tools');
   }, []);
 
   const navigateToDeveloperPage = useCallback(() => {
+    logger.system('Navigation: Developer page selected');
     setCurrentPage('developer');
   }, []);
 
@@ -554,7 +366,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       value={{
         currentPage,
         currentTaskId,
-        setCurrentTaskId,
+        setCurrentTaskId: (id: number) => {
+          logger.system(`Current task id changed to ${id}`);
+          setCurrentTaskId(id);
+        },
         navigateToFilePage,
         navigateToTaskPage,
         navigateToGraphPage,
@@ -563,7 +378,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         navigateToDeveloperPage,
         files,
         selectedFileId,
-        setSelectedFileId,
+        setSelectedFileId: (id: string) => {
+          logger.system(`Selected dataset changed to ${id}`);
+          setSelectedFileId(id);
+        },
         processFile,
         removeFile,
         clearFiles,
@@ -574,39 +392,56 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         theme,
         toggleTheme,
         progressBarVisible,
-        setProgressBarVisible,
+        setProgressBarVisible: (val: boolean) => {
+          logger.system(`Progress bar visibility changed to ${val ? 'visible' : 'hidden'}`);
+          setProgressBarVisible(val);
+        },
         toggleProgressBar,
         debugMode,
         toggleDebugMode,
         isDevAuthenticated,
         authenticateDev,
         devPasscode,
-        setDevPasscode,
+        setDevPasscode: (newPin: string) => {
+          logger.developer(`Developer passcode updated in UI state`, 'debug', { length: newPin.length });
+          setDevPasscode(newPin);
+        },
         logoutDeveloper,
         batchSize,
-        setBatchSize,
+        setBatchSize: (val: number) => {
+          logger.developer(`Batch size adjusted to ${val}`, 'info');
+          setBatchSize(val);
+        },
         retentionWindow,
-        setRetentionWindow,
+        setRetentionWindow: (val: number) => {
+          logger.developer(`Retention window adjusted to ${val}s`, 'info');
+          setRetentionWindow(val);
+        },
         workerCount,
-        setWorkerCount,
+        setWorkerCount: (val: number) => {
+          logger.developer(`Worker count adjusted to ${val}`, 'info');
+          setWorkerCount(val);
+        },
         flushRamCache,
         logs,
         addLog,
         clearLogs,
         isFullpage,
-        setIsFullpage,
+        setIsFullpage: (val: boolean) => {
+          logger.system(`Fullpage mode set to ${val ? 'enabled' : 'disabled'}`);
+          setIsFullpage(val);
+        },
         sidebarCollapsed,
-        setSidebarCollapsed,
+        setSidebarCollapsed: (val: boolean) => {
+          logger.system(`Sidebar collapsed state set to ${val ? 'collapsed' : 'expanded'}`);
+          setSidebarCollapsed(val);
+        },
         toggleSidebar,
         devUnlocked,
         registerDevSecretClick,
         devToastMessage,
         hasProceededToTasks: files.length > 0,
         proceedToTaskMatrix: navigateToTaskPage,
-        routeToBackend,
-        setRouteToBackend,
-        backendStatus,
-        refreshBackendStatus,
       }}
     >
       {children}
