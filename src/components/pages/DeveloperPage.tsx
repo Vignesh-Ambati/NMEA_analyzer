@@ -145,7 +145,10 @@ export const DeveloperPage: React.FC = () => {
     try {
       const result = await authenticateDev(pinToTest);
       if (!result.success) {
-        setAuthError(result.message || "Invalid password.");
+        setAuthError(result.message || "Invalid credentials.");
+      } else {
+        setAuthPinInput("");
+        setAuthError(null);
       }
     } catch (err: any) {
       setAuthError(err?.message || "Authentication request failed.");
@@ -170,10 +173,7 @@ export const DeveloperPage: React.FC = () => {
       }
       setPinChangeMsg(`PIN saved locally: ${newPin.trim()}`);
       setNewPin("");
-      addLog(
-        "Developer authorization PIN updated locally.",
-        "info",
-      );
+      addLog("Developer authorization PIN updated locally.", "info");
       setTimeout(() => setPinChangeMsg(null), 3500);
     } else {
       setPinChangeMsg("PIN must be at least 4 characters.");
@@ -220,30 +220,38 @@ export const DeveloperPage: React.FC = () => {
               Developer Suite Access
             </h2>
             <p className="text-xs text-[#736E65] dark:text-slate-400 max-w-xs mx-auto leading-relaxed">
-              Local UI-only password verification for the in-browser engineering
-              tools.
+              SQLite-backed scrypt authentication via Core API (POST
+              /api/dev/auth)
             </p>
           </div>
 
           {/* Password Form */}
           <form onSubmit={(e) => handleAuthSubmit(e)} className="space-y-4">
             <div className="space-y-1.5">
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
-                Developer Password / PIN
-              </label>
+              <div className="flex justify-between items-center">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  Developer Password
+                </label>
+                <span className="text-[10px] text-slate-400 font-mono">
+                  Default: 7788
+                </span>
+              </div>
               <div className="relative">
                 <input
                   type={showPassword ? "text" : "password"}
                   value={authPinInput}
                   onChange={(e) => setAuthPinInput(e.target.value)}
-                  placeholder="Enter PIN..."
+                  placeholder="Enter developer passkey..."
+                  disabled={isVerifyingAuth}
                   autoFocus
-                  className="w-full pl-3.5 pr-10 py-2.5 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-sm font-mono text-slate-900 dark:text-slate-100 focus:outline-none focus:border-[#E05318]"
+                  className="w-full pl-3.5 pr-10 py-2.5 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-xl text-sm font-mono text-slate-900 dark:text-slate-100 focus:outline-none focus:border-[#E05318] disabled:opacity-60 disabled:cursor-not-allowed"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                  disabled={isVerifyingAuth}
+                  className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer disabled:opacity-40"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
                 >
                   {showPassword ? (
                     <EyeOff className="w-4 h-4" />
@@ -255,21 +263,21 @@ export const DeveloperPage: React.FC = () => {
             </div>
 
             {authError && (
-              <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 text-rose-700 dark:text-rose-400 text-xs flex items-center space-x-2">
-                <AlertCircle className="w-4 h-4 shrink-0" />
-                <span>{authError}</span>
+              <div className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 text-rose-700 dark:text-rose-400 text-xs flex items-start space-x-2.5 animate-in fade-in duration-150">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span className="leading-relaxed">{authError}</span>
               </div>
             )}
 
             <button
               type="submit"
               disabled={isVerifyingAuth}
-              className="w-full py-3 rounded-xl bg-[#E05318] hover:bg-[#C94713] text-white text-xs font-bold font-mono uppercase shadow-md transition-all cursor-pointer flex items-center justify-center space-x-2 disabled:opacity-50"
+              className="w-full py-3 rounded-xl bg-[#E05318] hover:bg-[#C94713] text-white text-xs font-bold font-mono uppercase shadow-md transition-all cursor-pointer flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isVerifyingAuth ? (
                 <>
                   <RefreshCw className="w-4 h-4 animate-spin" />
-                  <span>Verifying Password...</span>
+                  <span>Verifying with Backend...</span>
                 </>
               ) : (
                 <>
@@ -380,10 +388,10 @@ export const DeveloperPage: React.FC = () => {
                 <span
                   className={`w-3 h-3 rounded-full shrink-0 ${
                     isCheckingBackend
-                      ? 'bg-amber-400 animate-ping'
-                      : backendStatus === 'online'
-                      ? 'bg-emerald-500 shadow-xs'
-                      : 'bg-rose-500 shadow-xs'
+                      ? "bg-amber-400 animate-ping"
+                      : backendStatus === "online"
+                        ? "bg-emerald-500 shadow-xs"
+                        : "bg-rose-500 shadow-xs"
                   }`}
                 />
                 <div className="min-w-0">
@@ -393,22 +401,27 @@ export const DeveloperPage: React.FC = () => {
                     </span>
                     <span
                       className={`text-[10px] font-mono px-2 py-0.5 rounded-md font-semibold ${
-                        backendStatus === 'online'
-                          ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300'
+                        backendStatus === "online"
+                          ? "bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300"
                           : isCheckingBackend
-                          ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300'
-                          : 'bg-rose-100 dark:bg-rose-950/60 text-rose-800 dark:text-rose-300'
+                            ? "bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300"
+                            : "bg-rose-100 dark:bg-rose-950/60 text-rose-800 dark:text-rose-300"
                       }`}
                     >
                       {isCheckingBackend
-                        ? 'Checking...'
-                        : backendStatus === 'online'
-                        ? 'Online'
-                        : 'Offline'}
+                        ? "Checking..."
+                        : backendStatus === "online"
+                          ? "Online"
+                          : "Offline"}
                     </span>
                   </div>
                   <div className="text-[11px] text-[#736E65] dark:text-slate-400 font-mono mt-0.5">
-                    Latency: {backendLatencyMs !== null ? `${backendLatencyMs}ms` : 'N/A'} · Last ping: {lastBackendPingTime || 'Never'} · Auto-ping: every 30m
+                    Latency:{" "}
+                    {backendLatencyMs !== null
+                      ? `${backendLatencyMs}ms`
+                      : "N/A"}{" "}
+                    · Last ping: {lastBackendPingTime || "Never"} · Auto-ping:
+                    every 30m
                   </div>
                 </div>
               </div>
@@ -419,8 +432,12 @@ export const DeveloperPage: React.FC = () => {
                 disabled={isCheckingBackend}
                 className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-[#EFEAE1] dark:bg-slate-800 text-[#736E65] dark:text-slate-200 hover:text-[#E05318] hover:bg-[#E5DFD4] dark:hover:bg-slate-700 border border-[#E6E1D6] dark:border-slate-700 shadow-xs flex items-center space-x-1.5 transition-all cursor-pointer shrink-0 self-start sm:self-auto"
               >
-                <RefreshCw className={`w-3.5 h-3.5 ${isCheckingBackend ? 'animate-spin text-[#E05318]' : ''}`} />
-                <span>{isCheckingBackend ? 'Pinging...' : 'Ping Backend Now'}</span>
+                <RefreshCw
+                  className={`w-3.5 h-3.5 ${isCheckingBackend ? "animate-spin text-[#E05318]" : ""}`}
+                />
+                <span>
+                  {isCheckingBackend ? "Pinging..." : "Ping Backend Now"}
+                </span>
               </button>
             </div>
 

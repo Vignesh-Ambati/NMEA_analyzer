@@ -27,6 +27,26 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <script>
+      (function() {
+        try {
+          var match = document.cookie.match(/(?:^|; )nmea_theme=([^;]*)/);
+          var saved = match ? decodeURIComponent(match[1]) : null;
+          if (!saved) {
+            saved = window.localStorage ? window.localStorage.getItem('nmea_theme') : null;
+          }
+          if (saved === 'dark' || (!saved && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+            document.documentElement.classList.remove('light');
+            document.documentElement.setAttribute('data-theme', 'dark');
+          } else {
+            document.documentElement.classList.add('light');
+            document.documentElement.classList.remove('dark');
+            document.documentElement.setAttribute('data-theme', 'light');
+          }
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body class="bg-[#F5F2EB] text-[#24211D] dark:bg-slate-950 dark:text-slate-100 antialiased font-sans transition-colors duration-150">
     <div id="root"></div>

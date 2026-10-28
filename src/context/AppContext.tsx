@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { PageType, ParsedLogFile, ThemeMode } from '../types';
-import { logger } from '../services/logger';
-import { checkBackendHealth, getBackendPingIntervalMs } from '../backend';
+import { logger, cookieService, COOKIE_KEYS } from '../services';
+import { checkBackendHealth, getBackendPingIntervalMs, backendService } from '../backend';
 
 export interface ConsoleMessage {
   id: string;
@@ -53,7 +53,7 @@ interface AppContextType {
   toggleDebugMode: () => void;
 
   isDevAuthenticated: boolean;
-  authenticateDev: (pin: string) => Promise<{ success: boolean; isDemo?: boolean; message?: string }>;
+  authenticateDev: (pin: string) => Promise<{ success: boolean; authenticated?: boolean; isDemo?: boolean; message?: string }>;
   devPasscode: string;
   setDevPasscode: (newPin: string) => void;
   logoutDeveloper: () => void;
@@ -95,6 +95,17 @@ interface AppContextType {
   pingBackend: () => Promise<boolean>;
 }
 
+const getInitialTheme = (): ThemeMode => {
+  const saved = cookieService.get(COOKIE_KEYS.THEME);
+  if (saved === 'dark' || saved === 'light') return saved;
+
+  if (typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+    return 'dark';
+  }
+
+  return 'light';
+};
+
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
@@ -108,11 +119,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [processingStatus, setProcessingStatus] = useState<string>('Ready');
   const [activeJobs, setActiveJobs] = useState<ActiveJob[]>([]);
 
-  const [theme, setTheme] = useState<ThemeMode>('light');
+  const [theme, setTheme] = useState<ThemeMode>(getInitialTheme);
   const [progressBarVisible, setProgressBarVisible] = useState<boolean>(true);
   const [debugMode, setDebugMode] = useState<boolean>(false);
   const [isFullpage, setIsFullpage] = useState<boolean>(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
+    return cookieService.get(COOKIE_KEYS.SIDEBAR_COLLAPSED) === 'true';
+  });
 
   // Backend status and ping state
   const [backendStatus, setBackendStatus] = useState<'online' | 'offline' | 'checking'>('checking');
@@ -123,6 +136,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const toggleSidebar = useCallback(() => {
     setSidebarCollapsed((prev) => {
       const next = !prev;
+      cookieService.set(COOKIE_KEYS.SIDEBAR_COLLAPSED, String(next));
       logger.system(`Sidebar collapsed state changed to ${next ? 'collapsed' : 'expanded'}`);
       return next;
     });
@@ -185,9 +199,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [isDevAuthenticated, setIsDevAuthenticated] = useState<boolean>(false);
   const [devPasscode, setDevPasscode] = useState<string>('');
 
-  const [batchSize, setBatchSize] = useState<number>(500);
-  const [retentionWindow, setRetentionWindow] = useState<number>(3600);
-  const [workerCount, setWorkerCount] = useState<number>(4);
+  const [batchSize, setBatchSize] = useState<number>(() => {
+    const saved = cookieService.get(COOKIE_KEYS.BATCH_SIZE);
+    return saved ? parseInt(saved, 10) : 500;
+  });
+  const [retentionWindow, setRetentionWindow] = useState<number>(() => {
+    const saved = cookieService.get(COOKIE_KEYS.RETENTION_WINDOW);
+    return saved ? parseInt(saved, 10) : 3600;
+  });
+  const [workerCount, setWorkerCount] = useState<number>(() => {
+    const saved = cookieService.get(COOKIE_KEYS.WORKER_COUNT);
+    return saved ? parseInt(saved, 10) : 4;
+  });
 
   const [logs, setLogs] = useState<ConsoleMessage[]>(() =>
     logger.getLogs().map((l) => ({
@@ -277,19 +300,38 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   }, [addLog]);
 
   const authenticateDev = useCallback(
-    async (pin: string): Promise<{ success: boolean; isDemo?: boolean; message?: string }> => {
+    async (pin: string): Promise<{ success: boolean; authenticated?: boolean; isDemo?: boolean; message?: string }> => {
       const trimmed = pin.trim();
-      const valid = trimmed.length > 0;
 
-      if (!valid) {
-        addLog('Developer authentication failed: empty PIN.', 'error');
-        return { success: false, message: 'Please enter a PIN.' };
+      if (!trimmed) {
+        addLog('Developer authentication failed: empty password/PIN.', 'error', 'developer');
+        return { success: false, authenticated: false, message: 'Please enter a developer password or PIN.' };
       }
 
-      logger.developer(`Developer access granted locally with provided PIN`, 'success');
+      addLog(`Submitting developer credentials to backend authentication endpoint (POST /api/dev/auth)...`, 'info', 'developer');
+      const result = await backendService.verifyDevPassword(trimmed);
+
+      if (result.authenticated) {
       setIsDevAuthenticated(true);
-      addLog(`Developer access granted locally: ${trimmed || 'Authenticated'}`, 'success');
-      return { success: true, isDemo: true, message: 'Local UI access granted.' };
+        addLog(`Developer authentication verified by backend: access granted.`, 'success', 'developer');
+        return { success: true, authenticated: true, message: result.message };
+      }
+
+      if (result.isOffline) {
+        addLog(`Developer authentication offline: ${result.message}`, 'warn', 'developer');
+        return {
+          success: false,
+          authenticated: false,
+          message: result.message,
+        };
+      }
+      // Backend returned 401 Unauthorized or other invalid credentials message
+      addLog(`Developer authentication rejected: ${result.message}`, 'error', 'developer');
+      return {
+        success: false,
+        authenticated: false,
+        message: result.message || 'Invalid developer credentials.',
+      };
     },
     [addLog]
   );
@@ -318,6 +360,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       body.classList.add('light');
       body.classList.remove('dark');
     }
+
+    // Persist to centralized cookie service
+    cookieService.set(COOKIE_KEYS.THEME, theme);
   }, [theme]);
 
   const processFile = useCallback(
@@ -464,16 +509,19 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         logoutDeveloper,
         batchSize,
         setBatchSize: (val: number) => {
+          cookieService.set(COOKIE_KEYS.BATCH_SIZE, String(val));
           logger.developer(`Batch size adjusted to ${val}`, 'info');
           setBatchSize(val);
         },
         retentionWindow,
         setRetentionWindow: (val: number) => {
+          cookieService.set(COOKIE_KEYS.RETENTION_WINDOW, String(val));
           logger.developer(`Retention window adjusted to ${val}s`, 'info');
           setRetentionWindow(val);
         },
         workerCount,
         setWorkerCount: (val: number) => {
+          cookieService.set(COOKIE_KEYS.WORKER_COUNT, String(val));
           logger.developer(`Worker count adjusted to ${val}`, 'info');
           setWorkerCount(val);
         },
