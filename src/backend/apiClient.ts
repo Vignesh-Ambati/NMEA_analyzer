@@ -304,9 +304,151 @@ export const verifyDevPassword = async (
   }
 };
 /**
+ * Fetch engine parameters from backend (GET /api/dev/engine-params)
+ */
+export const fetchEngineParams = async (
+  timeoutMs = 5000,
+): Promise<{ success: boolean; data?: import("./types").EngineTuningParams; message?: string; error?: string }> => {
+  const url = getApiUrl(ENDPOINTS.DEV_ENGINE_PARAMS);
+  const start = performance.now();
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const response = await fetch(url, {
+      method: "GET",
+      headers: { Accept: "application/json" },
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+    const latencyMs = Math.round(performance.now() - start);
+
+    if (response.ok) {
+      const data: any = await response.json();
+      const params = {
+        batchSize: Number(data.batchSize ?? data.batch_size ?? 500),
+        retentionWindow: Number(data.retentionWindow ?? data.retention_window ?? 3600),
+        workerCount: Number(data.workerCount ?? data.worker_count ?? 4),
+        updatedAt: data.updatedAt || data.updated_at || new Date().toISOString(),
+      };
+      logger.developer(`Fetched engine parameters from backend DB (${latencyMs}ms)`, "success", { url, params }, latencyMs);
+      return { success: true, data: params };
+    }
+
+    const errData = await response.json().catch(() => ({}));
+    const errMsg = errData.detail || errData.message || `Failed to fetch engine params (HTTP ${response.status})`;
+    logger.developer(`Engine params fetch failed: ${errMsg}`, "warn", { url, statusCode: response.status });
+    return { success: false, message: errMsg };
+  } catch (err: any) {
+    const errMsg = err?.name === "AbortError" ? "Request timed out" : (err?.message || "Backend offline");
+    logger.developer(`Engine params fetch error: ${errMsg}`, "warn", { url, error: errMsg });
+    return { success: false, error: errMsg, message: errMsg };
+  }
+};
+
+/**
+ * Commit engine parameters to backend DB (POST /api/dev/engine-params)
+ */
+export const commitEngineParams = async (
+  params: import("./types").EngineTuningParams,
+  timeoutMs = 6000,
+): Promise<{ success: boolean; message: string; params?: import("./types").EngineTuningParams }> => {
+  const url = getApiUrl(ENDPOINTS.DEV_ENGINE_PARAMS);
+  const start = performance.now();
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({
+        batchSize: params.batchSize,
+        batch_size: params.batchSize,
+        retentionWindow: params.retentionWindow,
+        retention_window: params.retentionWindow,
+        workerCount: params.workerCount,
+        worker_count: params.workerCount,
+      }),
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+    const latencyMs = Math.round(performance.now() - start);
+
+    if (response.ok) {
+      const data = await response.json().catch(() => ({}));
+      const successMsg = data.message || "Engine parameters synchronized with backend database.";
+      logger.developer(`Committed engine params to backend DB (${latencyMs}ms)`, "success", { url, params }, latencyMs);
+      return { success: true, message: successMsg, params };
+    }
+
+    const errData = await response.json().catch(() => ({}));
+    const errMsg = errData.detail || errData.message || `Backend rejected engine params (HTTP ${response.status})`;
+    logger.developer(`Engine params commit rejected: ${errMsg}`, "error", { url, statusCode: response.status });
+    return { success: false, message: errMsg };
+  } catch (err: any) {
+    const errMsg = err?.name === "AbortError" ? "Request timed out" : (err?.message || "Backend offline");
+    logger.developer(`Engine params commit error: ${errMsg}`, "error", { url, error: errMsg });
+    return { success: false, message: `Failed to commit to backend: ${errMsg}` };
+  }
+};
+
+/**
+ * Update developer access password in backend DB (POST /api/dev/password)
+ * Note: Never logs passwords or sensitive payloads!
+ */
+export const updateDevPassword = async (
+  payload: import("./types").UpdateDevPasswordPayload,
+  timeoutMs = 6000,
+): Promise<{ success: boolean; message: string }> => {
+  const url = getApiUrl(ENDPOINTS.DEV_PASSWORD);
+  const start = performance.now();
+  logger.network(`Initiating password update request to ${url}`, "info", { route: url, method: "POST" });
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({
+        currentPassword: payload.currentPassword,
+        newPassword: payload.newPassword,
+        password: payload.newPassword,
+      }),
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+    const latencyMs = Math.round(performance.now() - start);
+
+    if (response.ok) {
+      const data = await response.json().catch(() => ({}));
+      const successMsg = data.message || "Developer access password successfully updated in backend database.";
+      logger.developer(`Developer access password updated in backend DB (${latencyMs}ms)`, "success", { url }, latencyMs);
+      return { success: true, message: successMsg };
+    }
+
+    const errData = await response.json().catch(() => ({}));
+    const errMsg = errData.detail || errData.message || `Password update failed (HTTP ${response.status})`;
+    logger.developer(`Developer password update rejected: ${errMsg}`, "warn", { url, statusCode: response.status });
+    return { success: false, message: errMsg };
+  } catch (err: any) {
+    const errMsg = err?.name === "AbortError" ? "Request timed out" : (err?.message || "Backend offline");
+    logger.developer(`Developer password update error: ${errMsg}`, "error", { url, error: errMsg });
+    return { success: false, message: `Backend error: ${errMsg}` };
+  }
+};
+
+/**
  * Unified Backend Service client
  */
 export const backendService = {
   checkHealth: checkBackendHealth,
   verifyDevPassword,
+  fetchEngineParams,
+  commitEngineParams,
+  updateDevPassword,
 };

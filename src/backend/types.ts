@@ -63,3 +63,26 @@ export interface BackendTaskCalculationResponse {
     count: number;
   };
 }
+
+export interface EngineTuningParams {
+  batchSize: number;
+  retentionWindow: number;
+  workerCount: number;
+  updatedAt?: string;
+}
+
+export interface EngineTuningResponse {
+  success: boolean;
+  message: string;
+  params?: EngineTuningParams;
+}
+
+export interface UpdateDevPasswordPayload {
+  currentPassword?: string;
+  newPassword: string;
+}
+
+export interface UpdateDevPasswordResponse {
+  success: boolean;
+  message: string;
+}

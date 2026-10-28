@@ -1,4 +1,6 @@
 import { defineConfig, loadEnv } from "vite";
+import type { PluginOption, UserConfig } from "vite";
+import type { ServerOptions as HttpsServerOptions } from "node:https";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import basicSsl from "@vitejs/plugin-basic-ssl";
@@ -6,7 +8,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 // https://vitejs.dev/config/
-export default defineConfig(({ mode }) => {
+export default defineConfig(({ mode }): UserConfig => {
   const env = loadEnv(mode, process.cwd(), "");
 
   // Detect Cloud Run / container environment where edge terminates TLS and container must listen on plain HTTP
@@ -32,17 +34,16 @@ export default defineConfig(({ mode }) => {
 
   const hasCustomCerts = fs.existsSync(certPath) && fs.existsSync(keyPath);
 
-  const plugins = [react(), tailwindcss()];
+  const plugins: PluginOption[] = [react(), tailwindcss()];
 
-  let httpsConfig: boolean | { key: Buffer; cert: Buffer } | undefined =
-    undefined;
+  let httpsOptions: HttpsServerOptions | undefined = undefined;
 
   if (isHttpsRequested) {
     if (hasCustomCerts) {
       console.log(
         `\n\x1b[32m✔ [Vite HTTPS] Using custom backend certificates:\x1b[0m\n  Cert: ${certPath}\n  Key:  ${keyPath}\n`,
       );
-      httpsConfig = {
+      httpsOptions = {
         key: fs.readFileSync(keyPath),
         cert: fs.readFileSync(certPath),
       };
@@ -51,7 +52,6 @@ export default defineConfig(({ mode }) => {
         `\n\x1b[36mℹ [Vite HTTPS] Certificates not found at '${rawCert}'. Auto-generating development SSL certificates...\x1b[0m\n`,
       );
       plugins.push(basicSsl());
-      httpsConfig = true;
     }
   }
 
@@ -62,7 +62,8 @@ export default defineConfig(({ mode }) => {
   return {
     plugins,
     server: {
-      https: httpsConfig,
+      https: httpsOptions,
+      hmr: !isCloudContainer,
       proxy: {
         "/api": {
           target: backendUrl,

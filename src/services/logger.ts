@@ -46,6 +46,30 @@ export type LogSubscriber = (entry: AppLogEntry, allLogs: AppLogEntry[]) => void
 
 const MAX_LOGS = 1000;
 
+/**
+ * Deep credential redaction to guarantee passwords, tokens, and secret keys
+ * are never stored in memory logs, developer console, or exported reports.
+ */
+export function redactSensitiveData(data: any): any {
+  if (data === null || data === undefined) return data;
+  if (typeof data === "string") {
+    return data.replace(/(password|passcode|pin|secret|auth|token|credential)=([^&\s]+)/gi, "$1=[REDACTED]");
+  }
+  if (typeof data !== "object") return data;
+  if (Array.isArray(data)) {
+    return data.map(redactSensitiveData);
+  }
+  const sanitized: Record<string, any> = {};
+  for (const [key, val] of Object.entries(data)) {
+    if (/password|passcode|pin|secret|credential|token|auth_token|auth_key/i.test(key)) {
+      sanitized[key] = "[REDACTED]";
+    } else {
+      sanitized[key] = redactSensitiveData(val);
+    }
+  }
+  return sanitized;
+}
+
 class DiagnosticLogger {
   private logs: AppLogEntry[] = [];
   private offlineDiagnostics: OfflineDiagnosticEntry[] = [];
@@ -157,8 +181,15 @@ class DiagnosticLogger {
 
   public log(entry: Omit<AppLogEntry, 'id' | 'timestamp' | 'isoDate'>): AppLogEntry {
     const now = new Date();
+    const sanitizedDetails = entry.details ? redactSensitiveData(entry.details) : undefined;
+    const sanitizedMessage = typeof entry.message === 'string'
+      ? entry.message.replace(/(password|passcode|pin|secret|auth)=([^&\s]+)/gi, '$1=[REDACTED]')
+      : entry.message;
+
     const fullEntry: AppLogEntry = {
       ...entry,
+      message: sanitizedMessage,
+      details: sanitizedDetails,
       id: `log-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
       timestamp: this.formatTime(now),
       isoDate: now.toISOString(),

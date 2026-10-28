@@ -4,4 +4,21 @@
  * Provides high-level client functions for backend operations.
  */
 
-export * from './apiClient';
+import {
+  backendService,
+  checkBackendHealth,
+  verifyDevPassword,
+  fetchEngineParams,
+  commitEngineParams,
+  updateDevPassword,
+} from './apiClient';
+
+export {
+  backendService,
+  checkBackendHealth,
+  verifyDevPassword,
+  fetchEngineParams,
+  commitEngineParams,
+  updateDevPassword,
+};
+export default backendService;

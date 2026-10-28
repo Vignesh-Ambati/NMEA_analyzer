@@ -10,11 +10,14 @@ export const ENDPOINTS = {
   DEV_AUTH: '/dev/auth',
   DEV_SETTINGS: '/dev/settings',
   DEV_ENGINE_PARAMS: '/dev/engine-params',
+  DEV_PASSWORD: '/dev/password',
   PARSE_NMEA: '/nmea/parse',
   UPLOAD_LOG: '/nmea/upload',
   EXTRACTION_COPY: '/extraction/bulk-line-copy',
   TASK_STATUS: (taskId: string | number) => `/tasks/${taskId}`,
 } as const;
+
+export const ROUTE_DEV_PASSWORD = ENDPOINTS.DEV_PASSWORD;
 
 export const ROUTE_HEALTH = ENDPOINTS.HEALTH;
 export const ROUTE_DEV_LOGS = ENDPOINTS.DEV_LOGS;

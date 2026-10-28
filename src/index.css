@@ -2,44 +2,42 @@
 
 @variant dark (&:where(.dark, .dark *));
 
-@layer base {
-  :root {
-    --bg-app: #F5F2EB; /* Warm eye-care soothing canvas */
-    --bg-card: #FAF8F5; /* Warm paper / soft eggshell surface */
-    --border-subtle: #E6E1D6; /* Warm sand boundary */
-    --text-primary: #24211D; /* Warm dark charcoal (comfortable contrast) */
-    --text-muted: #736E65; /* Warm taupe-slate */
-  }
+:root {
+  --bg-app: #F5F2EB; /* Warm eye-care soothing canvas */
+  --bg-card: #FAF8F5; /* Warm paper / soft eggshell surface */
+  --border-subtle: #E6E1D6; /* Warm sand boundary */
+  --text-primary: #24211D; /* Warm dark charcoal (comfortable contrast) */
+  --text-muted: #736E65; /* Warm taupe-slate */
+}
 
-  .dark {
-    --bg-app: #0B1120;
-    --bg-card: #131D31;
-    --border-subtle: #1E2E48;
-    --text-primary: #F1F5F9;
-    --text-muted: #94A3B8;
-  }
+.dark {
+  --bg-app: #0B1120;
+  --bg-card: #131D31;
+  --border-subtle: #1E2E48;
+  --text-primary: #F1F5F9;
+  --text-muted: #94A3B8;
+}
 
-  html {
-    color-scheme: light;
-  }
+html {
+  color-scheme: light;
+}
 
-  html.dark {
-    color-scheme: dark;
-  }
+html.dark {
+  color-scheme: dark;
+}
 
-  body {
-    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
-    margin: 0;
-    padding: 0;
-    background-color: var(--bg-app);
-    color: var(--text-primary);
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-  }
+body {
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  margin: 0;
+  padding: 0;
+  background-color: var(--bg-app);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
 
-  code, pre, .font-mono {
-    font-family: 'JetBrains Mono', Consolas, monospace;
-  }
+code, pre, .font-mono {
+  font-family: 'JetBrains Mono', Consolas, monospace;
 }
 
 /* Eye-care friendly smooth scrollbars */

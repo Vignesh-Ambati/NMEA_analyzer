@@ -53,10 +53,9 @@ interface AppContextType {
   toggleDebugMode: () => void;
 
   isDevAuthenticated: boolean;
-  authenticateDev: (pin: string) => Promise<{ success: boolean; authenticated?: boolean; isDemo?: boolean; message?: string }>;
-  devPasscode: string;
-  setDevPasscode: (newPin: string) => void;
+  authenticateDev: (password: string) => Promise<{ success: boolean; authenticated?: boolean; message?: string }>;
   logoutDeveloper: () => void;
+  purgeClientStorage: () => void;
 
   batchSize: number;
   setBatchSize: (val: number) => void;
@@ -197,7 +196,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const [isDevModalOpen, setIsDevModalOpen] = useState<boolean>(false);
   const [isDevAuthenticated, setIsDevAuthenticated] = useState<boolean>(false);
-  const [devPasscode, setDevPasscode] = useState<string>('');
+
+  // Clear legacy client storage credentials on initialization
+  useEffect(() => {
+    try {
+      localStorage.removeItem('dev_pin');
+      localStorage.removeItem('dev_token');
+    } catch {
+      // Ignored if storage is restricted
+    }
+  }, []);
 
   const [batchSize, setBatchSize] = useState<number>(() => {
     const saved = cookieService.get(COOKIE_KEYS.BATCH_SIZE);
@@ -300,20 +308,20 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   }, [addLog]);
 
   const authenticateDev = useCallback(
-    async (pin: string): Promise<{ success: boolean; authenticated?: boolean; isDemo?: boolean; message?: string }> => {
-      const trimmed = pin.trim();
+    async (password: string): Promise<{ success: boolean; authenticated?: boolean; message?: string }> => {
+      const trimmed = password.trim();
 
       if (!trimmed) {
-        addLog('Developer authentication failed: empty password/PIN.', 'error', 'developer');
-        return { success: false, authenticated: false, message: 'Please enter a developer password or PIN.' };
+        addLog('Developer authentication failed: empty password submitted.', 'error', 'developer');
+        return { success: false, authenticated: false, message: 'Please enter the developer password.' };
       }
 
-      addLog(`Submitting developer credentials to backend authentication endpoint (POST /api/dev/auth)...`, 'info', 'developer');
+      addLog('Verifying developer credentials against backend database (POST /api/dev/auth)...', 'info', 'developer');
       const result = await backendService.verifyDevPassword(trimmed);
 
       if (result.authenticated) {
-      setIsDevAuthenticated(true);
-        addLog(`Developer authentication verified by backend: access granted.`, 'success', 'developer');
+        setIsDevAuthenticated(true);
+        addLog('Developer authentication verified by backend DB: access granted.', 'success', 'developer');
         return { success: true, authenticated: true, message: result.message };
       }
 
@@ -322,10 +330,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         return {
           success: false,
           authenticated: false,
-          message: result.message,
+          message: 'Backend database service is offline or unreachable. Authentication requires an active database connection.',
         };
       }
-      // Backend returned 401 Unauthorized or other invalid credentials message
+
       addLog(`Developer authentication rejected: ${result.message}`, 'error', 'developer');
       return {
         success: false,
@@ -337,7 +345,20 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   );
 
   const flushRamCache = useCallback(() => {
-    addLog('Telemetry RAM cache flushed.', 'info');
+    logger.clear();
+    setLogs([]);
+    addLog('Telemetry RAM cache and temporary buffers purged from memory.', 'success', 'system');
+  }, [addLog]);
+
+  const purgeClientStorage = useCallback(() => {
+    try {
+      localStorage.removeItem('dev_pin');
+      localStorage.removeItem('dev_token');
+      sessionStorage.clear();
+      addLog('Local client cache and session storages purged.', 'success', 'system');
+    } catch {
+      addLog('Failed to purge local client storage.', 'warn', 'system');
+    }
   }, [addLog]);
 
   useEffect(() => {
@@ -416,6 +437,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const navigateToDeveloperPage = useCallback(() => {
     logger.system('Navigation: Developer page selected');
+    setDevUnlocked(true);
     setCurrentPage('developer');
   }, []);
 
@@ -501,12 +523,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         toggleDebugMode,
         isDevAuthenticated,
         authenticateDev,
-        devPasscode,
-        setDevPasscode: (newPin: string) => {
-          logger.developer(`Developer passcode updated in UI state`, 'debug', { length: newPin.length });
-          setDevPasscode(newPin);
-        },
         logoutDeveloper,
+        purgeClientStorage,
         batchSize,
         setBatchSize: (val: number) => {
           cookieService.set(COOKIE_KEYS.BATCH_SIZE, String(val));
