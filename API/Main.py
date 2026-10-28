@@ -9,7 +9,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
 from contextlib import asynccontextmanager
 
-from DATA_BASE import dev_auth_repo
+from DATA_BASE import dev_auth_repo, engine_params_repo
 from CORE import system_logger, error_logger
 from API.ENDPOINTS import router as endpoints_router
 from API.Config import ( ALLOWED_ORIGINS, ALLOWED_ORIGINS_SET, API_PREFIX, APP_TITLE, APP_VERSION, )
@@ -18,6 +18,7 @@ from API.Config import ( ALLOWED_ORIGINS, ALLOWED_ORIGINS_SET, API_PREFIX, APP_T
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     try:
         dev_auth_repo.initialize_schema()
+        engine_params_repo.initialize_schema()
         system_logger.info("Developer authentication SQLite Database initialized successfully")
     except Exception as exc:
         error_logger.critical(f"Failed to provision authentication database: {exc}", exc_info=True)

@@ -11,9 +11,10 @@ API_PORT: Final[int] = int(os.getenv("API_PORT", "8000"))
 API_PREFIX: str = "/api"
 
 ROUTE_HEALTH: str = "/health"
-ROUTE_DEV_LOGS: str = "/dev/logs"
+ROUTE_DEV_LOGS: str = "/dev/logs"   #TODO: We need to add this later.
 ROUTE_DEV_AUTH: str = "/dev/auth"
-ROUTE_DEV_SETTINGS: str = "/dev/settings"
+ROUTE_DEV_PASSWORD: str = "/dev/password"
+ROUTE_DEV_SETTINGS: str = "/dev/settings"  #TODO: We need to add this later.
 ROUTE_DEV_ENGINE_PARAMS: str = "/dev/engine-params"
 ROUTE_NMEA_PARSE: str = "/nmea/parse"
 ROUTE_NMEA_UPLOAD: str = "/nmea/upload"
@@ -42,6 +43,7 @@ __all__ = [
     "ROUTE_HEALTH",
     "ROUTE_DEV_LOGS",
     "ROUTE_DEV_AUTH",
+    "ROUTE_DEV_PASSWORD",
     "ROUTE_DEV_SETTINGS",
     "ROUTE_DEV_ENGINE_PARAMS",
     "ROUTE_NMEA_PARSE",

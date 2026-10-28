@@ -6,13 +6,12 @@ import threading
 from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, File, HTTPException, Query, UploadFile, status
 
-from DATA_BASE import dev_auth_repo
 from CORE.MANAGERS import JobManager
 from CORE import system_logger, error_logger
 from CORE.EXTRACTORS import RegexLineExtractor
-from DATA_BASE import ( fetch_logs, get_developer_settings, get_engine_params, save_developer_settings, save_engine_params, )
-from API.Config import ( ROUTE_DEV_AUTH, ROUTE_DEV_ENGINE_PARAMS, ROUTE_DEV_LOGS, ROUTE_DEV_SETTINGS, ROUTE_EXTRACTION_COPY, ROUTE_EXTRACTION_STATUS, ROUTE_HEALTH, ROUTE_NMEA_PARSE, ROUTE_NMEA_UPLOAD, API_PREFIX)
-from API.Schemas import ( BulkLineCopyRequest, DevAuthRequest, DevAuthResponse, DevLogsQueryResponse, DevSettingsPayload, DevSettingsResponse, EngineParamsResponse, HealthResponse, NmeaEpochItem, NmeaParseRequest, NmeaParseResponse, NmeaUploadResponse, TaskInitializationResponse, TaskProgressResponse, )
+from DATA_BASE import dev_auth_repo, engine_params_repo
+from API.Config import ( ROUTE_DEV_AUTH, ROUTE_DEV_PASSWORD, ROUTE_DEV_ENGINE_PARAMS, ROUTE_EXTRACTION_COPY, ROUTE_EXTRACTION_STATUS, ROUTE_HEALTH, ROUTE_NMEA_PARSE, ROUTE_NMEA_UPLOAD, API_PREFIX)
+from API.Schemas import ( EngineParamsResponse, EngineParamsCommitResponse, EngineParamsUpdateRequest, DevAuthRequest, DevAuthResponse, HealthResponse, NmeaEpochItem, NmeaParseRequest, NmeaParseResponse, NmeaUploadResponse, TaskInitializationResponse, TaskProgressResponse, BulkLineCopyRequest)
 
 router: APIRouter = APIRouter()
 _job_manager: JobManager = JobManager()
@@ -33,36 +32,35 @@ def health_check() -> HealthResponse:
         },
     )
 
-@router.get(ROUTE_DEV_LOGS, response_model=DevLogsQueryResponse)
-def fetch_dev_logs(
-    limit: int = Query(default=200, ge=1, le=1000),
-    level: Optional[str] = Query(default=None),
-    stage: Optional[str] = Query(default=None),
-    source: Optional[str] = Query(default=None),
-) -> DevLogsQueryResponse:
-    rows: List[Dict[str, Any]] = fetch_logs(limit=limit, level=level, stage=stage, source=source)
-    return DevLogsQueryResponse(count=len(rows), logs=rows)
+@router.get(ROUTE_DEV_ENGINE_PARAMS, response_model=EngineParamsResponse)
+def read_engine_params() -> EngineParamsResponse:
+    params = engine_params_repo.get_parameters()
+    return EngineParamsResponse(**params)
 
-@router.get(ROUTE_DEV_SETTINGS, response_model=Dict[str, Any])
-def retrieve_dev_settings() -> Dict[str, Any]:
-    settings: Dict[str, Any] = get_developer_settings()
-    return settings
 
-@router.post(ROUTE_DEV_SETTINGS, response_model=DevSettingsResponse)
-def persist_dev_settings(payload: DevSettingsPayload) -> DevSettingsResponse:
-    persisted: Dict[str, Any] = save_developer_settings(payload.model_dump())
-    system_logger.info("Developer settings persisted successfully.")
-    return DevSettingsResponse(saved=True, message="Developer settings updated", data=persisted)
-
-@router.get(ROUTE_DEV_ENGINE_PARAMS, response_model=Dict[str, Any])
-def read_engine_params() -> Dict[str, Any]:
-    return get_engine_params()
-
-@router.post(ROUTE_DEV_ENGINE_PARAMS, response_model=EngineParamsResponse)
-def update_engine_params(payload: Dict[str, Any]) -> EngineParamsResponse:
-    persisted: Dict[str, Any] = save_engine_params(payload)
-    system_logger.info("Engine parameters saved.")
-    return EngineParamsResponse(saved=True, message="Engine parameters applied successfully", data=persisted)
+@router.post(ROUTE_DEV_ENGINE_PARAMS, response_model=EngineParamsCommitResponse)
+def update_engine_params(payload: EngineParamsUpdateRequest) -> EngineParamsCommitResponse:
+    try:
+        engine_params_repo.update_parameters(
+            batch_size=payload.resolved_batch_size,
+            retention_window=payload.resolved_retention_window,
+            worker_count=payload.resolved_worker_count,
+        )
+        system_logger.info(
+            f"Engine parameters updated: BATCH={payload.resolved_batch_size}, "
+            f"RETENTION={payload.resolved_retention_window}s, "
+            f"WORKERS={payload.resolved_worker_count}x"
+        )
+        return EngineParamsCommitResponse(
+            success=True,
+            message="Engine parameters synchronized with backend database."
+        )
+    except Exception as exc:
+        error_logger.error(f"Failed to commit engine parameters: {exc}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to persist engine parameters to database."
+        )
 
 @router.post(ROUTE_NMEA_PARSE, response_model=NmeaParseResponse)
 def parse_nmea(payload: NmeaParseRequest) -> NmeaParseResponse:
@@ -147,4 +145,36 @@ def authenticate_dev(payload: DevAuthRequest) -> DevAuthResponse:
         system_logger.info("Developer access authorized via sqlite vault")
         return DevAuthResponse(authenticated=True, message="Developer Access granted")
     error_logger.warning("Unauthorized access attempt on developer authentication endpoint.")
-    raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+    raise HTTPException( status_code=status.HTTP_401_UNAUTHORIZED,
+        detail= {"authenticated": False, "detail": "Invalid developer credentials.", }, )
+    
+@router.post(ROUTE_DEV_PASSWORD, response_model=DevPasswordUpdateResponse)
+def update_developer_password(payload: DevPasswordUpdateRequest) -> DevPasswordUpdateResponse:
+    current_pwd: str = payload.resolved_current_pwd
+    new_pwd: str = payload.resolved_new_pwd
+
+    # 1. Verify that the supplied current password is valid
+    if not dev_auth_repo.verify_developer_passkey(current_pwd):
+        error_logger.warning("Failed developer password update: incorrect current credentials.")[cite: 2]
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,[cite: 2]
+            detail={
+                "success": False,
+                "detail": "Invalid current developer credentials.",
+            },
+        )
+
+    # 2. Persist new hashed password
+    updated: bool = dev_auth_repo.update_developer_passkey(new_pwd)
+    if not updated:
+        error_logger.error("Failed to write updated developer password to database.")[cite: 2]
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,[cite: 2]
+            detail="Failed to update developer password in database.",[cite: 2]
+        )
+
+    system_logger.info("Developer access password updated successfully in SQLite vault.")[cite: 2]
+    return DevPasswordUpdateResponse(
+        success=True,
+        message="Developer access password successfully updated in backend database.",
+    )
