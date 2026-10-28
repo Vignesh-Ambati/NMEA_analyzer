@@ -86,5 +86,5 @@ RETENTION_WINDOW_SECONDS = 3 * 24 * 60 * 60
 
 
 _BASE_DIR = Path(__file__).resolve().parent.parent.parent
-CERT_FILE_PATH = os.path.join(_BASE_DIR, "cert.pem")
-KEY_FILE_PATH = os.path.join(_BASE_DIR, "key.pem")
+CERT_FILE_PATH = os.path.join(_BASE_DIR, "OUTPUT/cert.pem")
+KEY_FILE_PATH = os.path.join(_BASE_DIR, "OUTPUT/key.pem")

@@ -66,12 +66,12 @@ def generate_self_signed_cert() -> None:
     system_logger.info("SSL Certificates written successfully to target paths.")
 
 if __name__ == "__main__":
-    # generate_self_signed_cert()
+    generate_self_signed_cert()
     uvicorn.run(
         "API.Main:app",
         host=API_HOST,
         port=API_PORT,
-        # ssl_keyfile=KEY_FILE_PATH,
-        # ssl_certfile=CERT_FILE_PATH,
+        ssl_keyfile=KEY_FILE_PATH,
+        ssl_certfile=CERT_FILE_PATH,
         reload=True,
     )
