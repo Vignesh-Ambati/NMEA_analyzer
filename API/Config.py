@@ -21,7 +21,7 @@ ROUTE_NMEA_UPLOAD: str = "/nmea/upload"
 ROUTE_EXTRACTION_COPY: str = "/extraction/bulk-line-copy"
 ROUTE_EXTRACTION_STATUS: str = "/tasks/{task_id}"
 
-ALLOWED_ORIGINS: Final[List[str]] = [
+ALLOWED_ORIGINS: List[str] = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
     "http://localhost:5173",
@@ -32,7 +32,7 @@ ALLOWED_ORIGINS: Final[List[str]] = [
     "https://localhost:5173",
     "https://127.0.0.1:5173",
 ]
-ALLOWED_ORIGINS_SET: Final[Set[str]] = set(ALLOWED_ORIGINS)
+ALLOWED_ORIGINS_SET: Set[str] = set(ALLOWED_ORIGINS)
 
 __all__ = [
     "APP_TITLE",

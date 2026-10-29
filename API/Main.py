@@ -12,7 +12,7 @@ from contextlib import asynccontextmanager
 from DATA_BASE import dev_auth_repo, engine_params_repo
 from CORE import system_logger, error_logger
 from API.ENDPOINTS import router as endpoints_router
-from API.Config import ( ALLOWED_ORIGINS, ALLOWED_ORIGINS_SET, API_PREFIX, APP_TITLE, APP_VERSION, )
+from API import ( ALLOWED_ORIGINS, ALLOWED_ORIGINS_SET, API_PREFIX, APP_TITLE, APP_VERSION, )
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:

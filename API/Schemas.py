@@ -155,11 +155,6 @@ class TaskProgressResponse(StrictBaseModel):
     lines: int
     error: Optional[str] = None
 
-
-class GenericClientErrorResponse(StrictBaseModel):
-    detail: str
-
-
 __all__ = [
     "HealthResponse",
     
@@ -184,5 +179,4 @@ __all__ = [
     "BulkLineCopyRequest",
     "TaskInitializationResponse",
     "TaskProgressResponse",
-    "GenericClientErrorResponse",
 ]

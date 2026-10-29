@@ -1,6 +1,5 @@
 import uuid
 import datetime
-import secrets
 import threading
 
 from typing import Any, Dict, List, Optional
@@ -10,8 +9,7 @@ from CORE.MANAGERS import JobManager
 from CORE import system_logger, error_logger
 from CORE.EXTRACTORS import RegexLineExtractor
 from DATA_BASE import dev_auth_repo, engine_params_repo
-from API.Config import ( ROUTE_DEV_AUTH, ROUTE_DEV_PASSWORD, ROUTE_DEV_ENGINE_PARAMS, ROUTE_EXTRACTION_COPY, ROUTE_EXTRACTION_STATUS, ROUTE_HEALTH, ROUTE_NMEA_PARSE, ROUTE_NMEA_UPLOAD, API_PREFIX)
-from API.Schemas import ( EngineParamsResponse, EngineParamsCommitResponse, EngineParamsUpdateRequest, DevAuthRequest, DevAuthResponse, HealthResponse, NmeaEpochItem, NmeaParseRequest, NmeaParseResponse, NmeaUploadResponse, TaskInitializationResponse, TaskProgressResponse, BulkLineCopyRequest)
+from API import ( ROUTE_DEV_AUTH, ROUTE_DEV_PASSWORD, ROUTE_DEV_ENGINE_PARAMS, ROUTE_EXTRACTION_COPY, ROUTE_EXTRACTION_STATUS, ROUTE_HEALTH, ROUTE_NMEA_UPLOAD, API_PREFIX, EngineParamsResponse, EngineParamsCommitResponse, EngineParamsUpdateRequest, DevAuthRequest, DevAuthResponse, HealthResponse, NmeaUploadResponse, DevPasswordUpdateResponse, DevPasswordUpdateRequest, TaskInitializationResponse, TaskProgressResponse, BulkLineCopyRequest)
 
 router: APIRouter = APIRouter()
 _job_manager: JobManager = JobManager()
@@ -61,18 +59,6 @@ def update_engine_params(payload: EngineParamsUpdateRequest) -> EngineParamsComm
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to persist engine parameters to database."
         )
-
-@router.post(ROUTE_NMEA_PARSE, response_model=NmeaParseResponse)
-def parse_nmea(payload: NmeaParseRequest) -> NmeaParseResponse:
-    raw_lines: List[str] = payload.content.splitlines()
-    sentences: List[str] = [line.strip() for line in raw_lines if line.strip()]
-    target_name: str = payload.filename or "raw_stream.log"
-
-    return NmeaParseResponse(
-        success=True,
-        totalSentences=len(sentences),
-        epochs=[NmeaEpochItem(sentence_count=len(sentences), source=target_name)],
-    )
 
 @router.post(ROUTE_NMEA_UPLOAD, response_model=NmeaUploadResponse)
 async def upload_nmea_file(file: UploadFile = File(...)) -> NmeaUploadResponse:
@@ -145,9 +131,14 @@ def authenticate_dev(payload: DevAuthRequest) -> DevAuthResponse:
         system_logger.info("Developer access authorized via sqlite vault")
         return DevAuthResponse(authenticated=True, message="Developer Access granted")
     error_logger.warning("Unauthorized access attempt on developer authentication endpoint.")
-    raise HTTPException( status_code=status.HTTP_401_UNAUTHORIZED,
-        detail= {"authenticated": False, "detail": "Invalid developer credentials.", }, )
-    
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail={
+            "authenticated": False,
+            "detail": "Invalid developer credentials.",
+        },
+    )
+
 @router.post(ROUTE_DEV_PASSWORD, response_model=DevPasswordUpdateResponse)
 def update_developer_password(payload: DevPasswordUpdateRequest) -> DevPasswordUpdateResponse:
     current_pwd: str = payload.resolved_current_pwd
@@ -155,9 +146,9 @@ def update_developer_password(payload: DevPasswordUpdateRequest) -> DevPasswordU
 
     # 1. Verify that the supplied current password is valid
     if not dev_auth_repo.verify_developer_passkey(current_pwd):
-        error_logger.warning("Failed developer password update: incorrect current credentials.")[cite: 2]
+        error_logger.warning("Failed developer password update: incorrect current credentials.")
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,[cite: 2]
+            status_code=status.HTTP_401_UNAUTHORIZED,
             detail={
                 "success": False,
                 "detail": "Invalid current developer credentials.",
@@ -167,13 +158,13 @@ def update_developer_password(payload: DevPasswordUpdateRequest) -> DevPasswordU
     # 2. Persist new hashed password
     updated: bool = dev_auth_repo.update_developer_passkey(new_pwd)
     if not updated:
-        error_logger.error("Failed to write updated developer password to database.")[cite: 2]
+        error_logger.error("Failed to write updated developer password to database.")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,[cite: 2]
-            detail="Failed to update developer password in database.",[cite: 2]
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update developer password in database.",
         )
 
-    system_logger.info("Developer access password updated successfully in SQLite vault.")[cite: 2]
+    system_logger.info("Developer access password updated successfully in SQLite vault.")
     return DevPasswordUpdateResponse(
         success=True,
         message="Developer access password successfully updated in backend database.",

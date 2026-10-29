@@ -5,8 +5,8 @@ from pathlib import Path
 import sqlite3
 from typing import Any, Dict, Final, Optional
 
-_DB_DIR: Final[Path] = Path("data")
-_DB_PATH: Final[Path] = _DB_DIR / "engine_params.db"
+_DB_DIR: Final[Path] = Path("OUTPUT")
+_DB_PATH: Final[Path] = _DB_DIR / "DATABASE/engine_params.db"
 
 _DEFAULT_BATCH_SIZE: Final[int] = 500
 _DEFAULT_RETENTION_WINDOW: Final[int] = 3600
