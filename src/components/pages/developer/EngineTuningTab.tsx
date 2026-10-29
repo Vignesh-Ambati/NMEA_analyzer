@@ -1,5 +1,13 @@
-import React, { useState, useEffect, useCallback } from "react";
-import { Sliders, RefreshCw, Check, AlertCircle, Database, ArrowDownToLine, ArrowUpToLine } from "lucide-react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import {
+  Sliders,
+  RefreshCw,
+  Check,
+  AlertCircle,
+  Database,
+  ArrowDownToLine,
+  ArrowUpToLine,
+} from "lucide-react";
 import { useApp } from "../../../context/AppContext";
 import { backendService, EngineTuningParams } from "../../../backend";
 
@@ -14,54 +22,110 @@ export const EngineTuningTab: React.FC = () => {
     addLog,
   } = useApp();
 
+  const initialFetchRef = useRef(false);
+
   // Local state representing backend committed values
-  const [committedParams, setCommittedParams] = useState<EngineTuningParams | null>(null);
+  const [committedParams, setCommittedParams] =
+    useState<EngineTuningParams | null>(null);
   const [isFetching, setIsFetching] = useState<boolean>(false);
   const [isCommitting, setIsCommitting] = useState<boolean>(false);
-  const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error" | "info"; text: string } | null>(null);
+  const [statusMessage, setStatusMessage] = useState<{
+    type: "success" | "error" | "info";
+    text: string;
+  } | null>(null);
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
 
   // Check if current UI slider values differ from committed backend values
-  const isDirty = committedParams !== null && (
-    batchSize !== committedParams.batchSize ||
-    retentionWindow !== committedParams.retentionWindow ||
-    workerCount !== committedParams.workerCount
+  const isDirty =
+    committedParams !== null &&
+    (batchSize !== committedParams.batchSize ||
+      retentionWindow !== committedParams.retentionWindow ||
+      workerCount !== committedParams.workerCount);
+
+  // Auto-fetch parameters from backend on opening this tab, with a limited retry loop.
+  const handleFetchFromBackend = useCallback(
+    async (isInitial = false) => {
+      const maxAttempts = 3;
+      let attempt = 0;
+
+      setIsFetching(true);
+
+      try {
+        while (attempt < maxAttempts) {
+          attempt += 1;
+          setStatusMessage(
+            attempt === 1
+              ? null
+              : {
+                  type: "info",
+                  text: `Retrying engine parameters fetch (${attempt}/${maxAttempts})...`,
+                },
+          );
+
+          try {
+            const result = await backendService.fetchEngineParams();
+            if (result.success && result.data) {
+              setCommittedParams(result.data);
+              setBatchSize(result.data.batchSize);
+              setRetentionWindow(result.data.retentionWindow);
+              setWorkerCount(result.data.workerCount);
+              setLastSyncedAt(
+                result.data.updatedAt
+                  ? new Date(result.data.updatedAt).toLocaleTimeString()
+                  : new Date().toLocaleTimeString(),
+              );
+              setStatusMessage({
+                type: "success",
+                text: isInitial
+                  ? "Synchronized engine parameters with backend database."
+                  : "Engine parameters reloaded from database.",
+              });
+              return;
+            }
+
+            if (attempt < maxAttempts) {
+              await new Promise((resolve) =>
+                setTimeout(resolve, 400 * attempt),
+              );
+              continue;
+            }
+
+            setStatusMessage({
+              type: "info",
+              text:
+                result.message ||
+                "Backend DB params not found. Operating with session parameters.",
+            });
+            return;
+          } catch (err: any) {
+            const errorMessage =
+              err?.message || "Failed to fetch parameters from backend.";
+
+            if (attempt < maxAttempts) {
+              await new Promise((resolve) =>
+                setTimeout(resolve, 400 * attempt),
+              );
+              continue;
+            }
+
+            setStatusMessage({
+              type: "error",
+              text: errorMessage,
+            });
+            return;
+          }
+        }
+      } finally {
+        setIsFetching(false);
+      }
+    },
+    [setBatchSize, setRetentionWindow, setWorkerCount],
   );
 
-  // Auto-fetch parameters from backend on opening this tab
-  const handleFetchFromBackend = useCallback(async (isInitial = false) => {
-    setIsFetching(true);
-    setStatusMessage(null);
-    try {
-      const result = await backendService.fetchEngineParams();
-      if (result.success && result.data) {
-        setCommittedParams(result.data);
-        setBatchSize(result.data.batchSize);
-        setRetentionWindow(result.data.retentionWindow);
-        setWorkerCount(result.data.workerCount);
-        setLastSyncedAt(result.data.updatedAt ? new Date(result.data.updatedAt).toLocaleTimeString() : new Date().toLocaleTimeString());
-        setStatusMessage({
-          type: "success",
-          text: isInitial ? "Synchronized engine parameters with backend database." : "Engine parameters reloaded from database.",
-        });
-      } else {
-        setStatusMessage({
-          type: "info",
-          text: result.message || "Backend DB params not found. Operating with session parameters.",
-        });
-      }
-    } catch (err: any) {
-      setStatusMessage({
-        type: "error",
-        text: err?.message || "Failed to fetch parameters from backend.",
-      });
-    } finally {
-      setIsFetching(false);
-    }
-  }, [setBatchSize, setRetentionWindow, setWorkerCount]);
-
   useEffect(() => {
-    handleFetchFromBackend(true);
+    if (initialFetchRef.current) return;
+    initialFetchRef.current = true;
+    void handleFetchFromBackend(true);
   }, [handleFetchFromBackend]);
 
   // Commit tuning parameters to backend DB
@@ -83,16 +147,27 @@ export const EngineTuningTab: React.FC = () => {
           type: "success",
           text: result.message || "Tuning parameters committed to database.",
         });
-        addLog(`Engine parameters committed to backend DB: batchSize=${batchSize}, retentionWindow=${retentionWindow}s, workers=${workerCount}`, "success", "developer");
+        addLog(
+          `Engine parameters committed to backend DB: batchSize=${batchSize}, retentionWindow=${retentionWindow}s, workers=${workerCount}`,
+          "success",
+          "developer",
+        );
       } else {
         setStatusMessage({
           type: "error",
-          text: result.message || "Failed to commit parameters to backend database.",
+          text:
+            result.message ||
+            "Failed to commit parameters to backend database.",
         });
-        addLog(`Failed to commit engine params: ${result.message}`, "error", "developer");
+        addLog(
+          `Failed to commit engine params: ${result.message}`,
+          "error",
+          "developer",
+        );
       }
     } catch (err: any) {
-      const msg = err?.message || "Network error while saving parameters to database.";
+      const msg =
+        err?.message || "Network error while saving parameters to database.";
       setStatusMessage({
         type: "error",
         text: msg,
@@ -114,7 +189,8 @@ export const EngineTuningTab: React.FC = () => {
               <span>Engine Ingestion & Buffer Tuning</span>
             </h3>
             <p className="text-xs text-[#736E65] dark:text-slate-400 mt-0.5">
-              Tuning parameters are auto-fetched on tab open and synchronized directly with the backend database.
+              Tuning parameters are fetched on developer login and when
+              explicitly reloaded from the database.
             </p>
           </div>
 
@@ -126,7 +202,9 @@ export const EngineTuningTab: React.FC = () => {
               className="px-3 py-1.5 rounded-xl text-xs font-mono font-semibold bg-[#EFEAE1] dark:bg-slate-800 text-[#736E65] dark:text-slate-300 hover:text-[#24211D] dark:hover:text-white border border-[#E6E1D6] dark:border-slate-700 flex items-center space-x-1.5 transition-colors cursor-pointer disabled:opacity-50"
               title="Reload parameters from backend database"
             >
-              <ArrowDownToLine className={`w-3.5 h-3.5 ${isFetching ? "animate-bounce text-[#E05318]" : ""}`} />
+              <ArrowDownToLine
+                className={`w-3.5 h-3.5 ${isFetching ? "animate-bounce text-[#E05318]" : ""}`}
+              />
               <span>{isFetching ? "Fetching..." : "Fetch from DB"}</span>
             </button>
 
@@ -163,17 +241,22 @@ export const EngineTuningTab: React.FC = () => {
             <span className="text-slate-700 dark:text-slate-300">
               Database Sync:
             </span>
-            <span className={`px-2 py-0.5 rounded font-semibold text-[10px] ${
-              isDirty
-                ? "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300"
-                : "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300"
-            }`}>
+            <span
+              className={`px-2 py-0.5 rounded font-semibold text-[10px] ${
+                isDirty
+                  ? "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300"
+                  : "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300"
+              }`}
+            >
               {isDirty ? "Unsaved Local Changes" : "Synchronized with DB"}
             </span>
           </div>
 
           <div className="text-[11px] text-[#736E65] dark:text-slate-400">
-            Last Synced: <span className="font-semibold text-slate-800 dark:text-slate-200">{lastSyncedAt || "Not fetched"}</span>
+            Last Synced:{" "}
+            <span className="font-semibold text-slate-800 dark:text-slate-200">
+              {lastSyncedAt || "Not fetched"}
+            </span>
           </div>
         </div>
 
@@ -184,8 +267,8 @@ export const EngineTuningTab: React.FC = () => {
               statusMessage.type === "success"
                 ? "bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800/60 text-emerald-800 dark:text-emerald-300"
                 : statusMessage.type === "error"
-                ? "bg-rose-50 dark:bg-rose-950/30 border-rose-200 dark:border-rose-800/60 text-rose-800 dark:text-rose-300"
-                : "bg-sky-50 dark:bg-sky-950/30 border-sky-200 dark:border-sky-800/60 text-sky-800 dark:text-sky-300"
+                  ? "bg-rose-50 dark:bg-rose-950/30 border-rose-200 dark:border-rose-800/60 text-rose-800 dark:text-rose-300"
+                  : "bg-sky-50 dark:bg-sky-950/30 border-sky-200 dark:border-sky-800/60 text-sky-800 dark:text-sky-300"
             }`}
           >
             {statusMessage.type === "success" ? (
@@ -193,7 +276,9 @@ export const EngineTuningTab: React.FC = () => {
             ) : (
               <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
             )}
-            <span className="leading-relaxed font-mono">{statusMessage.text}</span>
+            <span className="leading-relaxed font-mono">
+              {statusMessage.text}
+            </span>
           </div>
         )}
 
@@ -278,7 +363,8 @@ export const EngineTuningTab: React.FC = () => {
               ))}
             </div>
             <p className="text-[10px] text-slate-400 font-mono text-center">
-              Parallel sentence parsing and aggregation workers for multi-task charts
+              Parallel sentence parsing and aggregation workers for multi-task
+              charts
             </p>
           </div>
         </div>
