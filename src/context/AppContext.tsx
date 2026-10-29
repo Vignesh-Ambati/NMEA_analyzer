@@ -1,15 +1,34 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { PageType, ParsedLogFile, ThemeMode } from '../types';
-import { logger, cookieService, COOKIE_KEYS } from '../services';
-import { checkBackendHealth, getBackendPingIntervalMs, backendService } from '../backend';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  ReactNode,
+} from "react";
+import { PageType, ParsedLogFile, ThemeMode } from "../types";
+import {
+  logger,
+  cookieService,
+  COOKIE_KEYS,
+  uploadAndIngestGnssFile,
+  syncEngineTuningSettings,
+  saveCachedEngineParams,
+  getCachedEngineParams,
+} from "../services";
+import {
+  checkBackendHealth,
+  getBackendPingIntervalMs,
+  backendService,
+} from "../backend";
 
 export interface ConsoleMessage {
   id: string;
   timestamp: string;
   text: string;
-  level: 'info' | 'warn' | 'error' | 'debug' | 'success';
+  level: "info" | "warn" | "error" | "debug" | "success";
   stage?: string;
-  source?: 'client';
+  source?: "client";
   details?: any;
   durationMs?: number;
 }
@@ -35,7 +54,9 @@ interface AppContextType {
   files: ParsedLogFile[];
   selectedFileId: string;
   setSelectedFileId: (id: string) => void;
-  processFile: (file: File | { name: string; content: string; size?: number }) => Promise<void>;
+  processFile: (
+    file: File | { name: string; content: string; size?: number },
+  ) => Promise<void>;
   removeFile: (id: string) => void;
   clearFiles: () => void;
 
@@ -53,7 +74,9 @@ interface AppContextType {
   toggleDebugMode: () => void;
 
   isDevAuthenticated: boolean;
-  authenticateDev: (password: string) => Promise<{ success: boolean; authenticated?: boolean; message?: string }>;
+  authenticateDev: (
+    password: string,
+  ) => Promise<{ success: boolean; authenticated?: boolean; message?: string }>;
   logoutDeveloper: () => void;
   purgeClientStorage: () => void;
 
@@ -68,9 +91,15 @@ interface AppContextType {
   logs: ConsoleMessage[];
   addLog: (
     text: string,
-    level?: 'info' | 'warn' | 'error' | 'debug' | 'success',
-    stage?: 'ingestion' | 'network' | 'tasks' | 'charts' | 'developer' | 'system',
-    details?: any
+    level?: "info" | "warn" | "error" | "debug" | "success",
+    stage?:
+      | "ingestion"
+      | "network"
+      | "tasks"
+      | "charts"
+      | "developer"
+      | "system",
+    details?: any,
   ) => void;
   clearLogs: () => void;
 
@@ -87,35 +116,44 @@ interface AppContextType {
   hasProceededToTasks: boolean;
   proceedToTaskMatrix: () => void;
 
-  backendStatus: 'online' | 'offline' | 'checking';
+  backendStatus: "online" | "offline" | "checking";
   isCheckingBackend: boolean;
   lastBackendPingTime: string | null;
   backendLatencyMs: number | null;
   pingBackend: () => Promise<boolean>;
+
+  syncEngineTuning: () => Promise<void>;
+  isSyncingEngine: boolean;
 }
 
 const getInitialTheme = (): ThemeMode => {
   const saved = cookieService.get(COOKIE_KEYS.THEME);
-  if (saved === 'dark' || saved === 'light') return saved;
+  if (saved === "dark" || saved === "light") return saved;
 
-  if (typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-    return 'dark';
+  if (
+    typeof window !== "undefined" &&
+    window.matchMedia &&
+    window.matchMedia("(prefers-color-scheme: dark)").matches
+  ) {
+    return "dark";
   }
 
-  return 'light';
+  return "light";
 };
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [currentPage, setCurrentPage] = useState<PageType>('file');
+export const AppProvider: React.FC<{ children: ReactNode }> = ({
+  children,
+}) => {
+  const [currentPage, setCurrentPage] = useState<PageType>("file");
   const [currentTaskId, setCurrentTaskId] = useState<number>(3);
   const [files, setFiles] = useState<ParsedLogFile[]>([]);
-  const [selectedFileId, setSelectedFileId] = useState<string>('Combined');
+  const [selectedFileId, setSelectedFileId] = useState<string>("Combined");
 
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [processingProgress, setProcessingProgress] = useState<number>(0);
-  const [processingStatus, setProcessingStatus] = useState<string>('Ready');
+  const [processingStatus, setProcessingStatus] = useState<string>("Ready");
   const [activeJobs, setActiveJobs] = useState<ActiveJob[]>([]);
 
   const [theme, setTheme] = useState<ThemeMode>(getInitialTheme);
@@ -123,20 +161,26 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [debugMode, setDebugMode] = useState<boolean>(false);
   const [isFullpage, setIsFullpage] = useState<boolean>(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
-    return cookieService.get(COOKIE_KEYS.SIDEBAR_COLLAPSED) === 'true';
+    return cookieService.get(COOKIE_KEYS.SIDEBAR_COLLAPSED) === "true";
   });
 
   // Backend status and ping state
-  const [backendStatus, setBackendStatus] = useState<'online' | 'offline' | 'checking'>('checking');
+  const [backendStatus, setBackendStatus] = useState<
+    "online" | "offline" | "checking"
+  >("checking");
   const [isCheckingBackend, setIsCheckingBackend] = useState<boolean>(false);
-  const [lastBackendPingTime, setLastBackendPingTime] = useState<string | null>(null);
+  const [lastBackendPingTime, setLastBackendPingTime] = useState<string | null>(
+    null,
+  );
   const [backendLatencyMs, setBackendLatencyMs] = useState<number | null>(null);
 
   const toggleSidebar = useCallback(() => {
     setSidebarCollapsed((prev) => {
       const next = !prev;
       cookieService.set(COOKIE_KEYS.SIDEBAR_COLLAPSED, String(next));
-      logger.system(`Sidebar collapsed state changed to ${next ? 'collapsed' : 'expanded'}`);
+      logger.system(
+        `Sidebar collapsed state changed to ${next ? "collapsed" : "expanded"}`,
+      );
       return next;
     });
   }, []);
@@ -147,10 +191,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const clickTimeoutRef = React.useRef<any>(null);
 
   const registerDevSecretClick = useCallback(() => {
-    logger.developer('Developer secret click gesture registered in UI shell', 'debug');
+    logger.developer(
+      "Developer secret click gesture registered in UI shell",
+      "debug",
+    );
     if (devUnlocked) {
-      setDevToastMessage('Developer Suite is already unlocked!');
-      logger.developer('Developer suite already unlocked; secret click ignored', 'info');
+      setDevToastMessage("Developer Suite is already unlocked!");
+      logger.developer(
+        "Developer suite already unlocked; secret click ignored",
+        "info",
+      );
       setTimeout(() => setDevToastMessage(null), 2500);
       return;
     }
@@ -165,12 +215,20 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
       const remaining = 7 - next;
       if (remaining > 0 && remaining <= 4) {
-        setDevToastMessage(`You are ${remaining} tap${remaining > 1 ? 's' : ''} away from Developer Suite.`);
-        logger.developer(`Developer unlock sequence progress: ${next}/7`, 'debug');
+        setDevToastMessage(
+          `You are ${remaining} tap${remaining > 1 ? "s" : ""} away from Developer Suite.`,
+        );
+        logger.developer(
+          `Developer unlock sequence progress: ${next}/7`,
+          "debug",
+        );
       } else if (remaining <= 0) {
         setDevUnlocked(true);
-        setDevToastMessage('🎉 Developer Suite Unlocked!');
-        logger.developer('Developer suite unlocked via secret-click sequence', 'success');
+        setDevToastMessage("🎉 Developer Suite Unlocked!");
+        logger.developer(
+          "Developer suite unlocked via secret-click sequence",
+          "success",
+        );
         setTimeout(() => setDevToastMessage(null), 4000);
         return 0;
       }
@@ -179,18 +237,21 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   }, [devUnlocked]);
 
   const logoutDeveloper = useCallback(() => {
-    logger.developer('Developer logout requested from UI context', 'info');
+    logger.developer("Developer logout requested from UI context", "info");
     setIsDevAuthenticated(false);
     setDevUnlocked(false);
-    setDevToastMessage('🔒 Developer Suite locked & hidden.');
+    setDevToastMessage("🔒 Developer Suite locked & hidden.");
     setTimeout(() => setDevToastMessage(null), 3000);
-    setCurrentPage((prev) => (prev === 'developer' ? 'file' : prev));
+    setCurrentPage((prev) => (prev === "developer" ? "file" : prev));
   }, []);
 
   useEffect(() => {
-    if (!devUnlocked && currentPage === 'developer') {
-      logger.developer('Developer page blocked because suite is locked', 'warn');
-      setCurrentPage('file');
+    if (!devUnlocked && currentPage === "developer") {
+      logger.developer(
+        "Developer page blocked because suite is locked",
+        "warn",
+      );
+      setCurrentPage("file");
     }
   }, [devUnlocked, currentPage]);
 
@@ -200,8 +261,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   // Clear legacy client storage credentials on initialization
   useEffect(() => {
     try {
-      localStorage.removeItem('dev_pin');
-      localStorage.removeItem('dev_token');
+      localStorage.removeItem("dev_pin");
+      localStorage.removeItem("dev_token");
     } catch {
       // Ignored if storage is restricted
     }
@@ -230,7 +291,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       source: l.source,
       details: l.details,
       durationMs: l.durationMs,
-    }))
+    })),
   );
 
   useEffect(() => {
@@ -253,40 +314,51 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   }, []);
 
   useEffect(() => {
-    if (files.length === 0 && (currentPage === 'task' || currentPage === 'graph')) {
-      logger.system(`Page reset from ${currentPage} because no datasets remain in the workspace`);
-      setCurrentPage('file');
+    if (
+      files.length === 0 &&
+      (currentPage === "task" || currentPage === "graph")
+    ) {
+      logger.system(
+        `Page reset from ${currentPage} because no datasets remain in the workspace`,
+      );
+      setCurrentPage("file");
     }
   }, [files.length, currentPage]);
 
   const addLog = useCallback(
     (
       text: string,
-      level: 'info' | 'warn' | 'error' | 'debug' | 'success' = 'info',
-      stage: 'ingestion' | 'network' | 'tasks' | 'charts' | 'developer' | 'system' = 'system',
-      details?: any
+      level: "info" | "warn" | "error" | "debug" | "success" = "info",
+      stage:
+        | "ingestion"
+        | "network"
+        | "tasks"
+        | "charts"
+        | "developer"
+        | "system" = "system",
+      details?: any,
     ) => {
       logger.log({
-        source: 'client',
+        source: "client",
         stage,
         level,
         message: text,
         details,
       });
     },
-    []
+    [],
   );
 
   const clearLogs = useCallback(() => {
     logger.clear();
     setLogs([]);
-    logger.system('UI log buffer cleared by user action');
+    logger.system("UI log buffer cleared by user action");
   }, []);
 
   const toggleTheme = useCallback(() => {
     setTheme((prev) => {
-      const next = prev === 'dark' ? 'light' : 'dark';
-      addLog(`Theme switched to ${next} mode`, 'info');
+      const next = prev === "dark" ? "light" : "dark";
+      addLog(`Theme switched to ${next} mode`, "info");
       return next;
     });
   }, [addLog]);
@@ -294,7 +366,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const toggleProgressBar = useCallback(() => {
     setProgressBarVisible((prev) => {
       const next = !prev;
-      logger.system(`Progress bar toggled to ${next ? 'visible' : 'hidden'}`);
+      logger.system(`Progress bar toggled to ${next ? "visible" : "hidden"}`);
       return next;
     });
   }, []);
@@ -302,84 +374,129 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const toggleDebugMode = useCallback(() => {
     setDebugMode((prev) => {
       const next = !prev;
-      addLog(`Debug mode ${next ? 'enabled' : 'disabled'}`, next ? 'warn' : 'info');
+      addLog(
+        `Debug mode ${next ? "enabled" : "disabled"}`,
+        next ? "warn" : "info",
+      );
       return next;
     });
   }, [addLog]);
 
   const authenticateDev = useCallback(
-    async (password: string): Promise<{ success: boolean; authenticated?: boolean; message?: string }> => {
+    async (
+      password: string,
+    ): Promise<{
+      success: boolean;
+      authenticated?: boolean;
+      message?: string;
+    }> => {
       const trimmed = password.trim();
 
       if (!trimmed) {
-        addLog('Developer authentication failed: empty password submitted.', 'error', 'developer');
-        return { success: false, authenticated: false, message: 'Please enter the developer password.' };
+        addLog(
+          "Developer authentication failed: empty password submitted.",
+          "error",
+          "developer",
+        );
+        return {
+          success: false,
+          authenticated: false,
+          message: "Please enter the developer password.",
+        };
       }
 
-      addLog('Verifying developer credentials against backend database (POST /api/dev/auth)...', 'info', 'developer');
+      addLog(
+        "Verifying developer credentials against backend database (POST /api/dev/auth)...",
+        "info",
+        "developer",
+      );
       const result = await backendService.verifyDevPassword(trimmed);
 
       if (result.authenticated) {
         setIsDevAuthenticated(true);
-        addLog('Developer authentication verified by backend DB: access granted.', 'success', 'developer');
+        addLog(
+          "Developer authentication verified by backend DB: access granted.",
+          "success",
+          "developer",
+        );
         return { success: true, authenticated: true, message: result.message };
       }
 
       if (result.isOffline) {
-        addLog(`Developer authentication offline: ${result.message}`, 'warn', 'developer');
+        addLog(
+          `Developer authentication offline: ${result.message}`,
+          "warn",
+          "developer",
+        );
         return {
           success: false,
           authenticated: false,
-          message: 'Backend database service is offline or unreachable. Authentication requires an active database connection.',
+          message:
+            "Backend database service is offline or unreachable. Authentication requires an active database connection.",
         };
       }
 
-      addLog(`Developer authentication rejected: ${result.message}`, 'error', 'developer');
+      addLog(
+        `Developer authentication rejected: ${result.message}`,
+        "error",
+        "developer",
+      );
       return {
         success: false,
         authenticated: false,
-        message: result.message || 'Invalid developer credentials.',
+        message: result.message || "Invalid developer credentials.",
       };
     },
-    [addLog]
+    [addLog],
   );
 
   const flushRamCache = useCallback(() => {
     logger.clear();
     setLogs([]);
-    addLog('Telemetry RAM cache and temporary buffers purged from memory.', 'success', 'system');
+    addLog(
+      "Telemetry RAM cache and temporary buffers purged from memory.",
+      "success",
+      "system",
+    );
   }, [addLog]);
 
   const purgeClientStorage = useCallback(() => {
     try {
-      localStorage.removeItem('dev_pin');
-      localStorage.removeItem('dev_token');
+      localStorage.removeItem("dev_pin");
+      localStorage.removeItem("dev_token");
       sessionStorage.clear();
-      addLog('Local client cache and session storages purged.', 'success', 'system');
+      addLog(
+        "Local client cache and session storages purged.",
+        "success",
+        "system",
+      );
     } catch {
-      addLog('Failed to purge local client storage.', 'warn', 'system');
+      addLog("Failed to purge local client storage.", "warn", "system");
     }
   }, [addLog]);
 
   useEffect(() => {
-    addLog('NMEA Log Analyzer initialized. Ready for genuine log upload.', 'info');
+    addLog(
+      "NMEA Log Analyzer initialized. Ready for genuine log upload.",
+      "info",
+    );
   }, [addLog]);
 
   useEffect(() => {
     const root = document.documentElement;
     const body = document.body;
-    if (theme === 'dark') {
-      root.classList.add('dark');
-      root.classList.remove('light');
-      root.setAttribute('data-theme', 'dark');
-      body.classList.add('dark');
-      body.classList.remove('light');
+    if (theme === "dark") {
+      root.classList.add("dark");
+      root.classList.remove("light");
+      root.setAttribute("data-theme", "dark");
+      body.classList.add("dark");
+      body.classList.remove("light");
     } else {
-      root.classList.add('light');
-      root.classList.remove('dark');
-      root.setAttribute('data-theme', 'light');
-      body.classList.add('light');
-      body.classList.remove('dark');
+      root.classList.add("light");
+      root.classList.remove("dark");
+      root.setAttribute("data-theme", "light");
+      body.classList.add("light");
+      body.classList.remove("dark");
     }
 
     // Persist to centralized cookie service
@@ -388,100 +505,178 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const processFile = useCallback(
     async (file: File | { name: string; content: string; size?: number }) => {
-      logger.system(`UI ingestion request ignored: file parsing is disabled in this UI-only build. ${file.name || 'unknown file'}`);
-      addLog('File ingestion has been removed from this UI-only build.', 'info', 'system');
+      const filename = file.name || "unnamed.log";
+      const sizeBytes = file.size || (file as any).fileSize || 0;
+      setIsProcessing(true);
+      setProcessingProgress(0);
+      setProcessingStatus(
+        `Connecting to FastAPI backend (Batch size: ${batchSize})...`,
+      );
+      addLog(
+        `Initiating backend file ingestion for ${filename} (${(sizeBytes / (1024 * 1024)).toFixed(1)} MB, batchSize=${batchSize})`,
+        "info",
+        "ingestion",
+      );
+
+      try {
+        const parsedFile = await uploadAndIngestGnssFile(
+          file,
+          batchSize,
+          (pct, status) => {
+            setProcessingProgress(pct);
+            setProcessingStatus(status);
+          },
+        );
+
+        setFiles((prev) => [...prev, parsedFile]);
+        setSelectedFileId(parsedFile.id);
+        addLog(
+          `Backend parsed ${filename}: ${(parsedFile.totalSentences || 0).toLocaleString()} sentences processed with zero browser memory overhead`,
+          "success",
+          "ingestion",
+        );
+      } catch (err: any) {
+        addLog(
+          `File ingestion error for ${filename}: ${err?.message || "Failed to ingest file"}`,
+          "error",
+          "ingestion",
+        );
+      } finally {
+        setIsProcessing(false);
+        setProcessingProgress(0);
+        setProcessingStatus("Ready");
+      }
     },
-    [addLog]
+    [addLog, batchSize],
   );
 
   const removeFile = useCallback(
     (id: string) => {
-      logger.system(`Dataset removal request ignored for id: ${id}`);
-      addLog('Dataset removal is not available in this UI-only build.', 'info', 'system');
+      setFiles((prev) => {
+        const remaining = prev.filter((f) => f.id !== id);
+        if (selectedFileId === id) {
+          setSelectedFileId(
+            remaining.length > 0 ? remaining[0].id : "Combined",
+          );
+        }
+        return remaining;
+      });
+      addLog(`Dataset ${id} removed from workspace`, "info", "ingestion");
     },
-    [addLog]
+    [addLog, selectedFileId],
   );
 
   const clearFiles = useCallback(() => {
-    logger.system('All workspace datasets cleared by user action');
+    logger.system("All workspace datasets cleared by user action");
     setFiles([]);
-    setSelectedFileId('Combined');
-    addLog('All files cleared from workspace.', 'info');
+    setSelectedFileId("Combined");
+    addLog("All files cleared from workspace.", "info");
   }, [addLog]);
 
   const navigateToFilePage = useCallback(() => {
-    logger.system('Navigation: File page selected');
-    setCurrentPage('file');
+    logger.system("Navigation: File page selected");
+    setCurrentPage("file");
   }, []);
 
   const navigateToTaskPage = useCallback(() => {
-    logger.system('Navigation: Task page selected');
-    setCurrentPage('task');
+    logger.system("Navigation: Task page selected");
+    setCurrentPage("task");
   }, []);
 
   const navigateToGraphPage = useCallback((taskId: number) => {
     logger.system(`Navigation: Graph page selected for task ${taskId}`);
     setCurrentTaskId(taskId);
-    setCurrentPage('graph');
+    setCurrentPage("graph");
   }, []);
 
   const navigateToReferencePage = useCallback(() => {
-    logger.system('Navigation: Reference page selected');
-    setCurrentPage('reference');
+    logger.system("Navigation: Reference page selected");
+    setCurrentPage("reference");
   }, []);
 
   const navigateToToolsPage = useCallback(() => {
-    logger.system('Navigation: Tools page selected');
-    setCurrentPage('tools');
+    logger.system("Navigation: Tools page selected");
+    setCurrentPage("tools");
   }, []);
 
   const navigateToDeveloperPage = useCallback(() => {
-    logger.system('Navigation: Developer page selected');
+    logger.system("Navigation: Developer page selected");
     setDevUnlocked(true);
-    setCurrentPage('developer');
+    setCurrentPage("developer");
   }, []);
+
+  const [isSyncingEngine, setIsSyncingEngine] = useState<boolean>(false);
+
+  const syncEngineTuning = useCallback(async () => {
+    setIsSyncingEngine(true);
+    try {
+      const res = await syncEngineTuningSettings();
+      if (res.params) {
+        setBatchSize(res.params.batchSize);
+        setRetentionWindow(res.params.retentionWindow);
+        setWorkerCount(res.params.workerCount);
+        addLog(
+          `Engine tuning settings synchronized: batchSize=${res.params.batchSize}, retentionWindow=${res.params.retentionWindow}s, workerCount=${res.params.workerCount} (${res.source})`,
+          res.success ? "success" : "info",
+          "developer",
+        );
+      }
+    } catch (err: any) {
+      addLog(
+        `Failed to synchronize engine tuning: ${err?.message}`,
+        "warn",
+        "developer",
+      );
+    } finally {
+      setIsSyncingEngine(false);
+    }
+  }, [addLog]);
 
   const pingBackend = useCallback(async (): Promise<boolean> => {
     setIsCheckingBackend(true);
-    setBackendStatus((prev) => (prev === 'online' ? 'online' : 'checking'));
+    setBackendStatus((prev) => (prev === "online" ? "online" : "checking"));
 
     const result = await checkBackendHealth();
 
     setIsCheckingBackend(false);
-    setBackendStatus(result.online ? 'online' : 'offline');
+    setBackendStatus(result.online ? "online" : "offline");
     setLastBackendPingTime(result.checkedAt);
     setBackendLatencyMs(result.latencyMs);
 
     if (result.online) {
       addLog(
         `Backend ping check: ONLINE (${result.latencyMs}ms) at ${result.url}`,
-        'success',
-        'network',
-        { latencyMs: result.latencyMs, data: result.data }
+        "success",
+        "network",
+        { latencyMs: result.latencyMs, data: result.data },
       );
+      // Synchronize engine tuning parameters whenever backend sync confirms online status
+      syncEngineTuning();
     } else {
       addLog(
         `Backend ping check: OFFLINE (${result.error}) at ${result.url}`,
-        'warn',
-        'network',
-        { error: result.error, latencyMs: result.latencyMs }
+        "warn",
+        "network",
+        { error: result.error, latencyMs: result.latencyMs },
       );
     }
 
     return result.online;
-  }, [addLog]);
+  }, [addLog, syncEngineTuning]);
 
-  // Periodic automatic async ping every 30 minutes (and immediate check on mount)
+  // Periodic automatic async ping every 30 minutes (and immediate check and engine tuning sync on mount)
   useEffect(() => {
+    syncEngineTuning();
     pingBackend();
 
     const intervalMs = getBackendPingIntervalMs();
     const intervalTimer = setInterval(() => {
       pingBackend();
+      syncEngineTuning();
     }, intervalMs);
 
     return () => clearInterval(intervalTimer);
-  }, [pingBackend]);
+  }, [pingBackend, syncEngineTuning]);
 
   return (
     <AppContext.Provider
@@ -515,7 +710,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         toggleTheme,
         progressBarVisible,
         setProgressBarVisible: (val: boolean) => {
-          logger.system(`Progress bar visibility changed to ${val ? 'visible' : 'hidden'}`);
+          logger.system(
+            `Progress bar visibility changed to ${val ? "visible" : "hidden"}`,
+          );
           setProgressBarVisible(val);
         },
         toggleProgressBar,
@@ -528,19 +725,40 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         batchSize,
         setBatchSize: (val: number) => {
           cookieService.set(COOKIE_KEYS.BATCH_SIZE, String(val));
-          logger.developer(`Batch size adjusted to ${val}`, 'info');
+          saveCachedEngineParams({
+            batchSize: val,
+            retentionWindow,
+            workerCount,
+          });
+          logger.developer(`Batch size adjusted to ${val} and cached`, "info");
           setBatchSize(val);
         },
         retentionWindow,
         setRetentionWindow: (val: number) => {
           cookieService.set(COOKIE_KEYS.RETENTION_WINDOW, String(val));
-          logger.developer(`Retention window adjusted to ${val}s`, 'info');
+          saveCachedEngineParams({
+            batchSize,
+            retentionWindow: val,
+            workerCount,
+          });
+          logger.developer(
+            `Retention window adjusted to ${val}s and cached`,
+            "info",
+          );
           setRetentionWindow(val);
         },
         workerCount,
         setWorkerCount: (val: number) => {
           cookieService.set(COOKIE_KEYS.WORKER_COUNT, String(val));
-          logger.developer(`Worker count adjusted to ${val}`, 'info');
+          saveCachedEngineParams({
+            batchSize,
+            retentionWindow,
+            workerCount: val,
+          });
+          logger.developer(
+            `Worker count adjusted to ${val} and cached`,
+            "info",
+          );
           setWorkerCount(val);
         },
         flushRamCache,
@@ -549,12 +767,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         clearLogs,
         isFullpage,
         setIsFullpage: (val: boolean) => {
-          logger.system(`Fullpage mode set to ${val ? 'enabled' : 'disabled'}`);
+          logger.system(`Fullpage mode set to ${val ? "enabled" : "disabled"}`);
           setIsFullpage(val);
         },
         sidebarCollapsed,
         setSidebarCollapsed: (val: boolean) => {
-          logger.system(`Sidebar collapsed state set to ${val ? 'collapsed' : 'expanded'}`);
+          logger.system(
+            `Sidebar collapsed state set to ${val ? "collapsed" : "expanded"}`,
+          );
           setSidebarCollapsed(val);
         },
         toggleSidebar,
@@ -569,6 +789,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         lastBackendPingTime,
         backendLatencyMs,
         pingBackend,
+
+        syncEngineTuning,
+        isSyncingEngine,
       }}
     >
       {children}
@@ -578,6 +801,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
 export const useApp = () => {
   const context = useContext(AppContext);
-  if (!context) throw new Error('useApp must be used within an AppProvider');
+  if (!context) throw new Error("useApp must be used within an AppProvider");
   return context;
 };

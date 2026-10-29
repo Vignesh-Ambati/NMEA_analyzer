@@ -18,6 +18,7 @@ export const FilePage: React.FC = () => {
     processingStatus,
     navigateToTaskPage,
     addLog,
+    batchSize,
   } = useApp();
 
   const [dragOver, setDragOver] = useState(false);
@@ -123,11 +124,15 @@ export const FilePage: React.FC = () => {
 
           <div>
             <p className="text-sm font-semibold text-[#24211D] dark:text-slate-100">
-              Drop your NMEA log file here or click to browse
+              Drop your GNSS or data log file here or click to browse
             </p>
             <p className="text-xs text-[#736E65] dark:text-slate-400 mt-1">
-              Supports .log, .nmea, .txt, and .ubx formats up to 500 MB
+              FastAPI Backend Streaming Engine: Supports files as large as 5 GB (.log, .nmea, .txt, .ubx) with zero browser memory strain
             </p>
+            <div className="mt-2 inline-flex items-center space-x-2 text-[11px] font-mono bg-[#EFEAE1]/80 dark:bg-slate-800 px-2.5 py-1 rounded-md text-[#736E65] dark:text-slate-300 border border-[#E6E1D6] dark:border-slate-700">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span>FastAPI Stream Pipeline · Global Batch Size: {batchSize} sentences</span>
+            </div>
           </div>
 
           <button
