@@ -1,6 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { useApp } from '../../context/AppContext';
-import { NMEA_REFERENCE_GUIDE, NmeaDocItem } from '../../services/nmeaReference';
+import React, { useState, useEffect } from "react";
+import { useApp } from "../../context/AppContext";
+import {
+  NMEA_REFERENCE_GUIDE,
+  NmeaDocItem,
+} from "../../services/nmeaReference";
 import {
   BookOpen,
   Search,
@@ -9,12 +12,12 @@ import {
   X,
   Copy,
   Check,
-  Code2
-} from 'lucide-react';
+  Code2,
+} from "lucide-react";
 
 export const ReferencePage: React.FC = () => {
   const { navigateToFilePage } = useApp();
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState("");
   // Floatable data popup state
   const [popupItem, setPopupItem] = useState<NmeaDocItem | null>(null);
   const [copiedExample, setCopiedExample] = useState(false);
@@ -22,12 +25,12 @@ export const ReferencePage: React.FC = () => {
   // Close floatable modal on Escape key
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
+      if (e.key === "Escape") {
         setPopupItem(null);
       }
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
   const handleCopyExample = (text: string) => {
@@ -40,7 +43,7 @@ export const ReferencePage: React.FC = () => {
     (item) =>
       item.sentence.toLowerCase().includes(search.toLowerCase()) ||
       item.name.toLowerCase().includes(search.toLowerCase()) ||
-      item.description.toLowerCase().includes(search.toLowerCase())
+      item.description.toLowerCase().includes(search.toLowerCase()),
   );
 
   return (
@@ -55,9 +58,6 @@ export const ReferencePage: React.FC = () => {
           <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-[#24211D] dark:text-slate-100 mt-1">
             GNSS Sentence & Protocol Guide
           </h2>
-          <p className="text-xs sm:text-sm text-[#736E65] dark:text-slate-400 mt-2 max-w-2xl leading-relaxed">
-            Understand how GNSS receivers output coordinate positioning, constellation tracking, and accuracy metrics. Click any sentence below to view its complete protocol specifications in a floatable popup.
-          </p>
         </div>
 
         <button
@@ -214,7 +214,7 @@ export const ReferencePage: React.FC = () => {
                   Supported GNSS Talkers
                 </h4>
                 <div className="flex flex-wrap gap-1.5">
-                  {popupItem.talkers.split(', ').map((talker) => (
+                  {popupItem.talkers.split(", ").map((talker) => (
                     <span
                       key={talker}
                       className="px-2 py-0.5 rounded-md bg-[#ECE5D8]/80 dark:bg-slate-800 text-[11px] font-mono text-[#24211D] dark:text-slate-300 border border-[#E6E1D6] dark:border-slate-700"
@@ -229,7 +229,9 @@ export const ReferencePage: React.FC = () => {
               <div>
                 <h4 className="text-[11px] font-bold uppercase tracking-wider text-[#736E65] font-mono mb-2 flex items-center space-x-1.5">
                   <Code2 className="w-3.5 h-3.5 text-[#E05318]" />
-                  <span>Payload Field Definitions ({popupItem.fields.length} Fields)</span>
+                  <span>
+                    Payload Field Definitions ({popupItem.fields.length} Fields)
+                  </span>
                 </h4>
                 <div className="border border-[#E6E1D6] dark:border-slate-800 rounded-xl overflow-hidden shadow-xs">
                   <table className="w-full text-left border-collapse">
@@ -243,7 +245,10 @@ export const ReferencePage: React.FC = () => {
                     </thead>
                     <tbody className="divide-y divide-[#E6E1D6] dark:divide-slate-800 text-[11px]">
                       {popupItem.fields.map((f, idx) => (
-                        <tr key={idx} className="hover:bg-[#FAF8F5]/60 dark:hover:bg-slate-800/40">
+                        <tr
+                          key={idx}
+                          className="hover:bg-[#FAF8F5]/60 dark:hover:bg-slate-800/40"
+                        >
                           <td className="py-2 px-3 font-mono font-bold text-center text-[#736E65]">
                             {idx + 1}
                           </td>

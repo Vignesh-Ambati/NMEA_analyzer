@@ -1,12 +1,12 @@
-import React, { useState, useRef } from 'react';
-import { useApp } from '../../context/AppContext';
+import React, { useState, useRef } from "react";
+import { useApp } from "../../context/AppContext";
 import {
   UploadCloud,
   FileCode2,
   Trash2,
   ArrowRight,
   CheckCircle2,
-} from 'lucide-react';
+} from "lucide-react";
 
 export const FilePage: React.FC = () => {
   const {
@@ -25,22 +25,38 @@ export const FilePage: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileDrop = (e: React.DragEvent) => {
-    addLog('File drop interaction detected on ingestion workspace', 'info', 'ingestion');
+    addLog(
+      "File drop interaction detected on ingestion workspace",
+      "info",
+      "ingestion",
+    );
     e.preventDefault();
     setDragOver(false);
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       for (let i = 0; i < e.dataTransfer.files.length; i++) {
-        addLog(`Queued dropped file for UI ingestion: ${e.dataTransfer.files[i].name}`, 'debug', 'ingestion');
+        addLog(
+          `Queued dropped file for UI ingestion: ${e.dataTransfer.files[i].name}`,
+          "debug",
+          "ingestion",
+        );
         processFile(e.dataTransfer.files[i]);
       }
     }
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    addLog('File browser selection triggered in ingestion workspace', 'info', 'ingestion');
+    addLog(
+      "File browser selection triggered in ingestion workspace",
+      "info",
+      "ingestion",
+    );
     if (e.target.files && e.target.files.length > 0) {
       for (let i = 0; i < e.target.files.length; i++) {
-        addLog(`Queued selected file for UI ingestion: ${e.target.files[i].name}`, 'debug', 'ingestion');
+        addLog(
+          `Queued selected file for UI ingestion: ${e.target.files[i].name}`,
+          "debug",
+          "ingestion",
+        );
         processFile(e.target.files[i]);
       }
     }
@@ -82,7 +98,7 @@ export const FilePage: React.FC = () => {
               NMEA & UBX Receiver Log Parser
             </h2>
             <p className="text-xs sm:text-sm text-[#736E65] dark:text-slate-400 mt-0.5">
-              Select or drop raw GNSS receiver captures (.log, .txt, .nmea, .ubx) to extract satellite fixes, SNR, and altitude profiles.
+              Select or drop raw GNSS receiver logs.
             </p>
           </div>
         </div>
@@ -92,21 +108,33 @@ export const FilePage: React.FC = () => {
           onDragOver={(e) => {
             e.preventDefault();
             setDragOver(true);
-            addLog('Drag-over state entered on ingestion drop zone', 'debug', 'ingestion');
+            addLog(
+              "Drag-over state entered on ingestion drop zone",
+              "debug",
+              "ingestion",
+            );
           }}
           onDragLeave={() => {
             setDragOver(false);
-            addLog('Drag-over state left on ingestion drop zone', 'debug', 'ingestion');
+            addLog(
+              "Drag-over state left on ingestion drop zone",
+              "debug",
+              "ingestion",
+            );
           }}
           onDrop={handleFileDrop}
           onClick={() => {
-            addLog('Ingestion zone clicked; browser file picker opened', 'info', 'ingestion');
+            addLog(
+              "Ingestion zone clicked; browser file picker opened",
+              "info",
+              "ingestion",
+            );
             fileInputRef.current?.click();
           }}
           className={`border-2 border-dashed rounded-2xl p-8 sm:p-12 text-center transition-all cursor-pointer flex flex-col items-center justify-center space-y-3 ${
             dragOver
-              ? 'border-[#E05318] bg-orange-50/50 dark:bg-orange-950/20'
-              : 'border-[#D8D2C5] dark:border-slate-800 hover:border-[#E05318] hover:bg-[#EFEAE1]/60 dark:hover:bg-slate-800/40'
+              ? "border-[#E05318] bg-orange-50/50 dark:bg-orange-950/20"
+              : "border-[#D8D2C5] dark:border-slate-800 hover:border-[#E05318] hover:bg-[#EFEAE1]/60 dark:hover:bg-slate-800/40"
           }`}
         >
           <input
@@ -126,20 +154,17 @@ export const FilePage: React.FC = () => {
             <p className="text-sm font-semibold text-[#24211D] dark:text-slate-100">
               Drop your GNSS or data log file here or click to browse
             </p>
-            <p className="text-xs text-[#736E65] dark:text-slate-400 mt-1">
-              FastAPI Backend Streaming Engine: Supports files as large as 5 GB (.log, .nmea, .txt, .ubx) with zero browser memory strain
-            </p>
-            <div className="mt-2 inline-flex items-center space-x-2 text-[11px] font-mono bg-[#EFEAE1]/80 dark:bg-slate-800 px-2.5 py-1 rounded-md text-[#736E65] dark:text-slate-300 border border-[#E6E1D6] dark:border-slate-700">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span>FastAPI Stream Pipeline · Global Batch Size: {batchSize} sentences</span>
-            </div>
           </div>
 
           <button
             type="button"
             onClick={(e) => {
               e.stopPropagation();
-              addLog('Browse files button clicked on ingestion page', 'info', 'ingestion');
+              addLog(
+                "Browse files button clicked on ingestion page",
+                "info",
+                "ingestion",
+              );
               fileInputRef.current?.click();
             }}
             className="px-5 py-2.5 rounded-xl text-xs font-semibold bg-[#E05318] hover:bg-[#C94713] text-white shadow-xs transition-all cursor-pointer"
@@ -173,14 +198,19 @@ export const FilePage: React.FC = () => {
                         {file.filename}
                       </div>
                       <div className="text-[11px] text-[#736E65] dark:text-slate-400 font-mono mt-0.5 truncate">
-                        {(file.totalSentences || 0).toLocaleString()} sentences · {((file.fileSize || 0) / 1024).toFixed(0)} KB
+                        {(file.totalSentences || 0).toLocaleString()} sentences
+                        · {((file.fileSize || 0) / 1024).toFixed(0)} KB
                       </div>
                     </div>
                   </div>
 
                   <button
                     onClick={() => {
-                      addLog(`Dataset removal requested for ${file.filename}`, 'info', 'ingestion');
+                      addLog(
+                        `Dataset removal requested for ${file.filename}`,
+                        "info",
+                        "ingestion",
+                      );
                       removeFile(file.id);
                     }}
                     type="button"
@@ -198,7 +228,11 @@ export const FilePage: React.FC = () => {
             <div className="pt-3 flex justify-end">
               <button
                 onClick={() => {
-                  addLog('User advanced from file ingestion to task matrix', 'info', 'tasks');
+                  addLog(
+                    "User advanced from file ingestion to task matrix",
+                    "info",
+                    "tasks",
+                  );
                   navigateToTaskPage();
                 }}
                 type="button"

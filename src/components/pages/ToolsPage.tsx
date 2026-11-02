@@ -1,52 +1,57 @@
-import React, { useState } from 'react';
-import { Clock, ArrowRightLeft, FileText, Wrench } from 'lucide-react';
+import React, { useState } from "react";
+import { Clock, ArrowRightLeft, FileText, Wrench } from "lucide-react";
 import {
   UtilityConfig,
   UtilityId,
   TimeDifferenceCalculator,
   UtcIstConverter,
   BulkLineCopyUtility,
-} from '../../utilities';
+} from "../../utilities";
 
 const UTILITIES_CONFIG: UtilityConfig[] = [
   {
-    id: 'timediff',
-    title: 'Time Difference Calculator',
-    shortTitle: 'Time Difference',
-    categoryLabel: '| Time-1 - Time-2 | ≈ |Time Difference|',
-    tagLine: 'Calculate duration and elapsed seconds between two GNSS timestamps.',
-    detailedInfo: 'Calculates elapsed duration and seconds between two GNSS timestamps. Supports format: 141105.00,17,10,2026 (Time, Day, Month, Year) or time-only 141105.00.',
-    inputFormat: '',
-    outputSpec: 'Duration & Total Seconds',
+    id: "timediff",
+    title: "Time Difference Calculator",
+    shortTitle: "Time Difference",
+    categoryLabel: "| Time-1 - Time-2 | ≈ |Time Difference|",
+    tagLine:
+      "Calculate duration and elapsed seconds between two GNSS timestamps.",
+    detailedInfo:
+      "Calculates elapsed duration and seconds between two GNSS timestamps. Supports format: 141105.00,17,10,2026 (Time, Day, Month, Year) or time-only 141105.00.",
+    inputFormat: "",
+    outputSpec: "Duration & Total Seconds",
     icon: Clock,
   },
   {
-    id: 'utc_ist',
-    title: 'UTC ⇋ IST Timezone Converter',
-    shortTitle: 'UTC ↔ IST',
-    categoryLabel: 'UTC ⇋ IST Conversion',
-    tagLine: 'Bi-directional conversion between GNSS UTC and IST.',
-    detailedInfo: 'Bi-directional converter between GNSS standard UTC and Indian Standard Time. Supports 141105.00,17,10,2026 or time-only 141105.00 with day shift.',
-    inputFormat: '',
-    outputSpec: 'IST Time, Date & Day Shift Status',
+    id: "utc_ist",
+    title: "UTC ⇋ IST Timezone Converter",
+    shortTitle: "UTC ↔ IST",
+    categoryLabel: "UTC ⇋ IST Conversion",
+    tagLine: "Bi-directional conversion between GNSS UTC and IST.",
+    detailedInfo:
+      "Bi-directional converter between GNSS standard UTC and Indian Standard Time. Supports 141105.00,17,10,2026 or time-only 141105.00 with day shift.",
+    inputFormat: "",
+    outputSpec: "IST Time, Date & Day Shift Status",
     icon: ArrowRightLeft,
   },
   {
-    id: 'linecopy',
-    title: 'Data Extractor Pro',
-    shortTitle: 'Data Extractor Pro',
-    categoryLabel: 'Streaming & Regex Extraction',
-    tagLine: 'Ultra-fast multi-GB data & log streaming extractor with regex, raw text pasting, and line slicing.',
-    detailedInfo: 'High-performance streaming log and data processor designed to handle multi-gigabyte files without freezing. Supports regex patterns, literal filters, raw data paste, line range slicing, checksum stripping, and instant export.',
-    inputFormat: 'Local File Stream or Raw Data',
-    outputSpec: 'Filtered Lines (.log / .txt)',
+    id: "linecopy",
+    title: "Data Extractor Pro",
+    shortTitle: "Data Extractor Pro",
+    categoryLabel: "Streaming & Regex Extraction",
+    tagLine:
+      "Ultra-fast multi-GB data & log streaming extractor with regex, raw text pasting, and line slicing.",
+    detailedInfo:
+      "High-performance streaming log and data processor designed to handle multi-gigabyte files without freezing. Supports regex patterns, literal filters, raw data paste, line range slicing, checksum stripping, and instant export.",
+    inputFormat: "Local File Stream or Raw Data",
+    outputSpec: "Filtered Lines (.log / .txt)",
     icon: FileText,
   },
 ];
 
 export const ToolsPage: React.FC = () => {
   // Active tab: 'all' displays the grid of utilities; specific id displays that utility's workspace
-  const [activeTab, setActiveTab] = useState<'all' | UtilityId>('all');
+  const [activeTab, setActiveTab] = useState<"all" | UtilityId>("all");
 
   return (
     <div className="flex-1 overflow-y-auto p-3 sm:p-5 md:p-6 space-y-4 sm:space-y-6 max-w-6xl mx-auto w-full select-none">
@@ -60,54 +65,51 @@ export const ToolsPage: React.FC = () => {
           <h2 className="text-xl font-bold tracking-tight text-[#24211D] dark:text-slate-100 mt-0.5">
             GNSS Standard Utilities
           </h2>
-          <p className="text-xs text-[#736E65] dark:text-slate-400 mt-0.5 truncate">
-            Quick-access GNSS utilities for time deltas, timezone shifts, and raw sentence slicing.
-          </p>
         </div>
       </div>
 
       {/* Top Navigation Tabs */}
       <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
         <button
-          onClick={() => setActiveTab('all')}
+          onClick={() => setActiveTab("all")}
           type="button"
           className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
-            activeTab === 'all'
-              ? 'bg-[#E05318] text-white shadow-xs'
-              : 'bg-[#FAF8F5] dark:bg-slate-900 text-[#736E65] dark:text-slate-300 hover:text-[#24211D] dark:hover:text-white border border-[#E6E1D6] dark:border-slate-800 hover:bg-[#EFEAE1]'
+            activeTab === "all"
+              ? "bg-[#E05318] text-white shadow-xs"
+              : "bg-[#FAF8F5] dark:bg-slate-900 text-[#736E65] dark:text-slate-300 hover:text-[#24211D] dark:hover:text-white border border-[#E6E1D6] dark:border-slate-800 hover:bg-[#EFEAE1]"
           }`}
         >
           All Utilities
         </button>
         <button
-          onClick={() => setActiveTab('timediff')}
+          onClick={() => setActiveTab("timediff")}
           type="button"
           className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
-            activeTab === 'timediff'
-              ? 'bg-[#E05318] text-white shadow-xs'
-              : 'bg-[#FAF8F5] dark:bg-slate-900 text-[#736E65] dark:text-slate-300 hover:text-[#24211D] dark:hover:text-white border border-[#E6E1D6] dark:border-slate-800 hover:bg-[#EFEAE1]'
+            activeTab === "timediff"
+              ? "bg-[#E05318] text-white shadow-xs"
+              : "bg-[#FAF8F5] dark:bg-slate-900 text-[#736E65] dark:text-slate-300 hover:text-[#24211D] dark:hover:text-white border border-[#E6E1D6] dark:border-slate-800 hover:bg-[#EFEAE1]"
           }`}
         >
           Time Difference
         </button>
         <button
-          onClick={() => setActiveTab('utc_ist')}
+          onClick={() => setActiveTab("utc_ist")}
           type="button"
           className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
-            activeTab === 'utc_ist'
-              ? 'bg-[#E05318] text-white shadow-xs'
-              : 'bg-[#FAF8F5] dark:bg-slate-900 text-[#736E65] dark:text-slate-300 hover:text-[#24211D] dark:hover:text-white border border-[#E6E1D6] dark:border-slate-800 hover:bg-[#EFEAE1]'
+            activeTab === "utc_ist"
+              ? "bg-[#E05318] text-white shadow-xs"
+              : "bg-[#FAF8F5] dark:bg-slate-900 text-[#736E65] dark:text-slate-300 hover:text-[#24211D] dark:hover:text-white border border-[#E6E1D6] dark:border-slate-800 hover:bg-[#EFEAE1]"
           }`}
         >
           UTC &harr; IST Converter
         </button>
         <button
-          onClick={() => setActiveTab('linecopy')}
+          onClick={() => setActiveTab("linecopy")}
           type="button"
           className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
-            activeTab === 'linecopy'
-              ? 'bg-[#E05318] text-white shadow-xs'
-              : 'bg-[#FAF8F5] dark:bg-slate-900 text-[#736E65] dark:text-slate-300 hover:text-[#24211D] dark:hover:text-white border border-[#E6E1D6] dark:border-slate-800 hover:bg-[#EFEAE1]'
+            activeTab === "linecopy"
+              ? "bg-[#E05318] text-white shadow-xs"
+              : "bg-[#FAF8F5] dark:bg-slate-900 text-[#736E65] dark:text-slate-300 hover:text-[#24211D] dark:hover:text-white border border-[#E6E1D6] dark:border-slate-800 hover:bg-[#EFEAE1]"
           }`}
         >
           Data Extractor Pro
@@ -115,7 +117,7 @@ export const ToolsPage: React.FC = () => {
       </div>
 
       {/* VIEW 1: All Utilities Grid */}
-      {activeTab === 'all' && (
+      {activeTab === "all" && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {UTILITIES_CONFIG.map((util) => {
             const IconComponent = util.icon;
@@ -155,9 +157,9 @@ export const ToolsPage: React.FC = () => {
       )}
 
       {/* VIEW 2: Focused Utility Workspaces */}
-      {activeTab === 'timediff' && <TimeDifferenceCalculator />}
-      {activeTab === 'utc_ist' && <UtcIstConverter />}
-      {activeTab === 'linecopy' && <BulkLineCopyUtility />}
+      {activeTab === "timediff" && <TimeDifferenceCalculator />}
+      {activeTab === "utc_ist" && <UtcIstConverter />}
+      {activeTab === "linecopy" && <BulkLineCopyUtility />}
     </div>
   );
 };

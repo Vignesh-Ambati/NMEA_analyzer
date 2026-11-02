@@ -184,13 +184,12 @@ export const EngineTuningTab: React.FC = () => {
         {/* Card Header & Backend DB Status */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[#E6E1D6] dark:border-slate-800">
           <div>
-            <h3 className="text-sm font-bold text-[#24211D] dark:text-slate-100 flex items-center space-x-2">
+            <h3 className="text-m font-bold text-[#24211D] dark:text-slate-100 flex items-center space-x-2">
               <Sliders className="w-4 h-4 text-[#E05318]" />
               <span>Engine Ingestion & Buffer Tuning</span>
             </h3>
-            <p className="text-xs text-[#736E65] dark:text-slate-400 mt-0.5">
-              Tuning parameters are fetched on developer login and when
-              explicitly reloaded from the database.
+            <p className="text-s text-[#736E65] dark:text-slate-400 mt-0.5">
+              Tuning backend services via parameters
             </p>
           </div>
 
@@ -292,7 +291,7 @@ export const EngineTuningTab: React.FC = () => {
                   BATCH_SIZE
                 </span>
                 <span className="text-[11px] text-[#736E65] dark:text-slate-400">
-                  Number of lines dispatched per processing batch to backend
+                  Number of lines dispatched per processing to backend
                 </span>
               </div>
               <span className="text-[#E05318] font-bold font-mono text-sm px-2.5 py-1 rounded-lg bg-orange-500/10 dark:bg-orange-950/40 border border-orange-500/20 shrink-0">
@@ -475,7 +474,7 @@ export const EngineTuningTab: React.FC = () => {
                   className="w-full px-3.5 py-2.5 text-xs font-mono font-semibold bg-white dark:bg-slate-900 border border-[#E6E1D6] dark:border-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500 text-[#24211D] dark:text-slate-100"
                   placeholder="Processes (1-128)"
                 />
-                <span className="absolute right-3 top-2.5 text-[11px] font-mono text-slate-400 pointer-events-none">
+                <span className="absolute right-10 top-2.5 text-[11px] font-mono text-slate-400 pointer-events-none">
                   cores
                 </span>
               </div>

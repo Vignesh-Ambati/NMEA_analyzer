@@ -14,12 +14,7 @@ import {
   ArrowLeft,
 } from "lucide-react";
 import { useApp } from "../../context/AppContext";
-import {
-  EngineTuningTab,
-  MiscTab,
-  SecurityTab,
-  LogsTab,
-} from "./developer";
+import { EngineTuningTab, MiscTab, SecurityTab, LogsTab } from "./developer";
 
 type DevTabKey = "engine" | "misc" | "security" | "logs";
 
@@ -81,7 +76,7 @@ export const DeveloperPage: React.FC = () => {
               Developer Suite Access
             </h2>
             <p className="text-xs text-[#736E65] dark:text-slate-400 max-w-xs mx-auto leading-relaxed">
-              Database authentication via Core API. Enter your developer account password.
+              Enter developer account password.
             </p>
           </div>
 
@@ -137,7 +132,7 @@ export const DeveloperPage: React.FC = () => {
               ) : (
                 <>
                   <KeyRound className="w-4 h-4" />
-                  <span>Authenticate with Backend</span>
+                  <span>Authenticate</span>
                 </>
               )}
             </button>
@@ -170,10 +165,10 @@ export const DeveloperPage: React.FC = () => {
             <span>Developer Suite</span>
           </div>
           <h2 className="text-xl font-bold tracking-tight text-[#24211D] dark:text-slate-100 mt-0.5">
-            Database & Engineering Console
+            Settings & Verification Console
           </h2>
           <p className="text-xs text-[#736E65] dark:text-slate-400 mt-0.5">
-            Synchronized with backend database service. Zero local password storage.
+            Synchronized with backend database services.
           </p>
         </div>
 
