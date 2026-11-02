@@ -15,9 +15,9 @@ export interface SyncedEngineTuningResult {
 }
 
 const DEFAULT_PARAMS: EngineTuningParams = {
-  batchSize: 500,
-  retentionWindow: 3600,
-  workerCount: 4,
+  batchSize: 50000, // Number of lines per chunk (e.g., 50k to 10M lines)
+  retentionWindow: 30, // Data and log retention window in days
+  workerCount: 4, // Multiprocessing backend worker processes
 };
 
 /**
@@ -29,14 +29,32 @@ export const getCachedEngineParams = (): EngineTuningParams => {
     const rawRetention = cookieService.get(COOKIE_KEYS.RETENTION_WINDOW);
     const rawWorkers = cookieService.get(COOKIE_KEYS.WORKER_COUNT);
 
+    let parsedBatch = rawBatch
+      ? parseInt(rawBatch, 10)
+      : DEFAULT_PARAMS.batchSize;
+    if (isNaN(parsedBatch) || parsedBatch < 100)
+      parsedBatch = DEFAULT_PARAMS.batchSize;
+
+    let parsedRetention = rawRetention
+      ? parseInt(rawRetention, 10)
+      : DEFAULT_PARAMS.retentionWindow;
+    // Migrate legacy seconds (>365) to days
+    if (parsedRetention > 365) {
+      parsedRetention = Math.max(1, Math.round(parsedRetention / 86400)) || 30;
+    }
+    if (isNaN(parsedRetention) || parsedRetention <= 0)
+      parsedRetention = DEFAULT_PARAMS.retentionWindow;
+
+    let parsedWorkers = rawWorkers
+      ? parseInt(rawWorkers, 10)
+      : DEFAULT_PARAMS.workerCount;
+    if (isNaN(parsedWorkers) || parsedWorkers <= 0)
+      parsedWorkers = DEFAULT_PARAMS.workerCount;
+
     return {
-      batchSize: rawBatch ? parseInt(rawBatch, 10) : DEFAULT_PARAMS.batchSize,
-      retentionWindow: rawRetention
-        ? parseInt(rawRetention, 10)
-        : DEFAULT_PARAMS.retentionWindow,
-      workerCount: rawWorkers
-        ? parseInt(rawWorkers, 10)
-        : DEFAULT_PARAMS.workerCount,
+      batchSize: parsedBatch,
+      retentionWindow: parsedRetention,
+      workerCount: parsedWorkers,
     };
   } catch {
     return DEFAULT_PARAMS;
@@ -90,9 +108,14 @@ export const syncEngineTuningSettings =
       const res = await fetchEngineParams();
 
       if (res.success && res.data) {
+        let liveRetention = Number(res.data.retentionWindow ?? 30);
+        if (liveRetention > 365) {
+          liveRetention = Math.max(1, Math.round(liveRetention / 86400)) || 30;
+        }
+
         const liveParams: EngineTuningParams = {
-          batchSize: Number(res.data.batchSize ?? 500),
-          retentionWindow: Number(res.data.retentionWindow ?? 3600),
+          batchSize: Number(res.data.batchSize ?? 50000),
+          retentionWindow: liveRetention,
           workerCount: Number(res.data.workerCount ?? 4),
           updatedAt: res.data.updatedAt,
         };
@@ -101,7 +124,7 @@ export const syncEngineTuningSettings =
         saveCachedEngineParams(liveParams);
 
         logger.developer(
-          `Global engine tuning settings synchronized from backend: batchSize=${liveParams.batchSize}, retentionWindow=${liveParams.retentionWindow}s, workerCount=${liveParams.workerCount}`,
+          `Global engine tuning settings synchronized from backend: batchSize=${liveParams.batchSize} lines, retentionWindow=${liveParams.retentionWindow} days, multiprocessingWorkers=${liveParams.workerCount}`,
           "success",
           liveParams,
         );

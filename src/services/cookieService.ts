@@ -12,7 +12,7 @@ export interface CookieOptions {
   /** Cookie path (default: '/') */
   path?: string;
   /** SameSite attribute (default: 'Lax') */
-  sameSite?: 'Lax' | 'Strict' | 'None';
+  sameSite?: "Lax" | "Strict" | "None";
   /** Secure flag for HTTPS (default: true if location.protocol is https) */
   secure?: boolean;
 }
@@ -21,16 +21,18 @@ export interface CookieOptions {
  * Standard application cookie keys
  */
 export const COOKIE_KEYS = {
-  THEME: 'nmea_theme',
-  SIDEBAR_COLLAPSED: 'nmea_sidebar_collapsed',
-  BATCH_SIZE: 'nmea_batch_size',
-  RETENTION_WINDOW: 'nmea_retention_window',
-  WORKER_COUNT: 'nmea_worker_count',
-  DEBUG_MODE: 'nmea_debug_mode',
-  DEV_SETTINGS: 'nmea_dev_settings',
+  THEME: "nmea_theme",
+  SIDEBAR_COLLAPSED: "nmea_sidebar_collapsed",
+  BATCH_SIZE: "nmea_batch_size",
+  RETENTION_WINDOW: "nmea_retention_window",
+  WORKER_COUNT: "nmea_worker_count",
+  DEBUG_MODE: "nmea_debug_mode",
+  DEV_SETTINGS: "nmea_dev_settings",
 } as const;
 
-export type CookieKey = typeof COOKIE_KEYS[keyof typeof COOKIE_KEYS] | (string & {});
+export type CookieKey =
+  | (typeof COOKIE_KEYS)[keyof typeof COOKIE_KEYS]
+  | (string & {});
 
 // In-memory fallback map if all browser storage is blocked
 const memoryFallback = new Map<string, string>();
@@ -39,12 +41,14 @@ const memoryFallback = new Map<string, string>();
  * Read a cookie by name (with localStorage and memory fallback)
  */
 export function getCookie(name: string): string | null {
-  if (typeof document === 'undefined') return null;
+  if (typeof document === "undefined") return null;
 
   // 1. Try document.cookie
   try {
-    const escaped = name.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
-    const match = document.cookie.match(new RegExp(`(?:^|; )${escaped}=([^;]*)`));
+    const escaped = name.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, "\\$&");
+    const match = document.cookie.match(
+      new RegExp(`(?:^|; )${escaped}=([^;]*)`),
+    );
     if (match) {
       return decodeURIComponent(match[1]);
     }
@@ -54,7 +58,7 @@ export function getCookie(name: string): string | null {
 
   // 2. Fallback to localStorage
   try {
-    if (typeof window !== 'undefined' && window.localStorage) {
+    if (typeof window !== "undefined" && window.localStorage) {
       const localVal = window.localStorage.getItem(name);
       if (localVal !== null) return localVal;
     }
@@ -69,13 +73,19 @@ export function getCookie(name: string): string | null {
 /**
  * Write a cookie with options (and mirrors to localStorage for robustness)
  */
-export function setCookie(name: string, value: string, options: CookieOptions = {}): void {
-  if (typeof document === 'undefined') return;
+export function setCookie(
+  name: string,
+  value: string,
+  options: CookieOptions = {},
+): void {
+  if (typeof document === "undefined") return;
 
   const days = options.days ?? 365;
-  const path = options.path ?? '/';
-  const sameSite = options.sameSite ?? 'Lax';
-  const secure = options.secure ?? (typeof window !== 'undefined' && window.location.protocol === 'https:');
+  const path = options.path ?? "/";
+  const sameSite = options.sameSite ?? "Lax";
+  const secure =
+    options.secure ??
+    (typeof window !== "undefined" && window.location.protocol === "https:");
 
   // Update in-memory fallback
   memoryFallback.set(name, value);
@@ -87,7 +97,7 @@ export function setCookie(name: string, value: string, options: CookieOptions = 
 
     let cookieStr = `${encodeURIComponent(name)}=${encodeURIComponent(value)};expires=${expires.toUTCString()};path=${path};SameSite=${sameSite}`;
     if (secure) {
-      cookieStr += ';Secure';
+      cookieStr += ";Secure";
     }
     document.cookie = cookieStr;
   } catch {
@@ -96,7 +106,7 @@ export function setCookie(name: string, value: string, options: CookieOptions = 
 
   // 2. Mirror to localStorage as resilient backup
   try {
-    if (typeof window !== 'undefined' && window.localStorage) {
+    if (typeof window !== "undefined" && window.localStorage) {
       window.localStorage.setItem(name, value);
     }
   } catch {
@@ -107,7 +117,7 @@ export function setCookie(name: string, value: string, options: CookieOptions = 
 /**
  * Delete a cookie by setting its expiration date in the past
  */
-export function deleteCookie(name: string, path = '/'): void {
+export function deleteCookie(name: string, path = "/"): void {
   memoryFallback.delete(name);
 
   try {
@@ -115,7 +125,7 @@ export function deleteCookie(name: string, path = '/'): void {
   } catch {}
 
   try {
-    if (typeof window !== 'undefined' && window.localStorage) {
+    if (typeof window !== "undefined" && window.localStorage) {
       window.localStorage.removeItem(name);
     }
   } catch {}
@@ -131,7 +141,10 @@ export function hasCookie(name: string): boolean {
 /**
  * Read and parse a JSON cookie
  */
-export function getJSONCookie<T>(name: string, fallback: T | null = null): T | null {
+export function getJSONCookie<T>(
+  name: string,
+  fallback: T | null = null,
+): T | null {
   const raw = getCookie(name);
   if (!raw) return fallback;
   try {
@@ -144,12 +157,71 @@ export function getJSONCookie<T>(name: string, fallback: T | null = null): T | n
 /**
  * Serialize and save an object to a cookie
  */
-export function setJSONCookie<T>(name: string, value: T, options?: CookieOptions): void {
+export function setJSONCookie<T>(
+  name: string,
+  value: T,
+  options?: CookieOptions,
+): void {
   try {
     setCookie(name, JSON.stringify(value), options);
   } catch {
     // Serialization error
   }
+}
+
+/**
+ * Thoroughly purges all cookies, localStorage, and sessionStorage.
+ * Returns verified counts of items removed.
+ */
+export function purgeAllClientStorage(): {
+  cookiesRemoved: number;
+  localStorageKeysRemoved: number;
+  sessionStorageKeysRemoved: number;
+} {
+  let cookiesRemoved = 0;
+  let localStorageKeysRemoved = 0;
+  let sessionStorageKeysRemoved = 0;
+
+  // 1. Purge all cookies
+  if (typeof document !== "undefined") {
+    try {
+      const cookieList = document.cookie ? document.cookie.split(";") : [];
+      for (const c of cookieList) {
+        const eqIdx = c.indexOf("=");
+        const name = (eqIdx > -1 ? c.slice(0, eqIdx) : c).trim();
+        if (name) {
+          document.cookie = `${encodeURIComponent(name)}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;SameSite=Lax`;
+          document.cookie = `${encodeURIComponent(name)}=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=;SameSite=Lax`;
+          cookiesRemoved++;
+        }
+      }
+    } catch {}
+  }
+
+  // 2. Purge localStorage
+  if (typeof window !== "undefined" && window.localStorage) {
+    try {
+      localStorageKeysRemoved = window.localStorage.length;
+      window.localStorage.clear();
+    } catch {}
+  }
+
+  // 3. Purge sessionStorage
+  if (typeof window !== "undefined" && window.sessionStorage) {
+    try {
+      sessionStorageKeysRemoved = window.sessionStorage.length;
+      window.sessionStorage.clear();
+    } catch {}
+  }
+
+  // 4. Purge in-memory fallback
+  memoryFallback.clear();
+
+  return {
+    cookiesRemoved,
+    localStorageKeysRemoved,
+    sessionStorageKeysRemoved,
+  };
 }
 
 /**
@@ -162,5 +234,6 @@ export const cookieService = {
   has: hasCookie,
   getJSON: getJSONCookie,
   setJSON: setJSONCookie,
+  purgeAll: purgeAllClientStorage,
   keys: COOKIE_KEYS,
 };

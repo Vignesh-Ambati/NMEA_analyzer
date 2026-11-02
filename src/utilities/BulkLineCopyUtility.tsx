@@ -28,7 +28,6 @@ import {
   ArrowDownUp,
   X,
   FileDown,
-  RefreshCw,
 } from "lucide-react";
 import { useApp } from "../context/AppContext";
 import {
@@ -46,13 +45,7 @@ const DEFAULT_TARGET_EXPR = "^ERROR|FATAL";
 const DEFAULT_SOURCE_PATH = "C:\\logs\\massive_file.log";
 
 export const BulkLineCopyUtility: React.FC = () => {
-  const {
-    files: appLoadedFiles,
-    batchSize,
-    setBatchSize,
-    syncEngineTuning,
-    isSyncingEngine,
-  } = useApp();
+  const { files: appLoadedFiles, batchSize } = useApp();
 
   // Mode: File Stream vs Raw Data Paste
   const [inputMode, setInputMode] = useState<"file" | "raw">("file");
@@ -533,48 +526,10 @@ export const BulkLineCopyUtility: React.FC = () => {
         <div className="lg:col-span-7 space-y-6">
           {/* 1. Backend Configuration (Output Destination section removed per instruction) */}
           <div className="bg-[#FAF8F5] dark:bg-slate-900 border border-[#E6E1D6] dark:border-slate-800 rounded-2xl p-5 sm:p-6 space-y-5 shadow-xs">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-1 border-b border-slate-200/80 dark:border-slate-800">
+            <div className="pb-1 border-b border-slate-200/80 dark:border-slate-800">
               <h4 className="text-base sm:text-lg font-bold text-slate-800 dark:text-slate-100 tracking-tight">
                 1. Backend Configuration
               </h4>
-              <div className="flex items-center space-x-1.5 text-[11px] font-mono bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200/80 dark:border-blue-800/60 px-2.5 py-1 rounded-lg text-blue-700 dark:text-blue-300">
-                <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
-                <span>FastAPI Engine (≤ 5 GB) · Global Batch Size:</span>
-                <span className="font-bold text-blue-900 dark:text-blue-200">
-                  {batchSize} lines
-                </span>
-                <div className="flex items-center space-x-1 pl-1">
-                  <button
-                    type="button"
-                    onClick={() => setBatchSize(Math.max(100, batchSize - 250))}
-                    className="w-4 h-4 rounded bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-200 flex items-center justify-center hover:bg-blue-200 cursor-pointer font-bold leading-none"
-                    title="Decrease global batch size"
-                  >
-                    -
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setBatchSize(Math.min(10000, batchSize + 250))
-                    }
-                    className="w-4 h-4 rounded bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-200 flex items-center justify-center hover:bg-blue-200 cursor-pointer font-bold leading-none"
-                    title="Increase global batch size"
-                  >
-                    +
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => syncEngineTuning()}
-                    disabled={isSyncingEngine}
-                    className="w-4 h-4 rounded bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-200 flex items-center justify-center hover:bg-blue-200 cursor-pointer ml-1"
-                    title="Sync global engine tuning settings from backend / cache"
-                  >
-                    <RefreshCw
-                      className={`w-2.5 h-2.5 ${isSyncingEngine ? "animate-spin" : ""}`}
-                    />
-                  </button>
-                </div>
-              </div>
             </div>
 
             {/* Source File Section (or Raw Textarea) */}

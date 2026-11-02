@@ -78,7 +78,11 @@ interface AppContextType {
     password: string,
   ) => Promise<{ success: boolean; authenticated?: boolean; message?: string }>;
   logoutDeveloper: () => void;
-  purgeClientStorage: () => void;
+  purgeClientStorage: () => {
+    cookiesRemoved: number;
+    localStorageKeysRemoved: number;
+    sessionStorageKeysRemoved: number;
+  };
 
   batchSize: number;
   setBatchSize: (val: number) => void;
@@ -86,7 +90,11 @@ interface AppContextType {
   setRetentionWindow: (val: number) => void;
   workerCount: number;
   setWorkerCount: (val: number) => void;
-  flushRamCache: () => void;
+  flushRamCache: () => {
+    logsFreed: number;
+    filesFreed: number;
+    jobsReset: number;
+  };
 
   logs: ConsoleMessage[];
   addLog: (
@@ -269,16 +277,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
   }, []);
 
   const [batchSize, setBatchSize] = useState<number>(() => {
-    const saved = cookieService.get(COOKIE_KEYS.BATCH_SIZE);
-    return saved ? parseInt(saved, 10) : 500;
+    return getCachedEngineParams().batchSize;
   });
   const [retentionWindow, setRetentionWindow] = useState<number>(() => {
-    const saved = cookieService.get(COOKIE_KEYS.RETENTION_WINDOW);
-    return saved ? parseInt(saved, 10) : 3600;
+    return getCachedEngineParams().retentionWindow;
   });
   const [workerCount, setWorkerCount] = useState<number>(() => {
-    const saved = cookieService.get(COOKIE_KEYS.WORKER_COUNT);
-    return saved ? parseInt(saved, 10) : 4;
+    return getCachedEngineParams().workerCount;
   });
 
   const [logs, setLogs] = useState<ConsoleMessage[]>(() =>
@@ -451,27 +456,60 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
   );
 
   const flushRamCache = useCallback(() => {
+    const logsCount = logger.getLogs().length;
+    const filesCount = files.length;
+    const jobsCount = activeJobs.length;
+
     logger.clear();
     setLogs([]);
+    setFiles([]);
+    setSelectedFileId("Combined");
+    setActiveJobs([]);
+
+    // Trigger Garbage Collection if exposed in runtime
+    if (typeof window !== "undefined" && (window as any).gc) {
+      try {
+        (window as any).gc();
+      } catch {
+        // no-op
+      }
+    }
+
     addLog(
-      "Telemetry RAM cache and temporary buffers purged from memory.",
+      `UI RAM flushed: purged ${logsCount} console logs, ${filesCount} in-memory datasets, and ${jobsCount} active job buffers.`,
       "success",
       "system",
+      { logsFreed: logsCount, filesFreed: filesCount, jobsReset: jobsCount },
     );
-  }, [addLog]);
+
+    return {
+      logsFreed: logsCount,
+      filesFreed: filesCount,
+      jobsReset: jobsCount,
+    };
+  }, [files.length, activeJobs.length, addLog]);
 
   const purgeClientStorage = useCallback(() => {
     try {
-      localStorage.removeItem("dev_pin");
-      localStorage.removeItem("dev_token");
-      sessionStorage.clear();
+      const result = cookieService.purgeAll();
       addLog(
-        "Local client cache and session storages purged.",
+        `Client storage purged: removed ${result.cookiesRemoved} cookies and ${result.localStorageKeysRemoved} localStorage entries. Session storage cleared.`,
         "success",
         "system",
+        result,
       );
-    } catch {
-      addLog("Failed to purge local client storage.", "warn", "system");
+      return result;
+    } catch (err: any) {
+      addLog(
+        `Failed to purge local client storage: ${err?.message}`,
+        "warn",
+        "system",
+      );
+      return {
+        cookiesRemoved: 0,
+        localStorageKeysRemoved: 0,
+        sessionStorageKeysRemoved: 0,
+      };
     }
   }, [addLog]);
 
@@ -616,7 +654,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
         setRetentionWindow(res.params.retentionWindow);
         setWorkerCount(res.params.workerCount);
         addLog(
-          `Engine tuning settings synchronized: batchSize=${res.params.batchSize}, retentionWindow=${res.params.retentionWindow}s, workerCount=${res.params.workerCount} (${res.source})`,
+          `Engine tuning settings synchronized: batchSize=${res.params.batchSize.toLocaleString()} lines, retentionWindow=${res.params.retentionWindow} days, workerCount=${res.params.workerCount} (${res.source})`,
           res.success ? "success" : "info",
           "developer",
         );
@@ -730,7 +768,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
             retentionWindow,
             workerCount,
           });
-          logger.developer(`Batch size adjusted to ${val} and cached`, "info");
+          logger.developer(
+            `Batch size adjusted to ${val.toLocaleString()} lines and cached`,
+            "info",
+          );
           setBatchSize(val);
         },
         retentionWindow,
@@ -742,7 +783,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
             workerCount,
           });
           logger.developer(
-            `Retention window adjusted to ${val}s and cached`,
+            `Retention window adjusted to ${val} days and cached`,
             "info",
           );
           setRetentionWindow(val);
@@ -756,7 +797,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
             workerCount: val,
           });
           logger.developer(
-            `Worker count adjusted to ${val} and cached`,
+            `Concurrent workers adjusted to ${val} multiprocessing cores and cached`,
             "info",
           );
           setWorkerCount(val);

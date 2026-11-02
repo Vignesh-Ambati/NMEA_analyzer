@@ -148,7 +148,7 @@ export const EngineTuningTab: React.FC = () => {
           text: result.message || "Tuning parameters committed to database.",
         });
         addLog(
-          `Engine parameters committed to backend DB: batchSize=${batchSize}, retentionWindow=${retentionWindow}s, workers=${workerCount}`,
+          `Engine parameters committed to backend DB: batchSize=${batchSize.toLocaleString()} lines, retentionWindow=${retentionWindow} days, concurrentWorkers=${workerCount} cores`,
           "success",
           "developer",
         );
@@ -283,89 +283,233 @@ export const EngineTuningTab: React.FC = () => {
         )}
 
         {/* Tuning Controls Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {/* BATCH_SIZE Slider */}
-          <div className="p-4 rounded-xl bg-[#F5F2EB]/60 dark:bg-slate-950 border border-[#E6E1D6] dark:border-slate-800 space-y-2.5">
-            <div className="flex justify-between items-center text-xs font-mono">
-              <span className="font-semibold text-slate-800 dark:text-slate-200">
-                BATCH_SIZE
-              </span>
-              <span className="text-[#E05318] font-bold">
-                {batchSize} epochs
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+          {/* 1. BATCH_SIZE (Number of Lines to Send) */}
+          <div className="p-4 sm:p-5 rounded-2xl bg-[#F5F2EB]/60 dark:bg-slate-950 border border-[#E6E1D6] dark:border-slate-800 space-y-4">
+            <div className="flex justify-between items-start">
+              <div>
+                <span className="text-s font-mono font-bold text-slate-800 dark:text-slate-200 block">
+                  BATCH_SIZE
+                </span>
+                <span className="text-[11px] text-[#736E65] dark:text-slate-400">
+                  Number of lines dispatched per processing batch to backend
+                </span>
+              </div>
+              <span className="text-[#E05318] font-bold font-mono text-sm px-2.5 py-1 rounded-lg bg-orange-500/10 dark:bg-orange-950/40 border border-orange-500/20 shrink-0">
+                {batchSize.toLocaleString()} lines
               </span>
             </div>
-            <input
-              type="range"
-              min="100"
-              max="2000"
-              step="50"
-              value={batchSize}
-              onChange={(e) => setBatchSize(Number(e.target.value))}
-              className="w-full accent-[#E05318] h-1.5 bg-slate-200 dark:bg-slate-800 rounded cursor-pointer"
-            />
-            <div className="flex justify-between text-[10px] text-slate-400 font-mono">
-              <span>Min: 100</span>
-              <span>Chunking buffer for stream decoding</span>
-              <span>Max: 2000</span>
+
+            {/* Direct Styled User Input */}
+            <div className="flex items-center space-x-2">
+              <div className="relative flex-1">
+                <input
+                  type="number"
+                  min="100"
+                  max="10000000"
+                  step="5000"
+                  value={batchSize || ""}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value, 10);
+                    if (!isNaN(val)) {
+                      setBatchSize(Math.min(10000000, Math.max(1, val)));
+                    }
+                  }}
+                  className="w-full px-3.5 py-2.5 text-xs font-mono font-semibold bg-white dark:bg-slate-900 border border-[#E6E1D6] dark:border-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E05318]/30 focus:border-[#E05318] text-[#24211D] dark:text-slate-100"
+                  placeholder="Enter lines count (e.g. 50000)"
+                />
+              </div>
+            </div>
+
+            {/* Quick Presets (50k to 10M) */}
+            <div className="space-y-1.5">
+              <span className="text-[10px] font-mono uppercase text-slate-400 font-semibold tracking-wider">
+                Quick Batch Size Presets
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                {[
+                  { label: "50K", value: 50000 },
+                  { label: "100K", value: 100000 },
+                  { label: "250K", value: 250000 },
+                  { label: "500K", value: 500000 },
+                  { label: "1M", value: 1000000 },
+                  { label: "5M", value: 5000000 },
+                  { label: "10M", value: 10000000 },
+                ].map((preset) => (
+                  <button
+                    key={preset.label}
+                    type="button"
+                    onClick={() => {
+                      setBatchSize(preset.value);
+                      addLog(
+                        `Batch size set to preset ${preset.label} (${preset.value.toLocaleString()} lines)`,
+                        "info",
+                        "developer",
+                      );
+                    }}
+                    className={`px-2.5 py-1 text-[11px] font-mono rounded-lg border transition-all cursor-pointer ${
+                      batchSize === preset.value
+                        ? "bg-[#E05318] text-white font-bold border-[#E05318] shadow-xs"
+                        : "bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:border-[#E05318]/50"
+                    }`}
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
-          {/* RETENTION_WINDOW Slider */}
-          <div className="p-4 rounded-xl bg-[#F5F2EB]/60 dark:bg-slate-950 border border-[#E6E1D6] dark:border-slate-800 space-y-2.5">
-            <div className="flex justify-between items-center text-xs font-mono">
-              <span className="font-semibold text-slate-800 dark:text-slate-200">
-                RETENTION_WINDOW
-              </span>
-              <span className="text-[#E05318] font-bold">
-                {retentionWindow}s ({Math.round(retentionWindow / 60)}m)
+          {/* 2. RETENTION_WINDOW (Days / Hours / Months) */}
+          <div className="p-4 sm:p-5 rounded-2xl bg-[#F5F2EB]/60 dark:bg-slate-950 border border-[#E6E1D6] dark:border-slate-800 space-y-4">
+            <div className="flex justify-between items-start">
+              <div>
+                <span className="text-s font-mono font-bold text-slate-800 dark:text-slate-200 block">
+                  RETENTION_WINDOW
+                </span>
+                <span className="text-[11px] text-[#736E65] dark:text-slate-400">
+                  Number of days to keep ingested logs and data retained
+                </span>
+              </div>
+              <span className="text-[#E05318] font-bold font-mono text-sm px-2.5 py-1 rounded-lg bg-orange-500/10 dark:bg-orange-950/40 border border-orange-500/20 shrink-0">
+                {retentionWindow} {retentionWindow === 1 ? "Day" : "Days"}
               </span>
             </div>
-            <input
-              type="range"
-              min="600"
-              max="7200"
-              step="300"
-              value={retentionWindow}
-              onChange={(e) => setRetentionWindow(Number(e.target.value))}
-              className="w-full accent-[#E05318] h-1.5 bg-slate-200 dark:bg-slate-800 rounded cursor-pointer"
-            />
-            <div className="flex justify-between text-[10px] text-slate-400 font-mono">
-              <span>Min: 10m</span>
-              <span>Telemetry window retention cutoff</span>
-              <span>Max: 120m</span>
+
+            {/* Direct Styled User Input */}
+            <div className="flex items-center space-x-2">
+              <div className="relative flex-1">
+                <input
+                  type="number"
+                  min="1"
+                  max="3650"
+                  step="1"
+                  value={retentionWindow || ""}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value, 10);
+                    if (!isNaN(val)) {
+                      setRetentionWindow(Math.min(3650, Math.max(1, val)));
+                    }
+                  }}
+                  className="w-full px-3.5 py-2.5 text-xs font-mono font-semibold bg-white dark:bg-slate-900 border border-[#E6E1D6] dark:border-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#E05318]/30 focus:border-[#E05318] text-[#24211D] dark:text-slate-100"
+                  placeholder="Enter retention in days"
+                />
+              </div>
+            </div>
+
+            {/* Retention Presets (Days, Hours, Months) */}
+            <div className="space-y-1.5">
+              <span className="text-[10px] font-mono uppercase text-slate-400 font-semibold tracking-wider">
+                Retention Presets
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                {[
+                  { label: "7 Days", value: 7 },
+                  { label: "14 Days", value: 14 },
+                  { label: "30 Days", value: 30 },
+                  { label: "90 Days", value: 90 },
+                  { label: "180 Days", value: 180 },
+                  { label: "365 Days", value: 365 },
+                ].map((preset) => (
+                  <button
+                    key={preset.label}
+                    type="button"
+                    onClick={() => {
+                      setRetentionWindow(preset.value);
+                      addLog(
+                        `Retention window set to preset ${preset.label}`,
+                        "info",
+                        "developer",
+                      );
+                    }}
+                    className={`px-2.5 py-1 text-[11px] font-mono rounded-lg border transition-all cursor-pointer ${
+                      retentionWindow === preset.value
+                        ? "bg-[#E05318] text-white font-bold border-[#E05318] shadow-xs"
+                        : "bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:border-[#E05318]/50"
+                    }`}
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
-          {/* CONCURRENT_WORKERS Selector */}
-          <div className="p-4 rounded-xl bg-[#F5F2EB]/60 dark:bg-slate-950 border border-[#E6E1D6] dark:border-slate-800 space-y-2.5 sm:col-span-2">
-            <div className="flex justify-between items-center text-xs font-mono">
-              <span className="font-semibold text-slate-800 dark:text-slate-200">
-                CONCURRENT_WORKERS
-              </span>
-              <span className="text-sky-500 font-bold">
-                {workerCount} Worker Threads
-              </span>
+          {/* 3. CONCURRENT_WORKERS (Multiprocessing CPU Processes) */}
+          <div className="p-4 sm:p-5 rounded-2xl bg-[#F5F2EB]/60 dark:bg-slate-950 border border-[#E6E1D6] dark:border-slate-800 space-y-4 sm:col-span-2">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <span className="text-s font-mono font-bold text-slate-800 dark:text-slate-200 block">
+                  CONCURRENT_WORKERS
+                </span>
+                <span className="text-[11px] text-[#736E65] dark:text-slate-400">
+                  Multiprocessing CPU worker processes spawned for parallel
+                  sentence parsing and extraction
+                </span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <span className="text-sky-500 font-bold font-mono text-sm px-2.5 py-1 rounded-lg bg-sky-500/10 dark:bg-sky-950/40 border border-sky-500/20 shrink-0">
+                  {workerCount}{" "}
+                  {workerCount === 1
+                    ? "Worker Process"
+                    : "Parallel Worker Processes"}
+                </span>
+              </div>
             </div>
-            <div className="grid grid-cols-4 gap-2">
-              {[1, 2, 4, 8].map((w) => (
-                <button
-                  key={w}
-                  type="button"
-                  onClick={() => setWorkerCount(w)}
-                  className={`py-2 text-xs font-mono rounded-xl border transition-all cursor-pointer ${
-                    workerCount === w
-                      ? "bg-sky-500 text-white font-bold border-sky-500 shadow-xs"
-                      : "bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:border-slate-300"
-                  }`}
-                >
-                  {w}x Workers
-                </button>
-              ))}
+
+            {/* Direct Worker Count Input & Stepper */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+              <div className="relative w-full sm:w-48">
+                <input
+                  type="number"
+                  min="1"
+                  max="128"
+                  step="1"
+                  value={workerCount || ""}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value, 10);
+                    if (!isNaN(val)) {
+                      setWorkerCount(Math.min(128, Math.max(1, val)));
+                    }
+                  }}
+                  className="w-full px-3.5 py-2.5 text-xs font-mono font-semibold bg-white dark:bg-slate-900 border border-[#E6E1D6] dark:border-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-500 text-[#24211D] dark:text-slate-100"
+                  placeholder="Processes (1-128)"
+                />
+                <span className="absolute right-3 top-2.5 text-[11px] font-mono text-slate-400 pointer-events-none">
+                  cores
+                </span>
+              </div>
+
+              {/* Multiprocessing Worker Presets */}
+              <div className="flex flex-wrap gap-2 flex-1">
+                {[
+                  { label: "1x (Single)", value: 1 },
+                  { label: "2x (Dual)", value: 2 },
+                  { label: "4x (Quad)", value: 4 },
+                  { label: "8x (Octa)", value: 8 },
+                ].map((preset) => (
+                  <button
+                    key={preset.label}
+                    type="button"
+                    onClick={() => {
+                      setWorkerCount(preset.value);
+                      addLog(
+                        `Multiprocessing worker count set to ${preset.value} cores`,
+                        "info",
+                        "developer",
+                      );
+                    }}
+                    className={`py-2 px-3 text-xs font-mono rounded-xl border transition-all cursor-pointer ${
+                      workerCount === preset.value
+                        ? "bg-sky-500 text-white font-bold border-sky-500 shadow-xs"
+                        : "bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:border-sky-400"
+                    }`}
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
             </div>
-            <p className="text-[10px] text-slate-400 font-mono text-center">
-              Parallel sentence parsing and aggregation workers for multi-task
-              charts
-            </p>
           </div>
         </div>
       </div>
