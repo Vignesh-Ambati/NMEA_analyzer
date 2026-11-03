@@ -149,7 +149,7 @@ export const checkBackendHealth = async (
       level: "warn",
       message: "Backend Core API service unreachable",
       error: errorMsg,
-      notes: "Make sure FastAPI backend is running on configured host and port",
+      notes: "Make sure backend service is running on configured host and port",
     });
 
     return {
@@ -338,7 +338,7 @@ export const verifyDevPassword = async (
       message: "Developer auth offline fallback: backend service unreachable",
       error: err.message || "Network unreachable",
       notes:
-        "Make sure FastAPI backend with SQLite auth is running at POST /api/dev/auth",
+        "Make sure backend service with user auth is running at POST /api/dev/auth",
     });
     return {
       success: false,

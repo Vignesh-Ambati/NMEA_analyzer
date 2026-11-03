@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { useApp } from "../../../context/AppContext";
 import { backendService, EngineTuningParams } from "../../../backend";
+import { saveCachedEngineParams } from "../../../services/engineTuningService";
 
 export const EngineTuningTab: React.FC = () => {
   const {
@@ -39,66 +40,42 @@ export const EngineTuningTab: React.FC = () => {
       retentionWindow !== committedParams.retentionWindow ||
       workerCount !== committedParams.workerCount);
 
-  // Auto-fetch parameters from backend on opening this tab, with a limited retry loop.
+  // Fetch parameters from backend if online, or preserve session parameters
   const handleFetchFromBackend = useCallback(
     async (isInitial = false) => {
-      const maxAttempts = 3;
-      let attempt = 0;
-
       setIsFetching(true);
 
       try {
-        while (attempt < maxAttempts) {
-          attempt += 1;
+        const result = await backendService.fetchEngineParams();
+        if (result.success && result.data) {
+          setCommittedParams(result.data);
+          setBatchSize(result.data.batchSize);
+          setRetentionWindow(result.data.retentionWindow);
+          setWorkerCount(result.data.workerCount);
+          setLastSyncedAt(
+            result.data.updatedAt
+              ? new Date(result.data.updatedAt).toLocaleTimeString()
+              : new Date().toLocaleTimeString(),
+          );
+          showToast(
+            isInitial
+              ? "Synchronized engine parameters with backend database."
+              : "Engine parameters reloaded from database.",
+            "success",
+          );
+          return;
+        }
 
-          try {
-            const result = await backendService.fetchEngineParams();
-            if (result.success && result.data) {
-              setCommittedParams(result.data);
-              setBatchSize(result.data.batchSize);
-              setRetentionWindow(result.data.retentionWindow);
-              setWorkerCount(result.data.workerCount);
-              setLastSyncedAt(
-                result.data.updatedAt
-                  ? new Date(result.data.updatedAt).toLocaleTimeString()
-                  : new Date().toLocaleTimeString(),
-              );
-              showToast(
-                isInitial
-                  ? "Synchronized engine parameters with backend database."
-                  : "Engine parameters reloaded from database.",
-                "success",
-              );
-              return;
-            }
-
-            if (attempt < maxAttempts) {
-              await new Promise((resolve) =>
-                setTimeout(resolve, 400 * attempt),
-              );
-              continue;
-            }
-
-            showToast(
-              result.message ||
-                "Backend DB params not found. Operating with session parameters.",
-              "info",
-            );
-            return;
-          } catch (err: any) {
-            const errorMessage =
-              err?.message || "Failed to fetch parameters from backend.";
-
-            if (attempt < maxAttempts) {
-              await new Promise((resolve) =>
-                setTimeout(resolve, 400 * attempt),
-              );
-              continue;
-            }
-
-            showToast(errorMessage, "error");
-            return;
-          }
+        if (!isInitial) {
+          showToast(
+            result.message ||
+              "Backend database offline. Retaining session parameters.",
+            "info",
+          );
+        }
+      } catch {
+        if (!isInitial) {
+          showToast("Backend service offline. Retaining local parameters.", "info");
         }
       } finally {
         setIsFetching(false);
@@ -113,7 +90,7 @@ export const EngineTuningTab: React.FC = () => {
     void handleFetchFromBackend(true);
   }, [handleFetchFromBackend]);
 
-  // Commit tuning parameters to backend DB
+  // Commit tuning parameters to local storage cache & backend DB if online
   const handleCommitToBackend = async () => {
     setIsCommitting(true);
     const paramsToCommit: EngineTuningParams = {
@@ -122,11 +99,14 @@ export const EngineTuningTab: React.FC = () => {
       workerCount,
     };
 
+    // Always persist to local cache first
+    saveCachedEngineParams(paramsToCommit);
+    setCommittedParams(paramsToCommit);
+    setLastSyncedAt(new Date().toLocaleTimeString());
+
     try {
       const result = await backendService.commitEngineParams(paramsToCommit);
       if (result.success) {
-        setCommittedParams(paramsToCommit);
-        setLastSyncedAt(new Date().toLocaleTimeString());
         showToast(
           result.message || "Tuning parameters committed to database.",
           "success",
@@ -137,21 +117,20 @@ export const EngineTuningTab: React.FC = () => {
           "developer",
         );
       } else {
-        showToast(
-          result.message || "Failed to commit parameters to backend database.",
-          "error",
-        );
+        showToast("Parameters saved to local configuration cache.", "success");
         addLog(
-          `Failed to commit engine params: ${result.message}`,
-          "error",
+          `Engine parameters saved to local cache (backend database offline): batchSize=${batchSize.toLocaleString()} lines, retentionWindow=${retentionWindow} days`,
+          "info",
           "developer",
         );
       }
-    } catch (err: any) {
-      const msg =
-        err?.message || "Network error while saving parameters to database.";
-      showToast(msg, "error");
-      addLog(`Commit error: ${msg}`, "error", "developer");
+    } catch {
+      showToast("Parameters saved to local configuration cache.", "success");
+      addLog(
+        `Engine parameters saved to local cache (backend offline): batchSize=${batchSize.toLocaleString()} lines`,
+        "info",
+        "developer",
+      );
     } finally {
       setIsCommitting(false);
     }

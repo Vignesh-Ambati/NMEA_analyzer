@@ -578,7 +578,7 @@ export const BulkLineCopyUtility: React.FC = () => {
                         Release to Drop Massive Log File Here
                       </div>
                       <div className="text-xs text-slate-500 dark:text-slate-400 font-mono">
-                        FastAPI backend stream processes files up to 5 GB
+                        Streaming engine processes files up to 5 GB
                         (batch: {batchSize} lines) with zero browser memory
                         strain
                       </div>

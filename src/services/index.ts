@@ -10,3 +10,4 @@ export * from "./extractionService";
 export * from "./ingestionService";
 export * from "./engineTuningService";
 export * from "./notificationService";
+export * from "./taskCalculationService";

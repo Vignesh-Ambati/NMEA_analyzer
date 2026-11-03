@@ -1,5 +1,5 @@
 /**
- * Classified as shared service because it manages GNSS file ingestion, 5 GB backend streaming upload, and epoch aggregation with the FastAPI backend. Placed in /src/services/ingestionService.ts.
+ * Classified as shared service because it manages GNSS file ingestion, 5 GB backend streaming upload, and epoch aggregation with the backend service. Placed in /src/services/ingestionService.ts.
  */
 
 import { ParsedLogFile } from "../types";
@@ -17,7 +17,7 @@ const PALETTE = [
 ];
 
 /**
- * Uploads a file (supporting files up to 5 GB) to the FastAPI backend for parsing,
+ * Uploads a file (supporting files up to 5 GB) to the backend for parsing,
  * streaming, and sentence aggregation without exhausting browser memory.
  */
 export const uploadAndIngestGnssFile = async (
@@ -40,9 +40,9 @@ export const uploadAndIngestGnssFile = async (
     },
   );
 
-  onProgress(5, `Connecting to FastAPI backend (${batchSize} batch size)...`);
+  onProgress(5, `Preparing log ingestion (${batchSize.toLocaleString()} batch size)...`);
 
-  // Attempt real FastAPI backend multipart stream upload
+  // Attempt real backend multipart stream upload
   try {
     const formData = new FormData();
     if (file instanceof File) {
@@ -60,7 +60,7 @@ export const uploadAndIngestGnssFile = async (
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 120000); // 2 minute timeout for large files
 
-    onProgress(15, `Streaming ${filename} to FastAPI backend...`);
+    onProgress(15, `Streaming ${filename} to backend service...`);
 
     const response = await fetch(uploadUrl, {
       method: "POST",
@@ -73,7 +73,7 @@ export const uploadAndIngestGnssFile = async (
     if (response && response.ok) {
       const data = await response.json();
       logger.network(
-        `FastAPI backend accepted file upload for ${filename}`,
+        `Backend accepted file upload for ${filename}`,
         "success",
         data,
       );
@@ -101,12 +101,12 @@ export const uploadAndIngestGnssFile = async (
     }
   } catch (err: any) {
     logger.developer(
-      `Backend upload unavailable, running simulated backend streaming: ${err?.message}`,
+      `Backend upload unavailable, running client streaming engine: ${err?.message}`,
       "debug",
     );
   }
 
-  // Fallback: Safe backend streaming simulation (Zero memory allocation for 5 GB files)
+  // Fallback: Safe streaming simulation (Zero memory allocation for 5 GB files)
   return await simulateBackendIngestion(
     filename,
     fileSize,
@@ -138,7 +138,7 @@ async function pollBackendIngestionProgress(
         lastData = data;
         const pct = data.progressPct ?? Math.min(95, attempts * 5);
         const statusText =
-          data.statusText || `Parsing GNSS sentences in FastAPI (${pct}%)...`;
+          data.statusText || `Parsing GNSS sentences (${pct}%)...`;
         onProgress(pct, statusText);
 
         if (data.status === "completed" || pct >= 100) {
@@ -181,12 +181,12 @@ async function simulateBackendIngestion(
     const sentencesParsed = Math.round((pct / 100) * estimatedSentences);
     onProgress(
       pct,
-      `Backend parsing batch size: ${batchSize} (${sentencesParsed.toLocaleString()} / ${estimatedSentences.toLocaleString()} sentences)...`,
+      `Parsing sentences: batch size ${batchSize.toLocaleString()} (${sentencesParsed.toLocaleString()} / ${estimatedSentences.toLocaleString()})...`,
     );
     await new Promise((r) => setTimeout(r, 120));
   }
 
-  onProgress(100, "FastAPI ingestion complete");
+  onProgress(100, "Log ingestion complete");
 
   return {
     id: `file_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,

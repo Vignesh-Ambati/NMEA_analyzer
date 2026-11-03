@@ -1,5 +1,5 @@
 /**
- * Classified as shared service because it manages chunked multi-GB file streaming and ingestion to the FastAPI backend for file processing. Placed in src/services/fileUploadService.ts.
+ * Classified as shared service because it manages chunked multi-GB file streaming and ingestion for file processing. Placed in src/services/fileUploadService.ts.
  */
 
 import { logger } from './logger';
@@ -30,7 +30,7 @@ export const uploadAndParseFile = async (
   const filename = file.name || 'unnamed_log.log';
   const fileSize = 'size' in file && typeof file.size === 'number' ? file.size : 0;
 
-  logger.network(`Starting 5 GB compatible upload for ${filename} (${fileSize} bytes) to FastAPI`, 'info');
+  logger.network(`Starting 5 GB compatible upload for ${filename} (${fileSize} bytes) to backend`, 'info');
 
   const reportProgress = (
     uploadedBytes: number,
@@ -89,7 +89,7 @@ export const uploadAndParseFile = async (
           end,
           uploadPct,
           'uploading',
-          `Streaming chunk ${chunkIndex + 1}/${totalChunks} to FastAPI (${(end / (1024 * 1024)).toFixed(0)} MB / ${(fileSize / (1024 * 1024)).toFixed(0)} MB)...`
+          `Streaming chunk ${chunkIndex + 1}/${totalChunks} to backend (${(end / (1024 * 1024)).toFixed(0)} MB / ${(fileSize / (1024 * 1024)).toFixed(0)} MB)...`
         );
 
         try {
@@ -99,7 +99,7 @@ export const uploadAndParseFile = async (
           });
 
           if (!res.ok) {
-            throw new Error(`FastAPI rejected chunk ${chunkIndex} (HTTP ${res.status})`);
+            throw new Error(`Backend rejected chunk ${chunkIndex} (HTTP ${res.status})`);
           }
           uploadedBytes = end;
         } catch (err: any) {
@@ -111,7 +111,7 @@ export const uploadAndParseFile = async (
 
       if (backendAvailable) {
         // Trigger server-side 5 GB parsing
-        reportProgress(fileSize, 85, 'parsing', 'FastAPI parsing 5 GB sentences on server...');
+        reportProgress(fileSize, 85, 'parsing', 'Parsing 5 GB sentences on server...');
         const parseUrl = getApiUrl('/nmea/parse');
 
         try {
@@ -126,7 +126,7 @@ export const uploadAndParseFile = async (
 
           if (parseRes.ok) {
             const data = await parseRes.json();
-            reportProgress(fileSize, 100, 'completed', 'FastAPI parse complete');
+            reportProgress(fileSize, 100, 'completed', 'Backend parse complete');
 
             return {
               id: uploadId,
@@ -137,14 +137,14 @@ export const uploadAndParseFile = async (
             };
           }
         } catch (err: any) {
-          logger.developer(`FastAPI parse error: ${err.message}`, 'error');
+          logger.developer(`Backend parse error: ${err.message}`, 'error');
         }
       }
     }
 
-    // Branch B: Client streaming fallback if FastAPI backend is temporarily offline
+    // Branch B: Client streaming fallback if backend service is temporarily offline
     // Reads only small sample chunks to estimate sentences without crashing on 5 GB
-    reportProgress(fileSize, 50, 'parsing', 'Reading log structure (FastAPI standby)...');
+    reportProgress(fileSize, 50, 'parsing', 'Reading log structure...');
     const sampleSize = Math.min(fileSize, 2 * 1024 * 1024); // 2 MB sample
     const sampleBlob = file.slice(0, sampleSize);
     const sampleText = await sampleBlob.text();

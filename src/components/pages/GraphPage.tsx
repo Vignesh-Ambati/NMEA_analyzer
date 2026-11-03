@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import { TASKS_CONFIG } from '../../services/tasks';
+import { calculateTaskSeries } from '../../services/taskCalculationService';
 import { InteractivePlot } from '../graph/InteractivePlot';
 import {
   ZoomIn,
@@ -40,8 +41,12 @@ export const GraphPage: React.FC = () => {
   const [exportCounter, setExportCounter] = useState(0);
 
   const targetSeries = useMemo<SeriesData[]>(() => {
-    // When backend submits plot series, it will populate here
-    return [];
+    if (files.length === 0) return [];
+    if (selectedFileId && selectedFileId !== 'Combined') {
+      const match = files.find((f) => f.id === selectedFileId);
+      return match ? [calculateTaskSeries(match, currentTaskId)] : [];
+    }
+    return files.map((f) => calculateTaskSeries(f, currentTaskId));
   }, [files, selectedFileId, currentTaskId]);
 
   const handleExportPng = () => {
