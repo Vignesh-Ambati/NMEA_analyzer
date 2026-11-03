@@ -74,8 +74,9 @@ export const MiscTab: React.FC = () => {
     addLog("Executing thorough Flush RAM action...", "info", "system");
     const result = flushRamCache();
     showToast(
-      `UI RAM flushed: ${result?.logsFreed ?? logs.length} logs & ${result?.filesFreed ?? files.length} datasets freed`,
+      `UI RAM flushed (${result?.logsFreed ?? logs.length} logs, ${result?.filesFreed ?? files.length} datasets)`,
       "success",
+      2400,
     );
   };
 
@@ -88,8 +89,9 @@ export const MiscTab: React.FC = () => {
     const result = purgeClientStorage();
     refreshStorageStats();
     showToast(
-      `Client storage purged: cleared ${result.cookiesRemoved} cookies & ${result.localStorageKeysRemoved} local storage keys`,
+      `Storage purged (${result.cookiesRemoved} cookies, ${result.localStorageKeysRemoved} keys)`,
       "success",
+      2400,
     );
   };
 
@@ -301,7 +303,10 @@ export const MiscTab: React.FC = () => {
 
             <button
               type="button"
-              onClick={() => pingBackend()}
+              onClick={() => {
+                showToast("Pinging backend...", "info", 1200);
+                pingBackend(true);
+              }}
               disabled={isCheckingBackend}
               className="px-4 py-2 rounded-xl text-xs font-semibold bg-[#EFEAE1] dark:bg-slate-800 text-[#736E65] dark:text-slate-200 hover:text-[#E05318] hover:bg-[#E5DFD4] dark:hover:bg-slate-700 border border-[#E6E1D6] dark:border-slate-700 shadow-xs flex items-center space-x-2 transition-all cursor-pointer shrink-0 self-start sm:self-auto disabled:opacity-50"
             >

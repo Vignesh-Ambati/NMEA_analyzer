@@ -49,6 +49,7 @@ export const SecurityTab: React.FC = () => {
     }
 
     setIsUpdating(true);
+    showToast("Updating password on backend...", "info", 1500);
     try {
       const result = await backendService.updateDevPassword({
         currentPassword: trimmedCurrent || undefined,
@@ -57,10 +58,7 @@ export const SecurityTab: React.FC = () => {
 
       if (result.success) {
         cookieService.set("dev_custom_key", trimmedNew);
-        showToast(
-          result.message || "Developer password updated in backend database.",
-          "success",
-        );
+        showToast("Password updated on backend", "success", 2600);
         setCurrentPassword("");
         setNewPassword("");
         setConfirmPassword("");
@@ -70,27 +68,26 @@ export const SecurityTab: React.FC = () => {
           "developer",
         );
       } else {
-        // Fallback: save to local security vault
         cookieService.set("dev_custom_key", trimmedNew);
-        showToast("Password updated and saved in local security vault.", "success");
+        showToast(result.message || "Backend rejected password update", "error", 3200);
         setCurrentPassword("");
         setNewPassword("");
         setConfirmPassword("");
         addLog(
-          "Developer access password saved in local security vault (backend database offline).",
-          "info",
+          `Developer access password update rejected by backend: ${result.message}`,
+          "warn",
           "developer",
         );
       }
     } catch (err: any) {
       cookieService.set("dev_custom_key", trimmedNew);
-      showToast("Password updated and saved in local security vault.", "success");
+      showToast("Backend password update failed", "error", 3200);
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
       addLog(
-        "Developer access password saved in local security vault (backend offline).",
-        "info",
+        `Developer access password update failed: ${err?.message}`,
+        "error",
         "developer",
       );
     } finally {

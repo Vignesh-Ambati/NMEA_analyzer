@@ -44,6 +44,9 @@ export const EngineTuningTab: React.FC = () => {
   const handleFetchFromBackend = useCallback(
     async (isInitial = false) => {
       setIsFetching(true);
+      if (!isInitial) {
+        showToast("Fetching parameters from backend...", "info", 1400);
+      }
 
       try {
         const result = await backendService.fetchEngineParams();
@@ -57,25 +60,20 @@ export const EngineTuningTab: React.FC = () => {
               ? new Date(result.data.updatedAt).toLocaleTimeString()
               : new Date().toLocaleTimeString(),
           );
-          showToast(
-            isInitial
-              ? "Synchronized engine parameters with backend database."
-              : "Engine parameters reloaded from database.",
-            "success",
-          );
+          showToast("Engine parameters synced from backend", "success", 2400);
           return;
         }
 
         if (!isInitial) {
           showToast(
-            result.message ||
-              "Backend database offline. Retaining session parameters.",
-            "info",
+            result.message || "Failed to fetch backend parameters",
+            "error",
+            3000,
           );
         }
       } catch {
         if (!isInitial) {
-          showToast("Backend service offline. Retaining local parameters.", "info");
+          showToast("Failed to fetch backend parameters", "error", 3000);
         }
       } finally {
         setIsFetching(false);
@@ -93,6 +91,7 @@ export const EngineTuningTab: React.FC = () => {
   // Commit tuning parameters to local storage cache & backend DB if online
   const handleCommitToBackend = async () => {
     setIsCommitting(true);
+    showToast("Committing parameters to backend...", "info", 1500);
     const paramsToCommit: EngineTuningParams = {
       batchSize,
       retentionWindow,
@@ -107,28 +106,25 @@ export const EngineTuningTab: React.FC = () => {
     try {
       const result = await backendService.commitEngineParams(paramsToCommit);
       if (result.success) {
-        showToast(
-          result.message || "Tuning parameters committed to database.",
-          "success",
-        );
+        showToast("Engine parameters committed to backend", "success", 2400);
         addLog(
           `Engine parameters committed to backend DB: batchSize=${batchSize.toLocaleString()} lines, retentionWindow=${retentionWindow} days, concurrentWorkers=${workerCount} cores`,
           "success",
           "developer",
         );
       } else {
-        showToast("Parameters saved to local configuration cache.", "success");
+        showToast(result.message || "Failed to commit parameters to backend", "error", 3200);
         addLog(
-          `Engine parameters saved to local cache (backend database offline): batchSize=${batchSize.toLocaleString()} lines, retentionWindow=${retentionWindow} days`,
-          "info",
+          `Engine parameters commit rejected by backend: ${result.message}`,
+          "warn",
           "developer",
         );
       }
-    } catch {
-      showToast("Parameters saved to local configuration cache.", "success");
+    } catch (err: any) {
+      showToast("Failed to commit parameters to backend", "error", 3200);
       addLog(
-        `Engine parameters saved to local cache (backend offline): batchSize=${batchSize.toLocaleString()} lines`,
-        "info",
+        `Engine parameters commit error: ${err?.message}`,
+        "error",
         "developer",
       );
     } finally {

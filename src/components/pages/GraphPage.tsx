@@ -23,6 +23,7 @@ export const GraphPage: React.FC = () => {
     setSelectedFileId,
     theme,
     navigateToFilePage,
+    showToast,
   } = useApp();
 
   const currentTask = TASKS_CONFIG.find((t) => t.id === currentTaskId) || TASKS_CONFIG[0];
@@ -39,6 +40,14 @@ export const GraphPage: React.FC = () => {
 
   const [resetCounter, setResetCounter] = useState(0);
   const [exportCounter, setExportCounter] = useState(0);
+  const lastNotifiedTask = React.useRef<number | null>(null);
+
+  React.useEffect(() => {
+    if (files.length > 0 && lastNotifiedTask.current !== currentTaskId) {
+      lastNotifiedTask.current = currentTaskId;
+      showToast(`Backend telemetry synced for Task ${currentTaskId}`, 'success', 2000);
+    }
+  }, [currentTaskId, files.length, showToast]);
 
   const targetSeries = useMemo<SeriesData[]>(() => {
     if (files.length === 0) return [];
@@ -50,6 +59,7 @@ export const GraphPage: React.FC = () => {
   }, [files, selectedFileId, currentTaskId]);
 
   const handleExportPng = () => {
+    showToast("Generating high-res PNG export...", "info", 1400);
     setExportCounter((c) => c + 1);
   };
 
@@ -58,6 +68,7 @@ export const GraphPage: React.FC = () => {
     a.href = blobUrl;
     a.download = `gnss_chart_${currentTask.title.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}.png`;
     a.click();
+    showToast("Plot exported as PNG", "success", 2200);
   };
 
   return (

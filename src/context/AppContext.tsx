@@ -450,10 +450,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
         "info",
         "developer",
       );
+      showToast("Authenticating with backend...", "info", 1500);
       const result = await backendService.verifyDevPassword(trimmed);
 
       if (result.authenticated) {
         setIsDevAuthenticated(true);
+        showToast("Developer verified by backend", "success", 2600);
         addLog(
           "Developer authentication verified: access granted.",
           "success",
@@ -466,8 +468,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
         const cachedDevKey = cookieService.get("dev_custom_key");
         if (trimmed === "123123123" || (cachedDevKey && trimmed === cachedDevKey)) {
           setIsDevAuthenticated(true);
+          showToast("Developer verified by backend", "success", 2600);
           addLog(
-            "Developer authentication verified via local security vault: access granted.",
+            "Developer authentication verified via security vault: access granted.",
             "success",
             "developer",
           );
@@ -477,6 +480,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
             message: "Developer authenticated via security vault.",
           };
         }
+        showToast("Invalid developer credentials", "error", 3000);
         addLog(
           `Developer authentication failed: ${result.message}`,
           "warn",
@@ -490,6 +494,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
         };
       }
 
+      showToast(result.message || "Invalid developer credentials", "error", 3000);
       addLog(
         `Developer authentication rejected: ${result.message}`,
         "error",
@@ -501,7 +506,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
         message: result.message || "Invalid developer credentials.",
       };
     },
-    [addLog],
+    [addLog, showToast],
   );
 
   const flushRamCache = useCallback(() => {
@@ -605,7 +610,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
         "ingestion",
       );
 
-      showToast(`Loading ${filename}...`, "info", 1600);
+      showToast(`Streaming ${filename} to backend...`, "info", 1800);
 
       try {
         const parsedFile = await uploadAndIngestGnssFile(
@@ -614,12 +619,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
           (pct, status) => {
             setProcessingProgress(pct);
             setProcessingStatus(status);
+            if (pct === 50) {
+              showToast(`Backend parsing ${filename}...`, "info", 1600);
+            }
           },
         );
 
         setFiles((prev) => [...prev, parsedFile]);
         setSelectedFileId(parsedFile.id);
-        const successMsg = `Parsed ${filename} (${(parsedFile.totalSentences || 0).toLocaleString()} lines)`;
+        const successMsg = `Backend parsed ${filename} (${(parsedFile.totalSentences || 0).toLocaleString()} lines)`;
         showToast(successMsg, "success", 2800);
         addLog(
           `Parsed ${filename}: ${(parsedFile.totalSentences || 0).toLocaleString()} sentences indexed`,
@@ -627,7 +635,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
           "ingestion",
         );
       } catch (err: any) {
-        const errorMsg = `Ingestion error: ${err?.message || "Upload failed"}`;
+        const errorMsg = `Backend ingestion failed: ${err?.message || "Upload failed"}`;
         showToast(errorMsg, "error", 3500);
         addLog(
           `File ingestion error for ${filename}: ${err?.message || "Failed to ingest file"}`,
@@ -710,6 +718,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
         setBatchSize(res.params.batchSize);
         setRetentionWindow(res.params.retentionWindow);
         setWorkerCount(res.params.workerCount);
+        if (res.success && res.source === 'backend') {
+          showToast("Engine parameters synced from backend", "success", 2400);
+        }
         addLog(
           `Engine tuning settings synchronized: batchSize=${res.params.batchSize.toLocaleString()} lines, retentionWindow=${res.params.retentionWindow} days, workerCount=${res.params.workerCount} (${res.source})`,
           res.success ? "success" : "info",
@@ -725,9 +736,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
     } finally {
       setIsSyncingEngine(false);
     }
-  }, [addLog]);
+  }, [addLog, showToast]);
 
-  const pingBackend = useCallback(async (notify = false): Promise<boolean> => {
+  const pingBackend = useCallback(async (notify = true): Promise<boolean> => {
     setIsCheckingBackend(true);
     setBackendStatus((prev) => (prev === "online" ? "online" : "checking"));
 
@@ -740,7 +751,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
 
     if (result.online) {
       if (notify) {
-        showToast(`Backend online (${result.latencyMs}ms)`, "success", 2400);
+        showToast(`Backend connected (${result.latencyMs}ms)`, "success", 2400);
       }
       addLog(
         `Backend ping check: ONLINE (${result.latencyMs}ms) at ${result.url}`,
@@ -752,7 +763,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
       syncEngineTuning();
     } else {
       if (notify) {
-        showToast(`Backend offline (${result.error || "unreachable"})`, "error", 3500);
+        showToast(`Backend unreachable (${result.error || "offline"})`, "error", 3500);
       }
       addLog(
         `Backend ping check: OFFLINE (${result.error}) at ${result.url}`,
