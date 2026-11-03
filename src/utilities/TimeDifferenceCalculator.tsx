@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Clock, Calculator, Calendar, RotateCcw, AlertCircle, CheckCircle2, Info } from 'lucide-react';
+import { Clock, Calculator, Calendar, RotateCcw, CheckCircle2, Info } from 'lucide-react';
 import { parseGnssTimeInput, ParsedGnssTime } from './timeParser';
+import { useApp } from '../context/AppContext';
 
 interface DiffResult {
   formattedDiff: string;
@@ -15,20 +16,19 @@ interface DiffResult {
 }
 
 export const TimeDifferenceCalculator: React.FC = () => {
+  const { showToast } = useApp();
   const [t1Input, setT1Input] = useState('');
   const [t2Input, setT2Input] = useState('');
   const [result, setResult] = useState<DiffResult | null>(null);
-  const [error, setError] = useState<string | null>(null);
 
   const calculateDiff = () => {
-    setError(null);
     if (!t1Input.trim()) {
-      setError('Please enter Start Time ( Time-1 )');
+      showToast('Please enter Start Time ( Time-1 )', 'error');
       setResult(null);
       return;
     }
     if (!t2Input.trim()) {
-      setError('Please enter End Time ( Time-2 )');
+      showToast('Please enter End Time ( Time-2 )', 'error');
       setResult(null);
       return;
     }
@@ -37,13 +37,13 @@ export const TimeDifferenceCalculator: React.FC = () => {
     const p2 = parseGnssTimeInput(t2Input);
 
     if (!p1.isValid) {
-      setError(`Start Time Error: ${p1.errorMessage || 'Invalid input'}`);
+      showToast(`Start Time Error: ${p1.errorMessage || 'Invalid input'}`, 'error');
       setResult(null);
       return;
     }
 
     if (!p2.isValid) {
-      setError(`End Time Error: ${p2.errorMessage || 'Invalid input'}`);
+      showToast(`End Time Error: ${p2.errorMessage || 'Invalid input'}`, 'error');
       setResult(null);
       return;
     }
@@ -75,6 +75,7 @@ export const TimeDifferenceCalculator: React.FC = () => {
         t2: p2,
         isDateCompared: true,
       });
+      showToast(`Calculated duration: ${parts.join(' ')}`, 'success');
     } else {
       const diffSec = Math.abs(p2.totalSecondsOfDay - p1.totalSecondsOfDay);
       const hours = Math.floor(diffSec / 3600);
@@ -97,6 +98,7 @@ export const TimeDifferenceCalculator: React.FC = () => {
         t2: p2,
         isDateCompared: false,
       });
+      showToast(`Calculated duration: ${parts.join(' ')}`, 'success');
     }
   };
 
@@ -104,7 +106,6 @@ export const TimeDifferenceCalculator: React.FC = () => {
     setT1Input('');
     setT2Input('');
     setResult(null);
-    setError(null);
   };
 
   return (
@@ -195,14 +196,6 @@ export const TimeDifferenceCalculator: React.FC = () => {
           <span>Calculate Time Difference</span>
         </button>
       </div>
-
-      {/* Error state */}
-      {error && (
-        <div className="p-3.5 rounded-xl bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/40 text-red-700 dark:text-red-300 text-xs font-mono flex items-center space-x-2">
-          <AlertCircle className="w-4 h-4 shrink-0" />
-          <span>{error}</span>
-        </div>
-      )}
 
       {/* Results Display */}
       {result && (

@@ -24,12 +24,12 @@ export const DeveloperPage: React.FC = () => {
     authenticateDev,
     logoutDeveloper,
     navigateToFilePage,
+    showToast,
   } = useApp();
 
   // Authentication Screen State
   const [authPasswordInput, setAuthPasswordInput] = useState<string>("");
   const [showPassword, setShowPassword] = useState<boolean>(false);
-  const [authError, setAuthError] = useState<string | null>(null);
   const [isVerifyingAuth, setIsVerifyingAuth] = useState<boolean>(false);
 
   // Authenticated Workspace State (4 tabs)
@@ -40,23 +40,22 @@ export const DeveloperPage: React.FC = () => {
     if (e) e.preventDefault();
     const trimmed = authPasswordInput.trim();
     if (!trimmed) {
-      setAuthError("Please enter the developer password.");
+      showToast("Please enter the developer password.", "error");
       return;
     }
 
     setIsVerifyingAuth(true);
-    setAuthError(null);
 
     try {
       const result = await authenticateDev(trimmed);
       if (!result.success) {
-        setAuthError(result.message || "Invalid credentials.");
+        showToast(result.message || "Invalid developer credentials.", "error");
       } else {
         setAuthPasswordInput("");
-        setAuthError(null);
+        showToast("Developer authentication verified. Access granted.", "success");
       }
     } catch (err: any) {
-      setAuthError(err?.message || "Authentication request failed.");
+      showToast(err?.message || "Authentication request failed.", "error");
     } finally {
       setIsVerifyingAuth(false);
     }
@@ -111,13 +110,6 @@ export const DeveloperPage: React.FC = () => {
                 </button>
               </div>
             </div>
-
-            {authError && (
-              <div className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 text-rose-700 dark:text-rose-400 text-xs flex items-start space-x-2.5 animate-in fade-in duration-150">
-                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                <span className="leading-relaxed font-mono">{authError}</span>
-              </div>
-            )}
 
             <button
               type="submit"

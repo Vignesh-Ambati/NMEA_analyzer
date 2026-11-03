@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { ArrowRightLeft, Sparkles, Copy, Check, RotateCcw, AlertCircle, Info } from 'lucide-react';
+import { ArrowRightLeft, Sparkles, Copy, Check, RotateCcw, Info } from 'lucide-react';
 import { parseGnssTimeInput, ParsedGnssTime } from './timeParser';
+import { useApp } from '../context/AppContext';
 
 interface ConvertResult {
   direction: 'utc_to_ist' | 'ist_to_utc';
@@ -14,23 +15,22 @@ interface ConvertResult {
 }
 
 export const UtcIstConverter: React.FC = () => {
+  const { showToast } = useApp();
   const [direction, setDirection] = useState<'utc_to_ist' | 'ist_to_utc'>('utc_to_ist');
   const [inputVal, setInputVal] = useState('');
   const [result, setResult] = useState<ConvertResult | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
   const convertTime = () => {
-    setError(null);
     if (!inputVal.trim()) {
-      setError(`Please enter a valid GNSS timestamp to convert`);
+      showToast('Please enter a valid GNSS timestamp to convert', 'error');
       setResult(null);
       return;
     }
 
     const parsed = parseGnssTimeInput(inputVal);
     if (!parsed.isValid) {
-      setError(parsed.errorMessage || 'Invalid GNSS time format');
+      showToast(parsed.errorMessage || 'Invalid GNSS time format', 'error');
       setResult(null);
       return;
     }
@@ -113,13 +113,13 @@ export const UtcIstConverter: React.FC = () => {
   const handleReset = () => {
     setInputVal('');
     setResult(null);
-    setError(null);
   };
 
   const handleCopyTarget = () => {
     if (!result) return;
     navigator.clipboard.writeText(result.targetFullNmea);
     setCopied(true);
+    showToast('Converted timestamp copied to clipboard!', 'success');
     setTimeout(() => setCopied(false), 2000);
   };
 
@@ -225,14 +225,6 @@ export const UtcIstConverter: React.FC = () => {
           <span>Reset</span>
         </button>
       </div>
-
-      {/* Error Message */}
-      {error && (
-        <div className="p-3.5 rounded-xl bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/40 text-red-700 dark:text-red-300 text-xs font-mono flex items-center space-x-2">
-          <AlertCircle className="w-4 h-4 shrink-0" />
-          <span>{error}</span>
-        </div>
-      )}
 
       {/* Results Card */}
       {result && (

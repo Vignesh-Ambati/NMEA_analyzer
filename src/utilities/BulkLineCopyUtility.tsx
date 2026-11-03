@@ -45,7 +45,7 @@ const DEFAULT_TARGET_EXPR = "^ERROR|FATAL";
 const DEFAULT_SOURCE_PATH = "C:\\logs\\massive_file.log";
 
 export const BulkLineCopyUtility: React.FC = () => {
-  const { files: appLoadedFiles, batchSize } = useApp();
+  const { files: appLoadedFiles, batchSize, showToast } = useApp();
 
   // Mode: File Stream vs Raw Data Paste
   const [inputMode, setInputMode] = useState<"file" | "raw">("file");
@@ -215,13 +215,14 @@ export const BulkLineCopyUtility: React.FC = () => {
     setSaveSuccessMsg(null);
 
     if (inputMode === "file" && !selectedFile && !sourcePath.trim()) {
-      setError(
-        "Please select or specify a source log file (e.g., massive_file.log) to execute.",
+      showToast(
+        "Please select or specify a source log file to execute.",
+        "error",
       );
       return;
     }
     if (inputMode === "raw" && !rawText.trim()) {
-      setError('Please paste raw text or click "Sample Data" to process.');
+      showToast('Please paste raw text or click "Sample Data" to process.', "error");
       return;
     }
 
@@ -257,18 +258,26 @@ export const BulkLineCopyUtility: React.FC = () => {
     };
 
     try {
+      showToast("Extraction engine initialized. Streaming data...", "info");
       const finalJob = await startExtractionJob(request, (updated) => {
         setActiveJob(updated);
       });
       setActiveJob(finalJob);
+      if (finalJob.status === "completed") {
+        showToast(
+          `Extraction complete: ${finalJob.linesExtracted.toLocaleString()} lines extracted.`,
+          "success",
+        );
+      }
     } catch (err: any) {
-      setError(err?.message || "Extraction execution failed");
+      showToast(err?.message || "Extraction execution failed", "error");
     }
   };
 
   const handleCancel = async () => {
     if (activeJob.jobId) {
       await cancelExtractionJob(activeJob.jobId);
+      showToast("Extraction cancelled", "warn", 2000);
     }
   };
 
@@ -320,6 +329,7 @@ export const BulkLineCopyUtility: React.FC = () => {
     if (!content) return;
     navigator.clipboard.writeText(content);
     setCopied(true);
+    showToast("Extracted lines copied to clipboard!", "success");
     setTimeout(() => setCopied(false), 2000);
   };
 
@@ -338,8 +348,9 @@ export const BulkLineCopyUtility: React.FC = () => {
     });
 
     if (res.success) {
-      setSaveSuccessMsg(`File committed successfully to ${res.filePath}`);
-      setTimeout(() => setSaveSuccessMsg(null), 5000);
+      showToast(`File committed successfully to ${res.filePath}`, "success");
+    } else {
+      showToast(res.message || "Failed to commit file", "error");
     }
   };
 
@@ -358,8 +369,9 @@ export const BulkLineCopyUtility: React.FC = () => {
 
     setShowSaveAsModal(false);
     if (res.success) {
-      setSaveSuccessMsg(`Saved as ${res.filePath}`);
-      setTimeout(() => setSaveSuccessMsg(null), 5000);
+      showToast(`Saved as ${res.filePath}`, "success");
+    } else {
+      showToast(res.message || "Failed to save file", "error");
     }
   };
 
@@ -494,31 +506,6 @@ export const BulkLineCopyUtility: React.FC = () => {
         onChange={handleFileChange}
         className="hidden"
       />
-
-      {/* Save Success Notice Banner */}
-      {saveSuccessMsg && (
-        <div className="p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 text-xs font-mono flex items-center space-x-2 animate-in fade-in duration-150">
-          <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-          <span>{saveSuccessMsg}</span>
-        </div>
-      )}
-
-      {/* Error Banner */}
-      {error && (
-        <div className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50 text-rose-700 dark:text-rose-300 text-xs font-mono flex items-center justify-between animate-in fade-in duration-150">
-          <div className="flex items-center space-x-2.5">
-            <AlertCircle className="w-4 h-4 shrink-0 text-rose-500" />
-            <span>{error}</span>
-          </div>
-          <button
-            type="button"
-            onClick={() => setError(null)}
-            className="text-rose-400 hover:text-rose-600 p-1 cursor-pointer"
-          >
-            <X className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      )}
 
       {/* MAIN WORKSPACE: 2-Column Split (Configuration + Live Temp File Sidebar) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">

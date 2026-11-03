@@ -13,7 +13,7 @@ import { useApp } from "../../../context/AppContext";
 import { backendService } from "../../../backend";
 
 export const SecurityTab: React.FC = () => {
-  const { logoutDeveloper, addLog } = useApp();
+  const { logoutDeveloper, addLog, showToast } = useApp();
 
   const [currentPassword, setCurrentPassword] = useState<string>("");
   const [newPassword, setNewPassword] = useState<string>("");
@@ -24,30 +24,26 @@ export const SecurityTab: React.FC = () => {
   const [showConfirm, setShowConfirm] = useState<boolean>(false);
 
   const [isUpdating, setIsUpdating] = useState<boolean>(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setErrorMessage(null);
-    setSuccessMessage(null);
 
     const trimmedNew = newPassword.trim();
     const trimmedConfirm = confirmPassword.trim();
     const trimmedCurrent = currentPassword.trim();
 
     if (!trimmedNew) {
-      setErrorMessage("Please enter a new password.");
+      showToast("Please enter a new password.", "error");
       return;
     }
 
     if (trimmedNew.length < 6) {
-      setErrorMessage("New password must be at least 6 characters long.");
+      showToast("New password must be at least 6 characters long.", "error");
       return;
     }
 
     if (trimmedNew !== trimmedConfirm) {
-      setErrorMessage("New password and confirmation do not match.");
+      showToast("New password and confirmation do not match.", "error");
       return;
     }
 
@@ -59,8 +55,9 @@ export const SecurityTab: React.FC = () => {
       });
 
       if (result.success) {
-        setSuccessMessage(
+        showToast(
           result.message || "Developer password updated in backend database.",
+          "success",
         );
         setCurrentPassword("");
         setNewPassword("");
@@ -71,8 +68,9 @@ export const SecurityTab: React.FC = () => {
           "developer",
         );
       } else {
-        setErrorMessage(
+        showToast(
           result.message || "Failed to update password in backend database.",
+          "error",
         );
         addLog(
           `Password update failed: ${result.message}`,
@@ -84,7 +82,7 @@ export const SecurityTab: React.FC = () => {
       const msg =
         err?.message ||
         "Network request failed. Is the backend server running?";
-      setErrorMessage(msg);
+      showToast(msg, "error");
       addLog(`Password update network failure: ${msg}`, "error", "developer");
     } finally {
       setIsUpdating(false);
@@ -109,24 +107,6 @@ export const SecurityTab: React.FC = () => {
                   Update the password
                 </p>
               </div>
-
-              {errorMessage && (
-                <div className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 text-rose-700 dark:text-rose-400 text-xs flex items-start space-x-2.5 animate-in fade-in duration-150">
-                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                  <span className="leading-relaxed font-mono">
-                    {errorMessage}
-                  </span>
-                </div>
-              )}
-
-              {successMessage && (
-                <div className="p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/60 text-emerald-800 dark:text-emerald-300 text-xs flex items-start space-x-2.5 animate-in fade-in duration-150">
-                  <Check className="w-4 h-4 shrink-0 mt-0.5 text-emerald-600 dark:text-emerald-400" />
-                  <span className="leading-relaxed font-mono">
-                    {successMessage}
-                  </span>
-                </div>
-              )}
 
               <form
                 onSubmit={handlePasswordSubmit}

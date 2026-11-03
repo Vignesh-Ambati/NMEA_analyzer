@@ -35,23 +35,11 @@ export const MiscTab: React.FC = () => {
     lastBackendPingTime,
     backendLatencyMs,
     pingBackend,
+    showToast,
   } = useApp();
 
   const [showMemoryCard, setShowMemoryCard] = React.useState(true);
   const [showBackendCard, setShowBackendCard] = React.useState(true);
-
-  const [lastRamFlush, setLastRamFlush] = React.useState<{
-    time: string;
-    logsFreed: number;
-    filesFreed: number;
-    jobsReset: number;
-  } | null>(null);
-
-  const [lastStoragePurge, setLastStoragePurge] = React.useState<{
-    time: string;
-    cookiesCleared: number;
-    localStorageKeysCleared: number;
-  } | null>(null);
 
   // Live storage counters
   const [storageStats, setStorageStats] = React.useState<{
@@ -80,17 +68,15 @@ export const MiscTab: React.FC = () => {
 
   React.useEffect(() => {
     refreshStorageStats();
-  }, [refreshStorageStats, lastStoragePurge]);
+  }, [refreshStorageStats]);
 
   const handleFlushRam = () => {
     addLog("Executing thorough Flush RAM action...", "info", "system");
     const result = flushRamCache();
-    setLastRamFlush({
-      time: new Date().toLocaleTimeString(),
-      logsFreed: result?.logsFreed ?? logs.length,
-      filesFreed: result?.filesFreed ?? files.length,
-      jobsReset: result?.jobsReset ?? activeJobs.length,
-    });
+    showToast(
+      `UI RAM flushed: ${result?.logsFreed ?? logs.length} logs & ${result?.filesFreed ?? files.length} datasets freed`,
+      "success",
+    );
   };
 
   const handlePurgeStorage = () => {
@@ -100,12 +86,11 @@ export const MiscTab: React.FC = () => {
       "system",
     );
     const result = purgeClientStorage();
-    setLastStoragePurge({
-      time: new Date().toLocaleTimeString(),
-      cookiesCleared: result.cookiesRemoved,
-      localStorageKeysCleared: result.localStorageKeysRemoved,
-    });
     refreshStorageStats();
+    showToast(
+      `Client storage purged: cleared ${result.cookiesRemoved} cookies & ${result.localStorageKeysRemoved} local storage keys`,
+      "success",
+    );
   };
 
   return (
@@ -182,16 +167,6 @@ export const MiscTab: React.FC = () => {
                   </span>
                 </div>
               </div>
-
-              {lastRamFlush && (
-                <div className="p-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/50 text-[11px] font-mono text-emerald-800 dark:text-emerald-300 flex items-center space-x-2">
-                  <Check className="w-3.5 h-3.5 shrink-0" />
-                  <span>
-                    Flushed at {lastRamFlush.time}: {lastRamFlush.logsFreed}{" "}
-                    logs, {lastRamFlush.filesFreed} files.
-                  </span>
-                </div>
-              )}
             </div>
 
             {/* Purge Client Storages Card */}
@@ -239,16 +214,6 @@ export const MiscTab: React.FC = () => {
                   </span>
                 </div>
               </div>
-
-              {lastStoragePurge && (
-                <div className="p-2.5 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800/50 text-[11px] font-mono text-rose-800 dark:text-rose-300 flex items-center space-x-2">
-                  <Check className="w-3.5 h-3.5 shrink-0" />
-                  <span>
-                    Cleared {lastStoragePurge.cookiesCleared} cookies and{" "}
-                    {lastStoragePurge.localStorageKeysCleared} local keys.
-                  </span>
-                </div>
-              )}
             </div>
           </div>
         )}

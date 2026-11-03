@@ -15,6 +15,8 @@ import {
   syncEngineTuningSettings,
   saveCachedEngineParams,
   getCachedEngineParams,
+  notificationService,
+  AppNotification,
 } from "../services";
 import {
   checkBackendHealth,
@@ -120,6 +122,9 @@ interface AppContextType {
   devUnlocked: boolean;
   registerDevSecretClick: () => void;
   devToastMessage: string | null;
+  activeToast: AppNotification | null;
+  showToast: (message: string, type?: "info" | "success" | "error" | "warn", durationMs?: number) => void;
+  dismissToast: (id?: string) => void;
 
   hasProceededToTasks: boolean;
   proceedToTaskMatrix: () => void;
@@ -196,7 +201,32 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
   const [devUnlocked, setDevUnlocked] = useState<boolean>(false);
   const [devClickCount, setDevClickCount] = useState<number>(0);
   const [devToastMessage, setDevToastMessage] = useState<string | null>(null);
+  const [activeToast, setActiveToast] = useState<AppNotification | null>(() =>
+    notificationService.getActive(),
+  );
   const clickTimeoutRef = React.useRef<any>(null);
+
+  useEffect(() => {
+    const unsub = notificationService.subscribe((notif) => {
+      setActiveToast(notif);
+    });
+    return unsub;
+  }, []);
+
+  const showToast = useCallback(
+    (
+      message: string,
+      type: "info" | "success" | "error" | "warn" = "info",
+      durationMs: number = 3000,
+    ) => {
+      notificationService.show(message, type, durationMs);
+    },
+    [],
+  );
+
+  const dismissToast = useCallback((id?: string) => {
+    notificationService.dismiss(id);
+  }, []);
 
   const registerDevSecretClick = useCallback(() => {
     logger.developer(
@@ -204,6 +234,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
       "debug",
     );
     if (devUnlocked) {
+      notificationService.info("Developer Suite is already unlocked!", 2500);
       setDevToastMessage("Developer Suite is already unlocked!");
       logger.developer(
         "Developer suite already unlocked; secret click ignored",
@@ -223,16 +254,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
 
       const remaining = 7 - next;
       if (remaining > 0 && remaining <= 4) {
-        setDevToastMessage(
-          `You are ${remaining} tap${remaining > 1 ? "s" : ""} away from Developer Suite.`,
-        );
+        const msg = `You are ${remaining} tap${remaining > 1 ? "s" : ""} away from Developer Suite.`;
+        notificationService.info(msg, 2500);
+        setDevToastMessage(msg);
         logger.developer(
           `Developer unlock sequence progress: ${next}/7`,
           "debug",
         );
       } else if (remaining <= 0) {
         setDevUnlocked(true);
-        setDevToastMessage("🎉 Developer Suite Unlocked!");
+        const msg = "🎉 Developer Suite Unlocked!";
+        notificationService.success(msg, 4000);
+        setDevToastMessage(msg);
         logger.developer(
           "Developer suite unlocked via secret-click sequence",
           "success",
@@ -248,7 +281,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
     logger.developer("Developer logout requested from UI context", "info");
     setIsDevAuthenticated(false);
     setDevUnlocked(false);
-    setDevToastMessage("🔒 Developer Suite locked & hidden.");
+    const msg = "🔒 Developer Suite locked & hidden.";
+    notificationService.warn(msg, 3000);
+    setDevToastMessage(msg);
     setTimeout(() => setDevToastMessage(null), 3000);
     setCurrentPage((prev) => (prev === "developer" ? "file" : prev));
   }, []);
@@ -556,6 +591,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
         "ingestion",
       );
 
+      showToast(`Uploading ${filename}...`, "info", 1600);
+
       try {
         const parsedFile = await uploadAndIngestGnssFile(
           file,
@@ -568,12 +605,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
 
         setFiles((prev) => [...prev, parsedFile]);
         setSelectedFileId(parsedFile.id);
+        const successMsg = `Parsed ${filename} (${(parsedFile.totalSentences || 0).toLocaleString()} lines)`;
+        showToast(successMsg, "success", 2800);
         addLog(
           `Backend parsed ${filename}: ${(parsedFile.totalSentences || 0).toLocaleString()} sentences processed with zero browser memory overhead`,
           "success",
           "ingestion",
         );
       } catch (err: any) {
+        const errorMsg = `Ingestion error: ${err?.message || "Upload failed"}`;
+        showToast(errorMsg, "error", 3500);
         addLog(
           `File ingestion error for ${filename}: ${err?.message || "Failed to ingest file"}`,
           "error",
@@ -585,7 +626,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
         setProcessingStatus("Ready");
       }
     },
-    [addLog, batchSize],
+    [addLog, batchSize, showToast],
   );
 
   const removeFile = useCallback(
@@ -599,17 +640,19 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
         }
         return remaining;
       });
+      showToast("Dataset removed from workspace", "info");
       addLog(`Dataset ${id} removed from workspace`, "info", "ingestion");
     },
-    [addLog, selectedFileId],
+    [addLog, selectedFileId, showToast],
   );
 
   const clearFiles = useCallback(() => {
     logger.system("All workspace datasets cleared by user action");
     setFiles([]);
     setSelectedFileId("Combined");
+    showToast("All datasets cleared from workspace", "info");
     addLog("All files cleared from workspace.", "info");
-  }, [addLog]);
+  }, [addLog, showToast]);
 
   const navigateToFilePage = useCallback(() => {
     logger.system("Navigation: File page selected");
@@ -682,6 +725,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
     setBackendLatencyMs(result.latencyMs);
 
     if (result.online) {
+      showToast(`Backend online (${result.latencyMs}ms)`, "success", 2400);
       addLog(
         `Backend ping check: ONLINE (${result.latencyMs}ms) at ${result.url}`,
         "success",
@@ -691,6 +735,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
       // Synchronize engine tuning parameters whenever backend sync confirms online status
       syncEngineTuning();
     } else {
+      showToast(`Backend offline (${result.error || "unreachable"})`, "error", 3500);
       addLog(
         `Backend ping check: OFFLINE (${result.error}) at ${result.url}`,
         "warn",
@@ -822,6 +867,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
         devUnlocked,
         registerDevSecretClick,
         devToastMessage,
+        activeToast,
+        showToast,
+        dismissToast,
         hasProceededToTasks: files.length > 0,
         proceedToTaskMatrix: navigateToTaskPage,
 

@@ -9,3 +9,4 @@ export * from "./cookieService";
 export * from "./extractionService";
 export * from "./ingestionService";
 export * from "./engineTuningService";
+export * from "./notificationService";

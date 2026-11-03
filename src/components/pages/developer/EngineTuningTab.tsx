@@ -20,6 +20,7 @@ export const EngineTuningTab: React.FC = () => {
     workerCount,
     setWorkerCount,
     addLog,
+    showToast,
   } = useApp();
 
   const initialFetchRef = useRef(false);
@@ -29,10 +30,6 @@ export const EngineTuningTab: React.FC = () => {
     useState<EngineTuningParams | null>(null);
   const [isFetching, setIsFetching] = useState<boolean>(false);
   const [isCommitting, setIsCommitting] = useState<boolean>(false);
-  const [statusMessage, setStatusMessage] = useState<{
-    type: "success" | "error" | "info";
-    text: string;
-  } | null>(null);
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
 
   // Check if current UI slider values differ from committed backend values
@@ -53,14 +50,6 @@ export const EngineTuningTab: React.FC = () => {
       try {
         while (attempt < maxAttempts) {
           attempt += 1;
-          setStatusMessage(
-            attempt === 1
-              ? null
-              : {
-                  type: "info",
-                  text: `Retrying engine parameters fetch (${attempt}/${maxAttempts})...`,
-                },
-          );
 
           try {
             const result = await backendService.fetchEngineParams();
@@ -74,12 +63,12 @@ export const EngineTuningTab: React.FC = () => {
                   ? new Date(result.data.updatedAt).toLocaleTimeString()
                   : new Date().toLocaleTimeString(),
               );
-              setStatusMessage({
-                type: "success",
-                text: isInitial
+              showToast(
+                isInitial
                   ? "Synchronized engine parameters with backend database."
                   : "Engine parameters reloaded from database.",
-              });
+                "success",
+              );
               return;
             }
 
@@ -90,12 +79,11 @@ export const EngineTuningTab: React.FC = () => {
               continue;
             }
 
-            setStatusMessage({
-              type: "info",
-              text:
-                result.message ||
+            showToast(
+              result.message ||
                 "Backend DB params not found. Operating with session parameters.",
-            });
+              "info",
+            );
             return;
           } catch (err: any) {
             const errorMessage =
@@ -108,10 +96,7 @@ export const EngineTuningTab: React.FC = () => {
               continue;
             }
 
-            setStatusMessage({
-              type: "error",
-              text: errorMessage,
-            });
+            showToast(errorMessage, "error");
             return;
           }
         }
@@ -119,7 +104,7 @@ export const EngineTuningTab: React.FC = () => {
         setIsFetching(false);
       }
     },
-    [setBatchSize, setRetentionWindow, setWorkerCount],
+    [setBatchSize, setRetentionWindow, setWorkerCount, showToast],
   );
 
   useEffect(() => {
@@ -131,7 +116,6 @@ export const EngineTuningTab: React.FC = () => {
   // Commit tuning parameters to backend DB
   const handleCommitToBackend = async () => {
     setIsCommitting(true);
-    setStatusMessage(null);
     const paramsToCommit: EngineTuningParams = {
       batchSize,
       retentionWindow,
@@ -143,22 +127,20 @@ export const EngineTuningTab: React.FC = () => {
       if (result.success) {
         setCommittedParams(paramsToCommit);
         setLastSyncedAt(new Date().toLocaleTimeString());
-        setStatusMessage({
-          type: "success",
-          text: result.message || "Tuning parameters committed to database.",
-        });
+        showToast(
+          result.message || "Tuning parameters committed to database.",
+          "success",
+        );
         addLog(
           `Engine parameters committed to backend DB: batchSize=${batchSize.toLocaleString()} lines, retentionWindow=${retentionWindow} days, concurrentWorkers=${workerCount} cores`,
           "success",
           "developer",
         );
       } else {
-        setStatusMessage({
-          type: "error",
-          text:
-            result.message ||
-            "Failed to commit parameters to backend database.",
-        });
+        showToast(
+          result.message || "Failed to commit parameters to backend database.",
+          "error",
+        );
         addLog(
           `Failed to commit engine params: ${result.message}`,
           "error",
@@ -168,10 +150,7 @@ export const EngineTuningTab: React.FC = () => {
     } catch (err: any) {
       const msg =
         err?.message || "Network error while saving parameters to database.";
-      setStatusMessage({
-        type: "error",
-        text: msg,
-      });
+      showToast(msg, "error");
       addLog(`Commit error: ${msg}`, "error", "developer");
     } finally {
       setIsCommitting(false);
@@ -258,28 +237,6 @@ export const EngineTuningTab: React.FC = () => {
             </span>
           </div>
         </div>
-
-        {/* Status Alert Banner */}
-        {statusMessage && (
-          <div
-            className={`p-3.5 rounded-xl text-xs flex items-start space-x-2.5 animate-in fade-in duration-150 border ${
-              statusMessage.type === "success"
-                ? "bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800/60 text-emerald-800 dark:text-emerald-300"
-                : statusMessage.type === "error"
-                  ? "bg-rose-50 dark:bg-rose-950/30 border-rose-200 dark:border-rose-800/60 text-rose-800 dark:text-rose-300"
-                  : "bg-sky-50 dark:bg-sky-950/30 border-sky-200 dark:border-sky-800/60 text-sky-800 dark:text-sky-300"
-            }`}
-          >
-            {statusMessage.type === "success" ? (
-              <Check className="w-4 h-4 shrink-0 mt-0.5" />
-            ) : (
-              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-            )}
-            <span className="leading-relaxed font-mono">
-              {statusMessage.text}
-            </span>
-          </div>
-        )}
 
         {/* Tuning Controls Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
