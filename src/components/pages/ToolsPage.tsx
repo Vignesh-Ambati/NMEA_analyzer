@@ -54,7 +54,11 @@ export const ToolsPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<"all" | UtilityId>("all");
 
   return (
-    <div className="flex-1 overflow-y-auto p-3 sm:p-5 md:p-6 space-y-4 sm:space-y-6 max-w-6xl mx-auto w-full select-none">
+    <div
+      className={`flex-1 overflow-y-auto p-3 sm:p-5 md:p-6 space-y-4 sm:space-y-6 mx-auto w-full select-none transition-[max-width] duration-200 ${
+        activeTab === "linecopy" ? "max-w-7xl" : "max-w-6xl"
+      }`}
+    >
       {/* Top Header Card */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-[#E6E1D6] dark:border-slate-800">
         <div>

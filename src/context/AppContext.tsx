@@ -335,22 +335,29 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
   );
 
   useEffect(() => {
+    let active = true;
     const unsubscribe = logger.subscribe((entry) => {
-      setLogs((prev) => [
-        ...prev.slice(-500),
-        {
-          id: entry.id,
-          timestamp: entry.timestamp,
-          text: entry.message,
-          level: entry.level,
-          stage: entry.stage,
-          source: entry.source,
-          details: entry.details,
-          durationMs: entry.durationMs,
-        },
-      ]);
+      queueMicrotask(() => {
+        if (!active) return;
+        setLogs((prev) => [
+          ...prev.slice(-500),
+          {
+            id: entry.id,
+            timestamp: entry.timestamp,
+            text: entry.message,
+            level: entry.level,
+            stage: entry.stage,
+            source: entry.source,
+            details: entry.details,
+            durationMs: entry.durationMs,
+          },
+        ]);
+      });
     });
-    return unsubscribe;
+    return () => {
+      active = false;
+      unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
